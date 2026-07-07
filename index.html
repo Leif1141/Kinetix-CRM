@@ -322,6 +322,28 @@ function showApp(user){
 // ═══════════════════════════════════════════════════════════════
 // FIREBASE REALTIME DB
 // ═══════════════════════════════════════════════════════════════
+// Firebase key sanitization — dots/$/#/[/] are illegal in RTDB keys
+function fbEncode(obj){
+  if(obj===null||obj===undefined||typeof obj!=='object')return obj;
+  if(Array.isArray(obj))return obj.map(fbEncode);
+  const out={};
+  for(const[k,v]of Object.entries(obj)){
+    const ek=k.replace(/\./g,'__dot__').replace(/\$/g,'__dlr__').replace(/#/g,'__hash__').replace(/\[/g,'__lb__').replace(/\]/g,'__rb__');
+    out[ek]=fbEncode(v);
+  }
+  return out;
+}
+function fbDecode(obj){
+  if(obj===null||obj===undefined||typeof obj!=='object')return obj;
+  if(Array.isArray(obj))return obj.map(fbDecode);
+  const out={};
+  for(const[k,v]of Object.entries(obj)){
+    const dk=k.replace(/__dot__/g,'.').replace(/__dlr__/g,'$').replace(/__hash__/g,'#').replace(/__lb__/g,'[').replace(/__rb__/g,']');
+    out[dk]=fbDecode(v);
+  }
+  return out;
+}
+
 function startListening(){
   if(_listenActive)return;
   _listenActive=true;
@@ -331,9 +353,9 @@ function startListening(){
     if(!data){
       S=buildInitialState();
       _saving=true;
-      stateRef.set(S);
+      stateRef.set(fbEncode(S));
     } else {
-      S=data;
+      S=fbDecode(data);
       // ensure arrays exist (Firebase drops empty arrays)
       S.companies=S.companies||[];
       S.advisors=S.advisors||[];
@@ -350,7 +372,7 @@ function startListening(){
 function save(){
   if(!stateRef)return;
   _saving=true;
-  stateRef.set(S);
+  stateRef.set(fbEncode(S));
 }
 
 // Debounced save for rapid edits
@@ -788,7 +810,7 @@ function exportJSON(){
 function importJSON(ev){
   const f=ev.target.files[0];if(!f)return;
   const rd=new FileReader();
-  rd.onload=e=>{try{const d=JSON.parse(e.target.result);S=d;save();renderAll();toast('Imported '+f.name)}catch(err){toast('Invalid JSON')}};
+  rd.onload=e=>{try{const d=JSON.parse(e.target.result);S=d;save();renderAll();toast('Imported '+f.name)}catch(err){toast('Import error: '+err.message)}};
   rd.readAsText(f);ev.target.value='';
 }
 
