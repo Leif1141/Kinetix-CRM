@@ -248,13 +248,13 @@ const FIREBASE_CONFIG = {
 };
 
 // Gmail API — create at console.cloud.google.com → APIs → Gmail API → OAuth 2.0 Client ID (Web)
-const GMAIL_CLIENT_ID = '';
+const GMAIL_CLIENT_ID = '237587368689-el02uv5n88eajgriee29q0jgms7vn8kr.apps.googleusercontent.com';
 // Microsoft Graph — register at portal.azure.com → App registrations → SPA redirect
-const AZURE_CLIENT_ID = '';
+const AZURE_CLIENT_ID = 'd15eea69-a75a-4022-bb50-7de0b6253e97';
 const AZURE_TENANT = 'common';
 
 // Allowed user emails (Firebase Auth). Leave empty = anyone can sign in.
-const ALLOWED_EMAILS = ['leif.berger26@gmail.com','tommy@kinetix-industries.com'];
+const ALLOWED_EMAILS = ['leif.berger26@gmail.com','tommy@kinetix-industries.com','leif@kinetixcap.com'];
 
 // ═══════════════════════════════════════════════════════════════
 // SEED DATA
@@ -991,13 +991,4 @@ if(initFirebase()){
       showApp(user);
     } else {
       document.getElementById('authScreen').style.display='flex';
-      document.getElementById('appScreen').style.display='none';
-    }
-  });
-} else {
-  document.getElementById('authScreen').style.display='flex';
-}
-</script>
-
-</body>
-</html>
+      document.getElementById('appScreen').sty
