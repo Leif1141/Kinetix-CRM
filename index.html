@@ -7,11 +7,11 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>h
 <script src="https://apis.google.com/js/api.js" async defer></script>
-<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js" crossorigin="anonymous"></script>
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/hmsal-browser.min.js" crossorigin="anonymous"></script>
 <script>window.msal=window.msal||{};if(!window.msal.PublicClientApplication){document.addEventListener('DOMContentLoaded',function(){if(!window.msal.PublicClientApplication){var s=document.createElement('script');s.src='https://unpkg.com/@azure/msal-browser@2.38.3/lib/msal-browser.min.js';document.head.appendChild(s)}})}</script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>h
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/charth.umd.js"></script>h
 <style>
 :root{color-scheme:light;--navy:#2E3C65;--navy2:#434F80;--deep:#112149;--red:#C00000;--amber:#FFC000;--lav:#A9A4C6;--sub:#CFD1E2;--gray:#595959;--lgray:#D3D3D2;--bg:#F8F8FA;--green:#2E7D32}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -634,9 +634,9 @@ function goList(l){goTab('orgs');document.getElementById('oList').value=l;render
 function renderOrgs(){
   const sel=document.getElementById('oStage');
   if(sel.options.length<3){STAGES.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o)});['Active','Inactive','Engaged','Paused'].forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o)})}
-  const lsel=document.getElementById('oList');
+  const lsel=document.getElementById('oList');const _lv=lsel.value;
   while(lsel.options.length>2)lsel.remove(2);
-  (S.customLists||[]).forEach(l=>{const o=document.createElement('option');o.value=l;o.textContent=l;lsel.appendChild(o)});
+  (S.customLists||[]).forEach(l=>{const o=document.createElement('option');o.value=l;o.textContent=l;lsel.appendChild(o)});if(_lv)lsel.value=_lv;
   const q=(document.getElementById('oSearch').value||'').toLowerCase();
   const kind=document.getElementById('oKind').value,stg=sel.value,list=lsel.value;
   let rows=allOrgs().filter(o=>
