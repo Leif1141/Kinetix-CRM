@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+h<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -11,7 +11,7 @@
 <script src="https://apis.google.com/js/api.js" async defer></script>
 <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js" crossorigin="anonymous"></script>
 <script>window.msal=window.msal||{};if(!window.msal.PublicClientApplication){document.addEventListener('DOMContentLoaded',function(){if(!window.msal.PublicClientApplication){var s=document.createElement('script');s.src='https://unpkg.com/@azure/msal-browser@2.38.3/lib/msal-browser.min.js';document.head.appendChild(s)}})}</script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>h
 <style>
 :root{color-scheme:light;--navy:#2E3C65;--navy2:#434F80;--deep:#112149;--red:#C00000;--amber:#FFC000;--lav:#A9A4C6;--sub:#CFD1E2;--gray:#595959;--lgray:#D3D3D2;--bg:#F8F8FA;--green:#2E7D32}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -437,7 +437,7 @@ function addTouch(rec,key,t){rec.touches=rec.touches||{};if(!rec.touches[key])re
 // ═══════════════════════════════════════════════════════════════
 // EMAIL MATCHING
 // ═══════════════════════════════════════════════════════════════
-function matchRecords(text,senderEmail){
+function matchRecords(text,senderEmail,strict){
   const out=[];const se=(senderEmail||'').toLowerCase();
   let hit=null;
   // try sender-map first
@@ -446,14 +446,14 @@ function matchRecords(text,senderEmail){
   if(!hit&&dom){const byDom=allOrgs().find(o=>(o.domain||'').toLowerCase()===dom||((o.email||'').split('@')[1]||'').toLowerCase()===dom);if(byDom)out.push(byDom)}
   const hay=normName(text);
   let bestLen=0;
-  if(!out.length)allOrgs().forEach(r=>{
+  if(!strict&&!out.length)allOrgs().forEach(r=>{
     const toks=nameTokens(dispName(r));
     if(!toks.length)return;
     const primary=toks[0];
-    if(primary.length>=4&&hay.includes(primary)){
+    if(primary.length>=5&&hay.includes(primary)){
       const total=toks.filter(t=>hay.includes(t)).length;
-      if(total>bestLen){bestLen=total;out.length=0;out.push(r)}
-      else if(total===bestLen&&!out.includes(r))out.push(r);
+      if(total>=2&&total>bestLen){bestLen=total;out.length=0;out.push(r)}
+      else if(total>=2&&total===bestLen&&!out.includes(r))out.push(r);
     }
   });
   // also match people via email
@@ -497,7 +497,7 @@ async function syncOutlookEmails(){
       const dir=MY_ADDR.some(a=>sAddr.includes(a))?'out':'in';
       const recipients=(msg.toRecipients||[]).map(r=>r.emailAddress?.address||'').filter(Boolean);
       const text=[msg.subject,msg.bodyPreview,...recipients].join(' ');
-      const recs=matchRecords(text,dir==='in'?sAddr:(recipients[0]||''));
+      const recs=matchRecords(text,dir==='in'?sAddr:(recipients[0]||''),true);
       const t={date:msg.receivedDateTime,dir,subject:msg.subject||'(no subject)',link:msg.webLink||'',src:'Kinetix',who:dir==='out'?recipients.join(', '):sAddr};
       if(recs.length){recs.forEach(r=>{addTouch(r,key,t)});added++}
       else{if(!(S.unmatched||[]).some(u=>u.key===key)){S.unmatched=S.unmatched||[];S.unmatched.push({...t,key,sender:sAddr})}}
@@ -548,7 +548,7 @@ async function syncGmailEmails(){
           const dir=MY_ADDR.some(a=>sender.includes(a))?'out':'in';
           const to=(headers.to||'');
           const text=[headers.subject,to].join(' ');
-          const recs=matchRecords(text,dir==='in'?sAddr:((to.match(/[\w.+-]+@[\w.-]+/)||[''])[0]));
+          const recs=matchRecords(text,dir==='in'?sAddr:((to.match(/[\w.+-]+@[\w.-]+/)||[''])[0]),true);
           const date=new Date(parseInt(m.internalDate)).toISOString();
           const t={date,dir,subject:headers.subject||'(no subject)',link:'https://mail.google.com/mail/u/0/#all/'+th.id,src:'Gmail',who:dir==='out'?to:sAddr};
           if(recs.length){recs.forEach(r=>{addTouch(r,key,t)});added++}
