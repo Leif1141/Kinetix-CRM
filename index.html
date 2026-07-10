@@ -1,4 +1,4 @@
-h<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -160,7 +160,7 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
       <div class="section"><div class="section-hdr">Favorites</div><div id="favBody"></div></div>
       <div class="section"><div class="section-hdr">Custom lists <button class="sm" style="background:#fff" onclick="newList()">+ New list</button></div><div id="listsBody"></div></div>
     </div>
-    <div class="section"><div class="section-hdr">Recent activity</div><div id="recentBody"></div></div>
+    <div class="section"><div class="section-hdr">Recent activity</div><div id="recentBody"></div></div><div class="section"><div class="section-hdr">Awaiting response <span style="font-weight:400;font-size:11px">outbound with no reply</span></div><div id="awaitBody"></div></div>
   </div>
 </div>
 
@@ -399,7 +399,7 @@ function nameTokens(s){return normName(s).split(' ').filter(w=>w.length>=4)}
 // ═══════════════════════════════════════════════════════════════
 // SEED + STATE
 // ═══════════════════════════════════════════════════════════════
-function seedAdvisor(a){return {id:uid(),kind:'advisor',firm:a.firm,contact:a.contact||'',email:a.email||'',domain:'',category:a.category||a.type||'',geo:a.geo||'',market:'',status:a.status||'Active',ptype:a.type||'',introPath:a.intro_path||'',notes:a.notes||'',detail:a.detail||'',cadence:30,fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:'',links:[]}}
+function seedAdvisor(a){return {id:uid(),kind:'advisor',firm:a.firm,contact:a.contact||'',email:a.email||'',domain:'',category:a.category||a.type||'',geo:a.geo||'',market:'',status:a.status||'Active',ptype:a.type||'',introPath:a.intro_path||'',notes:a.notes||'',detail:a.detail||'',cadence:30,fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:'',links:[],linkedin:''}}
 function seedCompany(t){return {id:uid(),kind:'target',name:t.company,geo:t.geo,revenue:t.revenue_eurm?+t.revenue_eurm:null,ebitda:t.ebitda_eurm?+t.ebitda_eurm:null,ebit:t.ebit_eurm?+t.ebit_eurm:null,gm:t.gross_margin?+t.gross_margin:null,description:t.description||'',ownership:t.ownership||'',flag:t.flag||'',stage:t.status==='Dead'?'Dead':t.status==='Active'?'Contacted':'Identified',channel:'',deadReason:'',revisitDate:'',stageLog:[{stage:'Identified',date:today()}],fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:'',links:[],location:t.location||''}}
 function seedPerson(p,orgId){return {id:uid(),kind:'person',name:p.name,title:p.title||'',firm:p.firm||'',orgId:orgId||'',email:p.email||'',phone:p.phone||'',linkedin:p.linkedin||'',city:p.city||'',market:p.market||'',ptype:p.ptype||p.source||'',angle:p.angle||'',networkPath:p.networkPath||'',fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:''}}
 function orgByFirm(f){const nf=normName(f);if(!nf)return null;return S.companies.find(c=>normName(c.name)===nf||normName(c.description||'').includes(nf))||S.advisors.find(a=>normName(a.firm)===nf)}
@@ -619,7 +619,7 @@ function renderOverview(){
   document.getElementById('favBody').innerHTML=favs.length?'<table>'+favs.map(r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))"><td>'+starHtml(r)+' <b>'+esc(dispName(r))+'</b></td><td class="muted">'+fmtAgo(lastTouch(r))+'</td></tr>').join('')+'</table>':'<p class="muted" style="padding:12px">Star records to pin them here.</p>';
   document.getElementById('listsBody').innerHTML=(S.customLists||[]).map(l=>{const items=allRecs().filter(r=>(r.lists||[]).includes(l));return '<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b style="cursor:pointer" onclick="goList(\''+esc(l)+'\')">'+esc(l)+'</b> <span class="muted">('+items.length+')</span> <button class="sm" onclick="delList(\''+esc(l)+'\')" style="float:right">×</button></div>'}).join('')||'<p class="muted" style="padding:12px">No custom lists yet.</p>';
   const recent=allRecs().flatMap(r=>touchList(r).slice(0,3).map(t=>({r,t}))).sort((a,b)=>(b.t.date||'').localeCompare(a.t.date||'')).slice(0,15);
-  document.getElementById('recentBody').innerHTML=recent.length?'<table>'+recent.map(x=>'<tr class="rowlink" onclick="openProfile(findRec(\''+x.r.id+'\'))"><td class="muted" style="width:70px;white-space:nowrap">'+fmtD(x.t.date)+'</td><td><b>'+esc(dispName(x.r))+'</b></td><td class="muted" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.t.subject)+'</td></tr>').join('')+'</table>':'<p class="muted" style="padding:12px">No activity yet. Sync to pull emails.</p>';
+  document.getElementById('recentBody').innerHTML=recent.length?'<table>'+recent.map(x=>'<tr class="rowlink" onclick="openProfile(findRec(\''+x.r.id+'\'))"><td class="muted" style="width:70px;white-space:nowrap">'+fmtD(x.t.date)+'</td><td><b>'+esc(dispName(x.r))+'</b></td><td class="muted" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.t.subject)+'</td></tr>').join('')+'</table>':'<p class="muted" style="padding:12px">No activity yet. Sync to pull emails.</p>';const awRx=/await|pending|waiting|response|follow.?up/i;const awaiting=allRecs().map(r=>{const tl=touchList(r);if(!tl.length)return null;const last=tl[0];const byAction=awRx.test(r.nextAction||'');const lastOut=tl.find(t=>t.dir==='out');if(!lastOut)return byAction?{r,reason:r.nextAction,days:daysAgo(last.date)}:null;const lastIn=tl.find(t=>t.dir==='in');const noReply=!lastIn||lastIn.date<lastOut.date;if(noReply||byAction){return {r,reason:byAction?(r.nextAction||'Awaiting response'):('Sent: '+lastOut.subject),days:daysAgo(lastOut.date),outDate:lastOut.date}}return null}).filter(Boolean).sort((a,b)=>b.days-a.days).slice(0,5);document.getElementById('awaitBody').innerHTML=awaiting.length?'<table><th style="width:70px">Days</th><th>Contact</th><th>Pending</th>'+awaiting.map(x=>'<tr class="rowlink" onclick="openProfile(findRec(\''+x.r.id+'\'))"><td class="c" style="font-weight:700;color:'+(x.days>14?'var(--red)':x.days>7?'var(--amber)':'var(--green)')+'">'+x.days+'</td><td><b>'+esc(dispName(x.r))+'</b></td><td class="muted" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.reason)+'</td></tr>').join('')+'</table>':'<p class="muted" style="padding:12px">No pending responses tracked.</p>';
 }
 
 function dismissSugg(k){S.dismissed[k]=today();save();renderOverview()}
@@ -677,8 +677,8 @@ function sortPeople(k){if(psortK===k)psortD*=-1;else{psortK=k;psortD=k==='lastc'
 // ═══════════════════════════════════════════════════════════════
 // RENDER: PIPELINE
 // ═══════════════════════════════════════════════════════════════
-function newCompany(){return {id:uid(),kind:'target',name:'',geo:'DE',revenue:null,ebitda:null,ebit:null,gm:null,stage:'Identified',channel:'',deadReason:'',revisitDate:'',stageLog:[{stage:'Identified',date:today()}],fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:'',links:[],description:'',ownership:'',flag:'',location:''}}
-function newAdvisor(){return {id:uid(),kind:'advisor',firm:'',contact:'',email:'',domain:'',category:'M&A sourcing intermediary',geo:'',market:'',status:'Active',ptype:'',introPath:'',notes:'',detail:'',cadence:30,fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:'',links:[]}}
+function newCompany(){return {id:uid(),kind:'target',name:'',geo:'DE',revenue:null,ebitda:null,ebit:null,gm:null,stage:'Identified',channel:'',deadReason:'',revisitDate:'',stageLog:[{stage:'Identified',date:today()}],fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:'',links:[],description:'',ownership:'',flag:'',location:'',linkedin:''}}
+function newAdvisor(){return {id:uid(),kind:'advisor',firm:'',contact:'',email:'',domain:'',category:'M&A sourcing intermediary',geo:'',market:'',status:'Active',ptype:'',introPath:'',notes:'',detail:'',cadence:30,fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:'',links:[],linkedin:''}}
 function newPerson(){return {id:uid(),kind:'person',name:'',title:'',firm:'',orgId:'',email:'',phone:'',linkedin:'',city:'',market:'',ptype:'',angle:'',networkPath:'',fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:''}}
 
 function renderPipeline(){
@@ -871,14 +871,14 @@ function openProfile(rec){
     '<div class="pgrid">'+selFld('e_stage','Stage',STAGES,rec.stage)+selFld('e_geo','Geo',['DE','UK','Other'],rec.geo)+fld('e_rev','Revenue (€m)',rec.revenue,'number')+fld('e_ebitda','EBITDA (€m)',rec.ebitda,'number')+fld('e_ebit','EBIT (€m)',rec.ebit,'number')+fld('e_gm','Gross margin %',rec.gm?rec.gm*100:null,'number')+selFld('e_chan','Channel',CHANNELS,rec.channel)+fld('e_loc','Location',rec.location)+'</div>'+
     '<label>Description</label><textarea id="e_desc" rows="2">'+esc(rec.description||'')+'</textarea>'+
     '<label>Ownership</label><input id="e_own" value="'+esc(rec.ownership||'')+'">'+
-    '<label>Flag</label><input id="e_flag" value="'+esc(rec.flag||'')+'">'+
+    '<label>LinkedIn</label><input id="e_li" value="'+esc(rec.linkedin||'')+'" placeholder="https://linkedin.com/company/...">'+    '<label>Flag</label><input id="e_flag" value="'+esc(rec.flag||'')+'">'+
     (rec.stage==='Dead'?selFld('e_dr','Dead reason',DEADREASONS,rec.deadReason)+fld('e_revd','Revisit date',rec.revisitDate,'date'):'')+
     '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+fld('e_na','Next action',rec.nextAction):
   isA?
     fld('e_firm','Firm name',rec.firm)+fld('e_contact','Primary contact',rec.contact)+fld('e_email','Email',rec.email)+fld('e_domain','Domain',rec.domain)+
     '<div class="pgrid">'+selFld('e_cat','Category',['M&A sourcing intermediary','M&A execution advisor','Sector specialist','Finance/tax/legal','Operational advisor','Board/NED','Other'],rec.category)+selFld('e_market','Market',['DE','UK','Nordic','Other'],rec.geo)+'</div>'+
     selFld('e_status','Status',['Active','Inactive','Engaged','Paused'],rec.status)+
-    fld('e_intro','Intro path',rec.introPath)+
+    fld('e_intro','Intro path',rec.introPath)+    fld('e_ali','LinkedIn',rec.linkedin)+
     '<label>Notes</label><textarea id="e_notes" rows="3">'+esc(rec.notes||'')+'</textarea>'+
     fld('e_cad','Check-in cadence (days)',rec.cadence||30,'number')+
     '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+fld('e_na','Next action',rec.nextAction):
@@ -917,11 +917,11 @@ function saveProfile(){
     const ns=gv('e_stage');if(ns!==r.stage){r.stage=ns;r.stageLog=r.stageLog||[];r.stageLog.push({stage:ns,date:today()})}
     r.geo=gv('e_geo');r.revenue=+gv('e_rev')||null;r.ebitda=+gv('e_ebitda')||null;r.ebit=+gv('e_ebit')||null;
     const gm=+gv('e_gm');r.gm=gm?gm/100:null;
-    r.channel=gv('e_chan');r.location=gv('e_loc');r.description=gv('e_desc');r.ownership=gv('e_own');r.flag=gv('e_flag');
+    r.channel=gv('e_chan');r.location=gv('e_loc');r.description=gv('e_desc');r.ownership=gv('e_own');r.linkedin=gv('e_li');r.flag=gv('e_flag');
     if(r.stage==='Dead'){r.deadReason=gv('e_dr');r.revisitDate=gv('e_revd')}
   } else if(r.kind==='advisor'){
     r.firm=gv('e_firm')||r.firm;r.contact=gv('e_contact');r.email=gv('e_email');r.domain=gv('e_domain');
-    r.category=gv('e_cat');r.geo=gv('e_market');r.status=gv('e_status');r.introPath=gv('e_intro');
+    r.category=gv('e_cat');r.geo=gv('e_market');r.status=gv('e_status');r.introPath=gv('e_intro');r.linkedin=gv('e_ali');
     r.notes=gv('e_notes');r.cadence=+gv('e_cad')||30;
   } else {
     r.name=gv('e_pname')||r.name;r.title=gv('e_ptitle');r.firm=gv('e_pfirm');r.email=gv('e_pemail');
