@@ -129,9 +129,6 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
     <span id="syncStatus" class="muted">Not synced yet</span>
     <button class="primary" id="btnSync" onclick="syncEmails()">Sync</button>
     <button id="btnUpd" onclick="checkDriveUpdates(false)">Updates</button>
-    <button onclick="exportJSON()">Export</button>
-    <button onclick="document.getElementById('importFile').click()">Import</button>
-    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
     <button onclick="signOut()" style="border-color:var(--gray);color:var(--gray)">Sign out</button>
   </div>
 </header>
@@ -664,7 +661,8 @@ function suggestions(){
   S.advisors.filter(a=>{const lt=lastTouch(a);return lt&&daysAgo(lt)>(a.cadence||30)}).forEach(a=>{const k='cad_'+a.id;if(!S.dismissed[k])out.push({rec:a,why:'Last contact '+fmtAgo(lastTouch(a))+' (cadence: '+(a.cadence||30)+'d)',tag:'Check-in',color:'var(--navy)',key:k})});
   S.companies.filter(c=>c.stage==='Dead'&&c.revisitDate&&c.revisitDate<=t).forEach(c=>{const k='rev_'+c.id;if(!S.dismissed[k])out.push({rec:c,why:'Revisit date reached — consider re-engaging',tag:'Revisit',color:'var(--green)',key:k})});
   allRecs().filter(r=>r.nextAction&&r.nextSet&&lastTouch(r)&&lastTouch(r).slice(0,10)>r.nextSet).forEach(r=>{const k='ovt_'+r.id+'_'+lastTouch(r).slice(0,10);if(!S.dismissed[k])out.push({rec:r,why:'Next action may be outdated — new activity since it was set ("'+r.nextAction.slice(0,60)+'"). Review and update.',tag:'Overtaken',color:'#7030A0',key:k})});
-  return out;
+  const seen=new Set();
+  return out.filter(s=>{if(seen.has(s.rec.id))return false;seen.add(s.rec.id);return true});
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -681,8 +679,8 @@ function renderOverview(){
   const favs=allRecs().filter(r=>r.fav);
   document.getElementById('favBody').innerHTML=favs.length?'<table>'+favs.map(r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))"><td>'+starHtml(r)+' <b>'+esc(dispName(r))+'</b></td><td class="muted">'+fmtAgo(lastTouch(r))+'</td></tr>').join('')+'</table>':'<p class="muted" style="padding:12px">Star records to pin them here.</p>';
   document.getElementById('listsBody').innerHTML=(S.customLists||[]).map(l=>{const items=allRecs().filter(r=>(r.lists||[]).includes(l));return '<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b style="cursor:pointer" onclick="goList(\''+esc(l)+'\')">'+esc(l)+'</b> <span class="muted">('+items.length+')</span> <button class="sm" onclick="delList(\''+esc(l)+'\')" style="float:right">×</button></div>'}).join('')||'<p class="muted" style="padding:12px">No custom lists yet.</p>';
-  const recent=allRecs().flatMap(r=>touchList(r).slice(0,3).map(t=>({r,t}))).sort((a,b)=>(b.t.date||'').localeCompare(a.t.date||'')).slice(0,15);
-  document.getElementById('recentBody').innerHTML=recent.length?'<table>'+recent.map(x=>'<tr class="rowlink" onclick="openProfile(findRec(\''+x.r.id+'\'))"><td class="muted" style="width:70px;white-space:nowrap">'+fmtD(x.t.date)+'</td><td><b>'+esc(dispName(x.r))+'</b></td><td class="muted" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.t.subject)+'</td></tr>').join('')+'</table>':'<p class="muted" style="padding:12px">No activity yet. Sync to pull emails.</p>';
+  const recent=allRecs().map(r=>{const ts=touchList(r);if(!ts.length)return null;const wk=ts.filter(t=>daysAgo(t.date)<7).length;return {r,t:ts[0],n:wk}}).filter(Boolean).sort((a,b)=>(b.t.date||'').localeCompare(a.t.date||'')).slice(0,15);
+  document.getElementById('recentBody').innerHTML=recent.length?'<table>'+recent.map(x=>'<tr class="rowlink" onclick="openProfile(findRec(\''+x.r.id+'\'))"><td class="muted" style="width:70px;white-space:nowrap">'+fmtD(x.t.date)+'</td><td><b>'+esc(dispName(x.r))+'</b></td><td class="muted" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.t.subject)+(x.n>1?' <span class="chip">+'+(x.n-1)+' more this week</span>':'')+'</td></tr>').join('')+'</table>':'<p class="muted" style="padding:12px">No activity yet. Sync to pull emails.</p>';
 }
 
 function dismissSugg(k){S.dismissed[k]=today();save();renderOverview()}
@@ -698,8 +696,10 @@ function renderOrgs(){
   const sel=document.getElementById('oStage');
   if(sel.options.length<3){STAGES.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o)});['Active','Inactive','Engaged','Paused'].forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o)})}
   const lsel=document.getElementById('oList');
+  const keepList=lsel.value;
   while(lsel.options.length>2)lsel.remove(2);
   (S.customLists||[]).forEach(l=>{const o=document.createElement('option');o.value=l;o.textContent=l;lsel.appendChild(o)});
+  if(keepList&&[...lsel.options].some(o=>o.value===keepList))lsel.value=keepList;
   const q=(document.getElementById('oSearch').value||'').toLowerCase();
   const kind=document.getElementById('oKind').value,stg=sel.value,list=lsel.value;
   let rows=allOrgs().filter(o=>
