@@ -128,6 +128,7 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
     <span id="userName" class="muted"></span>
     <span id="syncStatus" class="muted">Not synced yet</span>
     <button class="primary" id="btnSync" onclick="syncEmails()">Sync</button>
+    <button id="btnUpd" onclick="checkDriveUpdates(false)">Updates</button>
     <button onclick="exportJSON()">Export</button>
     <button onclick="document.getElementById('importFile').click()">Import</button>
     <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
@@ -534,12 +535,13 @@ async function syncOutlookEmails(){
 async function connectGmail(){
   if(!GMAIL_CLIENT_ID){toast('Set GMAIL_CLIENT_ID in the config');return}
   try{
-    const client=google.accounts.oauth2.initTokenClient({client_id:GMAIL_CLIENT_ID,scope:'https://www.googleapis.com/auth/gmail.readonly',callback:(resp)=>{
+    const client=google.accounts.oauth2.initTokenClient({client_id:GMAIL_CLIENT_ID,scope:'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/drive.readonly',callback:(resp)=>{
       if(resp.error){toast('Gmail auth failed');return}
       gmailToken=resp.access_token;
       document.getElementById('gmailConn').className='conn-status';
       document.getElementById('gmailConn').textContent='Gmail: connected';
       toast('Gmail connected');
+      checkDriveUpdates(true);
     }});
     client.requestAccessToken();
   }catch(e){toast('Gmail connection failed: '+e.message)}
@@ -623,6 +625,7 @@ function suggestions(){
   S.companies.filter(c=>LIVE.includes(c.stage)&&c.stage!=='Identified'&&isStale(c)).forEach(c=>{const k='stale_'+c.id;if(!S.dismissed[k])out.push({rec:c,why:c.stage+' for '+daysAgo(lastTouch(c)||(c.stageLog?.slice(-1)[0]?.date)||null)+'d with no activity',tag:'Stale',color:'#C6943E',key:k})});
   S.advisors.filter(a=>{const lt=lastTouch(a);return lt&&daysAgo(lt)>(a.cadence||30)}).forEach(a=>{const k='cad_'+a.id;if(!S.dismissed[k])out.push({rec:a,why:'Last contact '+fmtAgo(lastTouch(a))+' (cadence: '+(a.cadence||30)+'d)',tag:'Check-in',color:'var(--navy)',key:k})});
   S.companies.filter(c=>c.stage==='Dead'&&c.revisitDate&&c.revisitDate<=t).forEach(c=>{const k='rev_'+c.id;if(!S.dismissed[k])out.push({rec:c,why:'Revisit date reached — consider re-engaging',tag:'Revisit',color:'var(--green)',key:k})});
+  allRecs().filter(r=>r.nextAction&&r.nextSet&&lastTouch(r)&&lastTouch(r).slice(0,10)>r.nextSet).forEach(r=>{const k='ovt_'+r.id+'_'+lastTouch(r).slice(0,10);if(!S.dismissed[k])out.push({rec:r,why:'Next action may be outdated — new activity since it was set ("'+r.nextAction.slice(0,60)+'"). Review and update.',tag:'Overtaken',color:'#7030A0',key:k})});
   return out;
 }
 
@@ -855,6 +858,7 @@ function patchSet(r,set){
   for(const k of Object.keys(set)){
     if(['id','kind','touches','stageLog','stage'].includes(k))continue;
     if(k==='notes'&&r.notes&&set.notes){if(!r.notes.includes(set.notes))r.notes=(r.notes+' | '+set.notes).trim();continue}
+    if(k==='nextAction'&&set[k]!==r[k])r.nextSet=today();
     r[k]=set[k];
   }
 }
@@ -888,22 +892,48 @@ function applyPatchOps(ops){
   }
   return {made,skipped};
 }
+function applyPatchObj(p,name,force){
+  if(p.kinetixPatch!==1)throw new Error('not a Kinetix patch file');
+  S.appliedPatchTitles=S.appliedPatchTitles||{};
+  if(S.appliedPatchTitles[name]&&!force)return null;
+  const r=applyPatchOps(p.ops);
+  S.appliedPatchTitles[name]=today();
+  return r;
+}
 function applyPatchFile(ev){
   const f=ev.target.files[0];if(!f)return;
   const rd=new FileReader();
   rd.onload=e=>{
     try{
       const p=JSON.parse(e.target.result);
-      if(p.kinetixPatch!==1)throw new Error('not a Kinetix patch file');
-      S.appliedPatchTitles=S.appliedPatchTitles||{};
-      if(S.appliedPatchTitles[f.name]){if(!confirm(f.name+' was already applied on '+S.appliedPatchTitles[f.name]+'. Apply again anyway?')){ev.target.value='';return}}
-      const r=applyPatchOps(p.ops);
-      S.appliedPatchTitles[f.name]=today();
+      let force=true;
+      if((S.appliedPatchTitles||{})[f.name]){if(!confirm(f.name+' was already applied on '+S.appliedPatchTitles[f.name]+'. Apply again anyway?')){ev.target.value='';return}}
+      const r=applyPatchObj(p,f.name,force);
       save();renderAll();
       toast(r.made+' updates applied from '+f.name+(r.skipped?' ('+r.skipped+' skipped)':''));
     }catch(err){toast('Patch error: '+err.message)}
   };
   rd.readAsText(f);ev.target.value='';
+}
+const DRIVE_CRM_FOLDER='19NSMw1zEmNctsmWuPnXCLZeX09ehO6bW';
+async function checkDriveUpdates(auto){
+  if(!gmailToken){if(!auto){toast('Connect Google first (Data tab, Gmail) — one-time consent adds Drive read access');}return}
+  try{
+    const q=encodeURIComponent("'"+DRIVE_CRM_FOLDER+"' in parents and name contains 'KinetixCRM Patch' and trashed=false");
+    const res=await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&orderBy=name&fields=files(id,name)',{headers:{Authorization:'Bearer '+gmailToken}});
+    if(!res.ok)throw new Error('Drive list failed ('+res.status+')');
+    const files=((await res.json()).files||[]).filter(f=>!(S.appliedPatchTitles||{})[f.name]);
+    if(!files.length){if(!auto)toast('No new CRM updates in Drive');return}
+    let tot=0;
+    for(const f of files){
+      const dl=await fetch('https://www.googleapis.com/drive/v3/files/'+f.id+'?alt=media',{headers:{Authorization:'Bearer '+gmailToken}});
+      const p=await dl.json();
+      const r=applyPatchObj(p,f.name,false);
+      if(r)tot+=r.made;
+    }
+    save();renderAll();
+    toast(tot+' updates applied from '+files.length+' Claude patch file'+(files.length>1?'s':''));
+  }catch(e){if(!auto)toast('Update check failed: '+e.message+' — fallback: Apply Claude patch on Data tab')}
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1020,7 +1050,7 @@ function saveProfile(){
     r.phone=gv('e_pphone');r.linkedin=gv('e_plinkedin');r.city=gv('e_pcity');r.angle=gv('e_pangle');
     r.networkPath=gv('e_ppath');
   }
-  r.priority=gv('e_prio');r.nextDate=gv('e_nd');r.nextAction=gv('e_na');
+  r.priority=gv('e_prio');r.nextDate=gv('e_nd');const _na=gv('e_na');if(_na!==r.nextAction){r.nextSet=today()}r.nextAction=_na;
   // upsert into state
   if(r.kind==='target'&&!S.companies.find(c=>c.id===r.id))S.companies.push(r);
   if(r.kind==='advisor'&&!S.advisors.find(a=>a.id===r.id))S.advisors.push(r);
@@ -1074,12 +1104,37 @@ function renderLocations(){
   if(!locMap){locMap=L.map('locMap').setView([51.3,7.5],6);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(locMap)}
   if(locLayer)locLayer.remove();locLayer=L.layerGroup().addTo(locMap);
   S.geoCache=S.geoCache||{};
+  const PARTY=r=>r.kind==='target'?['Target','#C00000']:
+    r.kind==='person'?['Person','#434F80']:
+    r.category==='M&A sourcing intermediaries'?['M&A advisor','#2E3C65']:
+    r.category==='Financing partners'?['Financing','#2E7D32']:
+    r.category==='Investors & family office'?['Investor / FO','#7030A0']:
+    r.category==='DD advisors'?['DD / industry advisor','#C6943E']:
+    r.category==='HR, universities & interns'?['HR / interns','#FFC000']:
+    r.category==='Admin & infrastructure'?['Admin','#595959']:
+    r.category==='Personal network'?['Personal','#A9A4C6']:['Other','#8C97B8'];
   let plotted=0;
   cities.forEach(c=>{
     const g=S.geoCache[c.toLowerCase()];if(!g)return;plotted++;
-    const m=L.marker(g).addTo(locLayer);
-    m.bindPopup('<b>'+esc(c)+'</b><br>'+byCity[c].map(r=>esc(dispName(r))).join('<br>'));
+    byCity[c].forEach((r,i)=>{
+      const n=byCity[c].length;
+      const ang=2*Math.PI*i/Math.max(n,1);
+      const off=n>1?0.012:0;
+      const [lbl,col]=PARTY(r);
+      const m=L.circleMarker([g[0]+off*Math.sin(ang),g[1]+off*Math.cos(ang)],{radius:8,color:'#fff',weight:1.5,fillColor:col,fillOpacity:0.92}).addTo(locLayer);
+      m.bindPopup('<b>'+esc(dispName(r))+'</b><br><span style="color:'+col+';font-weight:700">'+lbl+'</span> · '+esc(c)+(r.contact?'<br>'+esc(r.contact):'')+'<br><a href="#" onclick="openProfile(findRec(\''+r.id+'\'));return false">Open profile →</a>');
+    });
   });
+  if(!locMap._legend){
+    const lg=L.control({position:'bottomright'});
+    lg.onAdd=function(){
+      const d=L.DomUtil.create('div');
+      d.style.cssText='background:#fff;padding:8px 12px;border:1px solid #D3D3D2;border-radius:4px;font:11px Arial;line-height:1.7';
+      d.innerHTML=[['Target','#C00000'],['M&A advisor','#2E3C65'],['Financing','#2E7D32'],['Investor / FO','#7030A0'],['DD / industry advisor','#C6943E'],['HR / interns','#FFC000'],['Admin','#595959'],['Personal','#A9A4C6'],['Person','#434F80']].map(x=>'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+x[1]+';margin-right:6px"></span>'+x[0]).join('<br>');
+      return d;
+    };
+    lg.addTo(locMap);locMap._legend=lg;
+  }
   if(cities.length&&plotted<cities.length)toast((cities.length-plotted)+' cities not geocoded yet — click "Geocode new cities"');
   setTimeout(()=>locMap.invalidateSize(),120);
 }
