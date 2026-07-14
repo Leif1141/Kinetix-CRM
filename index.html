@@ -966,7 +966,7 @@ async function autoDriveBackup(){
     if(!res.ok)throw new Error('upload '+res.status);
     S.lastDriveBackup=new Date().toISOString();save();
     console.log('Drive auto-backup: '+name);
-  }catch(e){console.warn('Drive backup failed:',e)}
+  }catch(e){toast('⚠ Drive backup FAILED: '+e.message+' — data is safe in Firebase, but weekly briefings go stale');console.warn('Drive backup failed:',e)}
 }
 async function checkDriveUpdates(auto){
   if(!gmailToken){if(!auto){toast('Connect Google first (Data tab, Gmail) — one-time consent adds Drive read access');}return}
@@ -986,7 +986,7 @@ async function checkDriveUpdates(auto){
     save();renderAll();
     toast(tot+' updates applied from '+files.length+' Claude patch file'+(files.length>1?'s':''));
     autoDriveBackup();
-  }catch(e){if(!auto)toast('Update check failed: '+e.message+' — fallback: Apply Claude patch on Data tab')}
+  }catch(e){toast('⚠ Claude-update check FAILED: '+e.message+(String(e.message).includes('403')?' — is the Drive API enabled in the Google Cloud project?':''))}
 }
 
 // ═══════════════════════════════════════════════════════════════
