@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kinetix Deal CRM</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
@@ -148,6 +150,7 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
   <div class="tab" data-t="pipeline">Pipeline</div>
   <div class="tab" data-t="followups">Follow-ups <span class="tab-badge" id="fuBadge" style="display:none"></span></div>
   <div class="tab" data-t="inbox">Inbox <span class="tab-badge" id="inbBadge" style="display:none"></span></div>
+  <div class="tab" data-t="locations">Locations</div>
   <div class="tab" data-t="reports">Reports</div>
   <div class="tab" data-t="data">Data</div>
 </div>
@@ -214,6 +217,17 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
     <div class="chartbox"><h4>Dead reasons</h4><canvas id="chDead"></canvas></div>
   </div>
   <div class="section" style="margin-top:14px"><div class="section-hdr">Time in stage (active deals)</div><table id="tisTable"></table></div>
+</div>
+
+<div class="panel" id="p-locations">
+  <div class="filterbar">
+    <select id="locKind" onchange="renderLocations()"><option value="">Everyone</option><option value="advisor">Advisors</option><option value="person">People</option><option value="target">Targets</option></select>
+    <select id="locGeo" onchange="renderLocations()"><option value="">All regions</option><option value="DE">Germany</option><option value="UK">UK</option></select>
+    <button class="sm" onclick="geocodeMissing()">Geocode new cities</button>
+    <span class="muted" id="locCount"></span>
+  </div>
+  <div id="locMap" style="height:440px;border:1px solid var(--lgray);border-radius:5px;margin-bottom:14px"></div>
+  <div class="section"><div class="section-hdr">By city</div><div id="locList"></div></div>
 </div>
 
 <div class="panel" id="p-data">
@@ -453,17 +467,17 @@ function matchRecords(text,senderEmail,strict){
   if(se)(S.people||[]).forEach(p=>{if((p.email||'').toLowerCase()===se&&!out.includes(p)){out.push(p);if(p.orgId){const org=findRec(p.orgId);if(org&&!out.includes(org))out.push(org)}}});
   // 4. fuzzy name-token matching -- ONLY when strict=false (manual/inbox use)
   if(!strict&&!out.length){
+    const STOPTOK=new Set(['invest','investment','investments','deutsche','deutsches','deutschland','german','germany','capital','partners','partner','group','gruppe','holding','holdings','private','equity','industrie','industrial','industries','industriebedarf','mittelstand','unternehmen','company','advisors','advisory','consulting','beratung','bank','banking','finance','financial','financing','european','europe','international','management','solutions','systems','service','services','technik','technology','office','network']);
     const hay=normName(text);
+    const hasWord=t=>new RegExp('(^|[^a-z0-9])'+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'($|[^a-z0-9])').test(hay);
     let bestLen=0;
     allOrgs().forEach(r=>{
-      const toks=nameTokens(dispName(r));
+      const toks=nameTokens(dispName(r)).filter(t=>!STOPTOK.has(t));
       if(!toks.length)return;
-      const primary=toks[0];
-      if(primary.length>=5&&hay.includes(primary)){
-        const total=toks.filter(t=>hay.includes(t)).length;
-        if(total>=2&&total>bestLen){bestLen=total;out.length=0;out.push(r)}
-        else if(total>=2&&total===bestLen&&!out.includes(r))out.push(r);
-      }
+      const hits=toks.filter(hasWord);
+      const ok=hits.length>=2||(hits.length===1&&hits[0].length>=6&&toks.length===1);
+      if(ok&&hits.length>bestLen){bestLen=hits.length;out.length=0;out.push(r)}
+      else if(ok&&hits.length===bestLen&&bestLen>0&&!out.includes(r))out.push(r);
     });
   }
   return out;
@@ -868,7 +882,7 @@ function applyPatchOps(ops){
         if(r&&o.stage&&STAGES.includes(o.stage)&&r.stage!==o.stage){r.stage=o.stage;r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.stage,date:o.date||today()});made++}else skipped++;
       }else if(o.op==='mapEmail'){
         const r=patchFind(o.match);
-        if(r&&o.email){S.emailMap=S.emailMap||{};S.emailMap[o.email.toLowerCase().replace(/\./g,',')]=r.id;made++}else skipped++;
+        if(r&&o.email){S.senderMap=S.senderMap||{};S.senderMap[o.email.toLowerCase().replace(/\./g,'_')]=r.id;made++}else skipped++;
       }else skipped++;
     }catch(e){skipped++}
   }
@@ -953,8 +967,9 @@ function openProfile(rec){
     '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+fld('e_na','Next action',rec.nextAction):
   isA?
     fld('e_firm','Firm name',rec.firm)+fld('e_contact','Primary contact',rec.contact)+fld('e_email','Email',rec.email)+fld('e_domain','Domain',rec.domain)+
-    '<div class="pgrid">'+selFld('e_cat','Category',['M&A sourcing intermediary','M&A execution advisor','Sector specialist','Finance/tax/legal','Operational advisor','Board/NED','Other'],rec.category)+selFld('e_market','Market',['DE','UK','Nordic','Other'],rec.geo)+'</div>'+
-    selFld('e_status','Status',['Active','Inactive','Engaged','Paused'],rec.status)+
+    '<div class="pgrid">'+selFld('e_cat','Category',['M&A sourcing intermediaries','Financing partners','DD advisors','Investors & family office','HR, universities & interns','Admin & infrastructure','Personal network','Other'],rec.category)+selFld('e_market','Market',['DE','UK','Nordic','Other'],rec.geo)+'</div>'+
+    selFld('e_status','Status',['To call','Emailed','Contact known','In dialogue','Active relationship','Dormant'],rec.status)+
+    '<div class="pgrid">'+fld('e_city','City',rec.city)+fld('e_addr','Address',rec.address)+'</div>'+
     fld('e_intro','Intro path',rec.introPath)+
     '<label>Notes</label><textarea id="e_notes" rows="3">'+esc(rec.notes||'')+'</textarea>'+
     fld('e_cad','Check-in cadence (days)',rec.cadence||30,'number')+
@@ -998,7 +1013,7 @@ function saveProfile(){
     if(r.stage==='Dead'){r.deadReason=gv('e_dr');r.revisitDate=gv('e_revd')}
   } else if(r.kind==='advisor'){
     r.firm=gv('e_firm')||r.firm;r.contact=gv('e_contact');r.email=gv('e_email');r.domain=gv('e_domain');
-    r.category=gv('e_cat');r.geo=gv('e_market');r.status=gv('e_status');r.introPath=gv('e_intro');
+    r.category=gv('e_cat');r.geo=gv('e_market');r.status=gv('e_status');r.introPath=gv('e_intro');r.city=gv('e_city')||r.city||'';r.address=gv('e_addr')||r.address||'';
     r.notes=gv('e_notes');r.cadence=+gv('e_cad')||30;
   } else {
     r.name=gv('e_pname')||r.name;r.title=gv('e_ptitle');r.firm=gv('e_pfirm');r.email=gv('e_pemail');
@@ -1046,7 +1061,44 @@ function calcMaths(){
 // ═══════════════════════════════════════════════════════════════
 // RENDER ALL + INIT
 // ═══════════════════════════════════════════════════════════════
-function renderAll(){if(!S)return;renderOverview();renderOrgs();renderPeople();renderPipeline();renderFollowups();renderInbox();renderReports();renderData()}
+function recCity(r){return (r.city||r.location||'').split(',')[0].trim()}
+let locMap=null,locLayer=null;
+function renderLocations(){
+  const kind=document.getElementById('locKind').value,geo=document.getElementById('locGeo').value;
+  const recs=allRecs().filter(r=>recCity(r)&&(!kind||r.kind===kind)&&(!geo||((r.geo||r.market||'')+'').toUpperCase().startsWith(geo)));
+  document.getElementById('locCount').textContent=recs.length+' records with a city';
+  const byCity={};recs.forEach(r=>{const c=recCity(r);(byCity[c]=byCity[c]||[]).push(r)});
+  const cities=Object.keys(byCity).sort((a,b)=>byCity[b].length-byCity[a].length);
+  document.getElementById('locList').innerHTML=cities.map(c=>'<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b>'+esc(c)+'</b> <span class="muted">('+byCity[c].length+')</span><br>'+byCity[c].map(r=>'<span class="chip" style="cursor:pointer" onclick="openProfile(findRec(\''+r.id+'\'))">'+esc(dispName(r))+'</span>').join(' ')+'</div>').join('')||'<p class="muted" style="padding:12px">No records with city yet — add cities on profiles or apply the latest Claude patch.</p>';
+  if(typeof L==='undefined')return;
+  if(!locMap){locMap=L.map('locMap').setView([51.3,7.5],6);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(locMap)}
+  if(locLayer)locLayer.remove();locLayer=L.layerGroup().addTo(locMap);
+  S.geoCache=S.geoCache||{};
+  let plotted=0;
+  cities.forEach(c=>{
+    const g=S.geoCache[c.toLowerCase()];if(!g)return;plotted++;
+    const m=L.marker(g).addTo(locLayer);
+    m.bindPopup('<b>'+esc(c)+'</b><br>'+byCity[c].map(r=>esc(dispName(r))).join('<br>'));
+  });
+  if(cities.length&&plotted<cities.length)toast((cities.length-plotted)+' cities not geocoded yet — click "Geocode new cities"');
+  setTimeout(()=>locMap.invalidateSize(),120);
+}
+async function geocodeMissing(){
+  S.geoCache=S.geoCache||{};
+  const cities=[...new Set(allRecs().map(recCity).filter(Boolean))].filter(c=>!S.geoCache[c.toLowerCase()]);
+  if(!cities.length){toast('All cities geocoded');return}
+  toast('Geocoding '+cities.length+' cities…');
+  for(const c of cities){
+    try{
+      const res=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(c+', Europe'));
+      const j=await res.json();
+      if(j[0])S.geoCache[c.toLowerCase()]=[+j[0].lat,+j[0].lon];
+      await new Promise(r=>setTimeout(r,1100));
+    }catch(e){}
+  }
+  save();renderLocations();toast('Geocoding done');
+}
+function renderAll(){if(!S)return;renderOverview();renderOrgs();renderPeople();renderPipeline();renderFollowups();renderInbox();renderReports();renderData();if(document.getElementById('p-locations').classList.contains('active'))renderLocations()}
 
 document.getElementById('tabs').addEventListener('click',e=>{
   const t=e.target.closest('.tab');if(!t)return;
@@ -1054,6 +1106,7 @@ document.getElementById('tabs').addEventListener('click',e=>{
   document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');
   document.getElementById('p-'+t.dataset.t).classList.add('active');
+  if(t.dataset.t==='locations')renderLocations();
   if(t.dataset.t==='reports')renderReports();
 });
 
