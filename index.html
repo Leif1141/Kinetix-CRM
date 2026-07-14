@@ -535,7 +535,7 @@ async function syncOutlookEmails(){
 async function connectGmail(){
   if(!GMAIL_CLIENT_ID){toast('Set GMAIL_CLIENT_ID in the config');return}
   try{
-    const client=google.accounts.oauth2.initTokenClient({client_id:GMAIL_CLIENT_ID,scope:'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/drive.readonly',callback:(resp)=>{
+    const client=google.accounts.oauth2.initTokenClient({client_id:GMAIL_CLIENT_ID,scope:'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/drive',callback:(resp)=>{
       if(resp.error){toast('Gmail auth failed');return}
       gmailToken=resp.access_token;
       document.getElementById('gmailConn').className='conn-status';
@@ -603,6 +603,7 @@ async function syncEmails(){
     toast('Sync failed: '+e.message);
   }
   btn.disabled=false;btn.textContent='Sync';
+  autoDriveBackup();
   renderAll();
 }
 
@@ -916,6 +917,20 @@ function applyPatchFile(ev){
   rd.readAsText(f);ev.target.value='';
 }
 const DRIVE_CRM_FOLDER='19NSMw1zEmNctsmWuPnXCLZeX09ehO6bW';
+async function autoDriveBackup(){
+  if(!gmailToken)return;
+  try{
+    const name=today().replace(/-/g,'')+' KinetixCRM Backup.json';
+    const meta={name:name,parents:[DRIVE_CRM_FOLDER],mimeType:'application/json'};
+    const boundary='kinetix'+Date.now();
+    const body='--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify(meta)+
+      '\r\n--'+boundary+'\r\nContent-Type: application/json\r\n\r\n'+JSON.stringify(S)+'\r\n--'+boundary+'--';
+    const res=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{Authorization:'Bearer '+gmailToken,'Content-Type':'multipart/related; boundary='+boundary},body:body});
+    if(!res.ok)throw new Error('upload '+res.status);
+    S.lastDriveBackup=new Date().toISOString();save();
+    console.log('Drive auto-backup: '+name);
+  }catch(e){console.warn('Drive backup failed:',e)}
+}
 async function checkDriveUpdates(auto){
   if(!gmailToken){if(!auto){toast('Connect Google first (Data tab, Gmail) — one-time consent adds Drive read access');}return}
   try{
@@ -933,6 +948,7 @@ async function checkDriveUpdates(auto){
     }
     save();renderAll();
     toast(tot+' updates applied from '+files.length+' Claude patch file'+(files.length>1?'s':''));
+    autoDriveBackup();
   }catch(e){if(!auto)toast('Update check failed: '+e.message+' — fallback: Apply Claude patch on Data tab')}
 }
 
