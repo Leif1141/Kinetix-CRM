@@ -335,6 +335,7 @@ function showApp(user){
   document.getElementById('appScreen').style.display='block';
   document.getElementById('userName').textContent=user.displayName||user.email;
   startListening();
+  setTimeout(autoConnect,900);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -487,18 +488,36 @@ function matchRecords(text,senderEmail,strict){
 // ═══════════════════════════════════════════════════════════════
 // OUTLOOK (Microsoft Graph) SYNC
 // ═══════════════════════════════════════════════════════════════
+function ensureMsal(){
+  if(!msalInstance)msalInstance=new msal.PublicClientApplication({auth:{clientId:AZURE_CLIENT_ID,authority:'https://login.microsoftonline.com/'+AZURE_TENANT,redirectUri:window.location.origin+window.location.pathname},cache:{cacheLocation:'localStorage'}});
+  return msalInstance;
+}
+function setConnUI(id,txt){const el=document.getElementById(id);if(el){el.className='conn-status';el.textContent=txt}}
 async function connectOutlook(){
   if(!AZURE_CLIENT_ID){toast('Set AZURE_CLIENT_ID in the config');return}
   try{
-    if(!msalInstance)msalInstance=new msal.PublicClientApplication({auth:{clientId:AZURE_CLIENT_ID,authority:'https://login.microsoftonline.com/'+AZURE_TENANT,redirectUri:window.location.origin+window.location.pathname},cache:{cacheLocation:'sessionStorage'}});
+    ensureMsal();
     await msalInstance.initialize();
     const login=await msalInstance.loginPopup({scopes:['Mail.Read']});
     const token=await msalInstance.acquireTokenSilent({scopes:['Mail.Read'],account:login.account});
     outlookToken=token.accessToken;
-    document.getElementById('outlookConn').className='conn-status';
-    document.getElementById('outlookConn').textContent='Outlook: '+login.account.username;
+    setConnUI('outlookConn','Outlook: '+login.account.username);
     toast('Outlook connected');
+    autoPipeline();
   }catch(e){toast('Outlook connection failed: '+e.message);console.error(e)}
+}
+async function silentOutlook(){
+  if(!AZURE_CLIENT_ID)return false;
+  try{
+    ensureMsal();
+    await msalInstance.initialize();
+    const accs=msalInstance.getAllAccounts();
+    if(!accs.length)return false;
+    const token=await msalInstance.acquireTokenSilent({scopes:['Mail.Read'],account:accs[0]});
+    outlookToken=token.accessToken;
+    setConnUI('outlookConn','Outlook: '+accs[0].username);
+    return true;
+  }catch(e){console.warn('Outlook silent auth failed:',e);return false}
 }
 async function syncOutlookEmails(){
   if(!outlookToken)return 0;
@@ -532,19 +551,37 @@ async function syncOutlookEmails(){
 // ═══════════════════════════════════════════════════════════════
 // GMAIL SYNC
 // ═══════════════════════════════════════════════════════════════
-async function connectGmail(){
+let _gClient=null;
+function gClient(){
+  if(_gClient)return _gClient;
+  _gClient=google.accounts.oauth2.initTokenClient({client_id:GMAIL_CLIENT_ID,scope:'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/drive',callback:(resp)=>{
+    if(resp.error){console.warn('Google auth:',resp.error);return}
+    gmailToken=resp.access_token;
+    localStorage.setItem('kx_gAuth','1');
+    setConnUI('gmailConn','Gmail: connected');
+    checkDriveUpdates(true);
+    autoPipeline();
+  }});
+  return _gClient;
+}
+function connectGmail(){
   if(!GMAIL_CLIENT_ID){toast('Set GMAIL_CLIENT_ID in the config');return}
-  try{
-    const client=google.accounts.oauth2.initTokenClient({client_id:GMAIL_CLIENT_ID,scope:'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/drive',callback:(resp)=>{
-      if(resp.error){toast('Gmail auth failed');return}
-      gmailToken=resp.access_token;
-      document.getElementById('gmailConn').className='conn-status';
-      document.getElementById('gmailConn').textContent='Gmail: connected';
-      toast('Gmail connected');
-      checkDriveUpdates(true);
-    }});
-    client.requestAccessToken();
-  }catch(e){toast('Gmail connection failed: '+e.message)}
+  try{gClient().requestAccessToken()}catch(e){toast('Gmail connection failed: '+e.message)}
+}
+let _autoRan=false;
+async function autoPipeline(){
+  if(_autoRan)return;
+  const stale=!S||!S.lastSync||Date.now()-new Date(S.lastSync).getTime()>6*3600e3;
+  if(stale&&(outlookToken||gmailToken)){_autoRan=true;toast('Auto-sync running…');syncEmails()}
+  else if(gmailToken&&S&&(!S.lastDriveBackup||Date.now()-new Date(S.lastDriveBackup).getTime()>24*3600e3)){_autoRan=true;autoDriveBackup()}
+}
+async function autoConnect(){
+  await silentOutlook();
+  if(localStorage.getItem('kx_gAuth')&&GMAIL_CLIENT_ID){
+    const kick=()=>{if(!gmailToken){try{gClient().requestAccessToken({prompt:''})}catch(e){}}};
+    document.addEventListener('pointerdown',kick,{once:true});
+    kick();
+  }else if(outlookToken){autoPipeline()}
 }
 async function syncGmailEmails(){
   if(!gmailToken)return 0;
