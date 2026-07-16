@@ -524,7 +524,7 @@ async function silentOutlook(){
 async function syncOutlookEmails(){
   if(!outlookToken)return 0;
   const afterDate=new Date(Date.now()-45*864e5).toISOString();
-  let url='https://graph.microsoft.com/v1.0/me/messages?$filter=receivedDateTime ge '+afterDate+'&$top=100&$orderby=receivedDateTime desc&$select=id,internetMessageId,subject,receivedDateTime,sender,toRecipients,bodyPreview,webLink,hasAttachments';
+  let url='https://graph.microsoft.com/v1.0/me/messages?$filter=receivedDateTime ge '+afterDate+'&$top=100&$orderby=receivedDateTime desc&$select=id,internetMessageId,subject,receivedDateTime,sender,toRecipients,bodyPreview,webLink,hasAttachments,isDraft';
   let added=0,allMsgs=[];const attQueue=[];
   try{
     while(url&&allMsgs.length<500){
@@ -535,6 +535,7 @@ async function syncOutlookEmails(){
       url=data['@odata.nextLink']||null;
     }
     allMsgs.forEach(msg=>{
+      if(msg.isDraft)return; // drafts are not activity
       const key='ol_'+(msg.internetMessageId||msg.id);
       const sAddr=(msg.sender?.emailAddress?.address||'').toLowerCase();
       const _holders=[...S.companies,...S.advisors,...(S.people||[])].filter(r=>r.touches&&r.touches[key]);
@@ -692,7 +693,8 @@ function reconcileDraftActions(){
     if(!r.nextAction||!/entwurf|draft/i.test(r.nextAction))return;
     const lo=touchList(r).find(t=>t.dir==='out'&&t.src!=='Note');
     if(!lo)return;
-    const since=r.nextSet||'2000-01-01';
+    if(!r.nextSet)return; // only auto-complete actions with a known set-date
+    const since=r.nextSet;
     if((lo.date||'').slice(0,10)>=since){
       addTouch(r,'auto_'+r.id+'_'+(lo.date||'').slice(0,10),{date:new Date().toISOString(),dir:'out',subject:'\u2714 Auto-completed: '+r.nextAction.slice(0,90)+' (email sent '+fmtD(lo.date)+')',src:'Note'});
       r.nextAction='';r.nextDate='';r.nextSet='';n++;
