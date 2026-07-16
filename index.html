@@ -160,12 +160,12 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
 <div class="panel active" id="p-overview">
   <div class="kpis" id="ovKpis"></div>
   <div class="section"><div class="section-hdr">Suggested actions <span style="font-weight:400;font-size:11px">rule-based — act or dismiss</span></div><div id="suggBody"></div></div>
+  <div class="section"><div class="section-hdr">Recent activity</div><div id="recentBody"></div></div>
   <div class="ov-grid">
     <div>
       <div class="section"><div class="section-hdr">Favorites</div><div id="favBody"></div></div>
-      <div class="section"><div class="section-hdr">Custom lists <button class="sm" style="background:#fff" onclick="newList()">+ New list</button></div><div id="listsBody"></div></div>
     </div>
-    <div class="section"><div class="section-hdr">Recent activity</div><div id="recentBody"></div></div>
+    <div class="section"><div class="section-hdr">Custom lists <button class="sm" style="background:#fff" onclick="newList()">+ New list</button></div><div id="listsBody"></div></div>
   </div>
 </div>
 
@@ -288,7 +288,7 @@ const LIVE=STAGES.filter(s=>!['Closed','Dead'].includes(s));
 const CHANNELS=['','Cold email','Letter','Cold call','LinkedIn','Broker','Referral','Platform','Event','Inbound'];
 const DEADREASONS=['No response','Not for sale','Valuation gap','Too small','Too large','Bad fit','Lost to buyer','Other'];
 const STALE_DAYS={'Identified':null,'Contacted':7,'Replied':5,'Meeting':7,'NDA':10,'Info received':10,'IOI/LOI':7,'Diligence':14};
-const MY_ADDR=['leif@kinetixcap.com','leif.berger26@gmail.com','tommy@kinetix-industries.com'];
+const MY_ADDR=['leif@kinetixcap.com','leif.berger26@gmail.com','leif@kinetix-industries.de','leif@kinetix-industries.com','tommy@kinetix-industries.com'];
 const ACT_TYPES=['Call','Meeting','Note','Letter','LinkedIn'];
 const PRIORITIES=['','Urgent','High','Medium'];
 const PRIO_COL={'Urgent':'var(--red)','High':'#C6943E','Medium':'#434F80'};
@@ -299,7 +299,7 @@ const LEGAL=/\b(gmbh|co|kg|ag|kgaa|ohg|e\.k\.|ek|se|ltd|limited|plc|llp|inc|hold
 // ═══════════════════════════════════════════════════════════════
 let fbApp=null, db=null, auth=null, stateRef=null, currentUser=null;
 let S=null, profRec=null, charts={}, profChart=null;
-let sortK='lastc', sortD=-1, psortK='name', psortD=1;
+let sortK='lastc', sortD=-1, psortK='lastc', psortD=-1;
 let gmailToken=null, outlookToken=null, msalInstance=null;
 let _saving=false, _listenActive=false;
 
@@ -463,9 +463,10 @@ function matchRecords(text,senderEmail,strict){
   let hit=null;
   // 1. try sender-map first (exact email -> record mapping)
   if(se&&S.senderMap[se.replace(/\./g,'_')]){hit=findRec(S.senderMap[se.replace(/\./g,'_')]);if(hit)out.push(hit)}
-  // 2. try domain match
+  // 2. try domain match (never on freemail domains)
+  const FREEMAIL=new Set(['gmail.com','googlemail.com','icloud.com','me.com','mac.com','gmx.de','gmx.at','gmx.net','gmx.ch','web.de','t-online.de','outlook.com','outlook.de','hotmail.com','hotmail.de','live.com','yahoo.com','yahoo.de','aol.com','proton.me','protonmail.com','mail.com','posteo.de','freenet.de']);
   const dom=se.split('@')[1]||'';
-  if(!hit&&dom){const byDom=allOrgs().find(o=>(o.domain||'').toLowerCase()===dom||((o.email||'').split('@')[1]||'').toLowerCase()===dom);if(byDom)out.push(byDom)}
+  if(!hit&&dom&&!FREEMAIL.has(dom)){const byDom=allOrgs().find(o=>(o.domain||'').toLowerCase()===dom||((o.email||'').split('@')[1]||'').toLowerCase()===dom);if(byDom)out.push(byDom)}
   // 3. people email match
   if(se)(S.people||[]).forEach(p=>{if((p.email||'').toLowerCase()===se&&!out.includes(p)){out.push(p);if(p.orgId){const org=findRec(p.orgId);if(org&&!out.includes(org))out.push(org)}}});
   // 4. fuzzy name-token matching -- ONLY when strict=false (manual/inbox use)
@@ -539,9 +540,13 @@ async function syncOutlookEmails(){
       const _holders=[...S.companies,...S.advisors,...(S.people||[])].filter(r=>r.touches&&r.touches[key]);
       if(_holders.length){if(msg.hasAttachments&&!_holders[0].touches[key].att)attQueue.push({key,id:msg.id,holders:_holders});return}
       const dir=MY_ADDR.some(a=>sAddr.includes(a))?'out':'in';
-      const recipients=(msg.toRecipients||[]).map(r=>r.emailAddress?.address||'').filter(Boolean);
+      const recipients=(msg.toRecipients||[]).map(r=>(r.emailAddress?.address||'').toLowerCase()).filter(Boolean);
       const text=[msg.subject,msg.bodyPreview,...recipients].join(' ');
-      const recs=matchRecords(text,dir==='in'?sAddr:(recipients[0]||''),true);
+      const cand=dir==='in'?[sAddr]:recipients.filter(a=>!MY_ADDR.some(m=>a.includes(m)));
+      if(!cand.length)return;
+      if(cand.every(isIgnoredAddr))return;
+      let recs=[];
+      cand.forEach(a=>{matchRecords(text,a,true).forEach(x=>{if(!recs.includes(x))recs.push(x)})});
       const t={date:msg.receivedDateTime,dir,subject:msg.subject||'(no subject)',link:msg.webLink||'',src:'Kinetix',who:dir==='out'?recipients.join(', '):sAddr,prev:(msg.bodyPreview||'').replace(/\s+/g,' ').slice(0,200)};
       if(recs.length){recs.forEach(r=>{addTouch(r,key,t)});added++;if(msg.hasAttachments)attQueue.push({key,id:msg.id,holders:recs})}
       else{if(!(S.unmatched||[]).some(u=>u.key===key)){S.unmatched=S.unmatched||[];S.unmatched.push({...t,key,sender:sAddr})}}
@@ -617,9 +622,13 @@ async function syncGmailEmails(){
           const sender=(headers.from||'').toLowerCase();
           const sAddr=(sender.match(/[\w.+-]+@[\w.-]+/)||[''])[0];
           const dir=MY_ADDR.some(a=>sender.includes(a))?'out':'in';
-          const to=(headers.to||'');
+          const to=(headers.to||'').toLowerCase();
           const text=[headers.subject,to].join(' ');
-          const recs=matchRecords(text,dir==='in'?sAddr:((to.match(/[\w.+-]+@[\w.-]+/)||[''])[0]),true);
+          const cand=dir==='in'?[sAddr]:(to.match(/[\w.+-]+@[\w.-]+/g)||[]).filter(a=>!MY_ADDR.some(mm=>a.includes(mm)));
+          if(!cand.length)return;
+          if(cand.every(isIgnoredAddr))return;
+          let recs=[];
+          cand.forEach(a=>{matchRecords(text,a,true).forEach(x=>{if(!recs.includes(x))recs.push(x)})});
           const date=new Date(parseInt(m.internalDate)).toISOString();
           const t={date,dir,subject:headers.subject||'(no subject)',link:'https://mail.google.com/mail/u/0/#all/'+th.id,src:'Gmail',who:dir==='out'?to:sAddr};
           if(recs.length){recs.forEach(r=>{addTouch(r,key,t)});added++}
@@ -634,6 +643,49 @@ async function syncGmailEmails(){
 // ═══════════════════════════════════════════════════════════════
 // COMBINED SYNC
 // ═══════════════════════════════════════════════════════════════
+function personOrg(p){
+  if(p.orgId){const o=findRec(p.orgId);if(o)return o}
+  const fn=normName(p.firm||'');if(!fn)return null;
+  return allOrgs().find(o=>normName(dispName(o))===fn)||null;
+}
+function backfillPersonTouches(){
+  const map={};
+  (S.people||[]).forEach(p=>{const e=(p.email||'').toLowerCase();if(e){(map[e]=map[e]||[]).push(p)}});
+  let n=0;
+  [...(S.companies||[]),...(S.advisors||[])].forEach(o=>{
+    Object.keys(o.touches||{}).forEach(k=>{
+      const t=o.touches[k];
+      (((t.who||'').toLowerCase().match(/[\w.+-]+@[\w.-]+/g))||[]).forEach(a=>{
+        (map[a]||[]).forEach(p=>{if(!(p.touches||{})[k]){addTouch(p,k,t);n++}});
+      });
+    });
+  });
+  return n;
+}
+function isIgnoredAddr(a){
+  a=(a||'').toLowerCase();if(!a)return false;
+  if((S.ignoredSenders||{})[a.replace(/\./g,'_')])return true;
+  const d=a.split('@')[1]||'';
+  return !!(d&&(S.ignoredDomains||{})[d.replace(/\./g,'_')]);
+}
+function retriageUnmatched(){
+  let assigned=0,dropped=0;
+  S.unmatched=(S.unmatched||[]).filter(u=>{
+    if(allRecs().some(r=>r.touches&&r.touches[u.key])){dropped++;return false}
+    const addrs=u.dir==='out'?(((u.who||'').toLowerCase().match(/[\w.+-]+@[\w.-]+/g))||[]):[((u.sender||'').toLowerCase())];
+    const real=addrs.filter(a=>a&&a.includes('@')&&!MY_ADDR.some(m=>a.includes(m)));
+    if(u.src!=='Granola'&&!real.length){dropped++;return false}
+    if(real.length&&real.every(isIgnoredAddr)){dropped++;return false}
+    let recs=[];
+    real.forEach(a=>{matchRecords((u.subject||'')+' '+(u.who||''),a,true).forEach(x=>{if(!recs.includes(x))recs.push(x)})});
+    if(recs.length){
+      const t={date:u.date,dir:u.dir,subject:u.subject,link:u.link||'',src:u.src,who:u.who||u.sender,prev:u.prev||''};
+      recs.forEach(r=>addTouch(r,u.key,t));assigned++;return false;
+    }
+    return true;
+  });
+  return {assigned,dropped};
+}
 function reconcileDraftActions(){
   let n=0;
   allRecs().forEach(r=>{
@@ -688,6 +740,8 @@ async function syncEmails(){
     const [ol,gm,gr]=await Promise.all([syncOutlookEmails(),syncGmailEmails(),syncGranolaCalls()]);
     total=ol+gm+gr;
     try{await checkDriveUpdates(true)}catch(e){}
+    backfillPersonTouches();
+    const _rt=retriageUnmatched();if(_rt.assigned||_rt.dropped)toast('Inbox triage: '+_rt.assigned+' auto-assigned, '+_rt.dropped+' cleared');
     const _rd=reconcileDraftActions();if(_rd)toast(_rd+' draft action'+(_rd>1?'s':'')+' auto-completed (email was sent)');
     S.lastSync=new Date().toISOString();
     save();
@@ -740,11 +794,16 @@ function renderOverview(){
   const favs=allRecs().filter(r=>r.fav);
   document.getElementById('favBody').innerHTML=favs.length?'<table>'+favs.map(r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))"><td>'+starHtml(r)+' <b>'+esc(dispName(r))+'</b></td><td class="muted">'+fmtAgo(lastTouch(r))+'</td></tr>').join('')+'</table>':'<p class="muted" style="padding:12px">Star records to pin them here.</p>';
   document.getElementById('listsBody').innerHTML=(S.customLists||[]).map(l=>{const items=allRecs().filter(r=>(r.lists||[]).includes(l));return '<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b style="cursor:pointer" onclick="goList(\''+esc(l)+'\')">'+esc(l)+'</b> <span class="muted">('+items.length+')</span> <button class="sm" onclick="delList(\''+esc(l)+'\')" style="float:right">×</button></div>'}).join('')||'<p class="muted" style="padding:12px">No custom lists yet.</p>';
-  const recent=allRecs().map(r=>{const ts=touchList(r);if(!ts.length)return null;const wk=ts.filter(t=>daysAgo(t.date)<7).length;return {r,t:ts[0],n:wk}}).filter(Boolean).sort((a,b)=>(b.t.date||'').localeCompare(a.t.date||'')).slice(0,15);
-  document.getElementById('recentBody').innerHTML=recent.length?'<table>'+recent.map(x=>'<tr class="rowlink" onclick="openProfile(findRec(\''+x.r.id+'\'))"><td class="muted" style="width:70px;white-space:nowrap">'+fmtD(x.t.date)+'</td><td><b>'+esc(dispName(x.r))+'</b></td><td class="muted" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.t.subject)+(x.n>1?' <span class="chip">+'+(x.n-1)+' more this week</span>':'')+'</td><td class="muted" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(x.r.nextAction?'\u2192 '+esc(x.r.nextAction.slice(0,80)):'')+'</td></tr>').join('')+'</table>':'<p class="muted" style="padding:12px">No activity yet. Sync to pull emails.</p>';
+  const recent=allRecs().map(r=>{const ts=touchList(r);if(!ts.length)return null;const wk=ts.filter(t=>daysAgo(t.date)<7).length;return {r,t:ts[0],n:wk}}).filter(Boolean).sort((a,b)=>(b.t.date||'').localeCompare(a.t.date||'')).slice(0,30);
+  document.getElementById('recentBody').innerHTML=recent.length?'<table><tr><th style="width:64px">Date</th><th style="width:18%">Name</th><th style="width:30%">Subject</th><th>Summary</th></tr>'+recent.map(x=>{const sum=x.t.prev||x.t.note||'';return '<tr class="rowlink" onclick="openProfile(findRec(\''+x.r.id+'\'))"><td class="muted" style="white-space:nowrap;vertical-align:top">'+fmtD(x.t.date)+'</td><td style="vertical-align:top"><b>'+esc(dispName(x.r))+'</b>'+(x.n>1?' <span class="chip">+'+(x.n-1)+' this wk</span>':'')+'</td><td style="vertical-align:top">'+(x.t.dir==='out'?'<span style="color:#2E3C65">\u2191</span> ':'<span style="color:#C6943E">\u2193</span> ')+esc(x.t.subject)+'</td><td class="muted" style="vertical-align:top">'+esc(sum.slice(0,180))+'</td></tr>'}).join('')+'</table>':'<p class="muted" style="padding:12px">No activity yet. Sync to pull emails.</p>';
 }
 
-function dismissSugg(k){S.dismissed[k]=today();save();renderOverview()}
+function dismissSugg(k){
+  S.dismissed[k]=today();
+  if(k.startsWith('due_')){const r=findRec(k.slice(4));if(r){r.nextAction='';r.nextDate='';r.priority='';r.nextSet=''}}
+  save();renderAll();
+}
+function isDismissed(k){return !!(S.dismissed&&S.dismissed[k]&&daysAgo(S.dismissed[k])<14)}
 function newList(){const n=prompt('List name:');if(n&&!(S.customLists||[]).includes(n)){S.customLists=S.customLists||[];S.customLists.push(n);save();renderOverview()}}
 function delList(n){if(!confirm('Delete list "'+n+'"? Records stay.'))return;S.customLists=(S.customLists||[]).filter(x=>x!==n);allRecs().forEach(r=>{if(r.lists)r.lists=r.lists.filter(x=>x!==n)});save();renderAll()}
 function goTab(t){document.querySelector('.tab[data-t="'+t+'"]')?.click()}
@@ -786,11 +845,11 @@ function renderPeople(){
   const q=(document.getElementById('pSearch').value||'').toLowerCase();
   const ty=tsel.value,has=document.getElementById('pHas').value;
   let rows=(S.people||[]).filter(p=>
-    (!q||p.name.toLowerCase().includes(q)||(p.firm||'').toLowerCase().includes(q)||(p.title||'').toLowerCase().includes(q))&&
+    (!q||(p.name||'').toLowerCase().includes(q)||(p.firm||'').toLowerCase().includes(q)||(p.title||'').toLowerCase().includes(q))&&
     (!ty||p.ptype===ty)&&
     (!has||(has==='email'&&p.email)||(has==='linkedin'&&p.linkedin)||(has==='path'&&p.networkPath)||(has==='touch'&&Object.keys(p.touches||{}).length))
   );
-  const val=p=>{switch(psortK){case 'name':return p.name.toLowerCase();case 'firm':return (p.firm||'').toLowerCase();case 'lastc':return lastTouch(p)||'';default:return ''}};
+  const val=p=>{switch(psortK){case 'name':return (p.name||'').toLowerCase();case 'firm':return (p.firm||'').toLowerCase();case 'lastc':return lastTouch(p)||'';default:return ''}};
   rows.sort((a,b)=>{const va=val(a),vb=val(b);return va<vb?-psortD:va>vb?psortD:0});
   document.getElementById('pCount').textContent=rows.length+' of '+(S.people||[]).length;
   const hdr=(k,label)=>'<th onclick="sortPeople(\''+k+'\')">'+label+(psortK===k?' <span class="arr">'+(psortD>0?'▲':'▼')+'</span>':'')+'</th>';
@@ -842,10 +901,10 @@ function renderFollowups(){
   const overdue=withDates.filter(r=>r.nextDate<t);
   const dueToday=withDates.filter(r=>r.nextDate===t);
   const week=withDates.filter(r=>r.nextDate>t&&daysAgo(r.nextDate)>-8);
-  const stale=live.filter(c=>isStale(c)&&!c.nextDate);
+  const stale=live.filter(c=>isStale(c)&&!c.nextDate&&!isDismissed('stale_'+c.id));
   const noAction=live.filter(c=>c.stage!=='Identified'&&!c.nextDate&&!isStale(c));
-  const resurrect=(S.companies||[]).filter(c=>c.stage==='Dead'&&c.revisitDate&&c.revisitDate<=t);
-  const advDue=(S.advisors||[]).filter(a=>{const lt=lastTouch(a);return lt&&daysAgo(lt)>(a.cadence||30)&&!a.nextDate});
+  const resurrect=(S.companies||[]).filter(c=>c.stage==='Dead'&&c.revisitDate&&c.revisitDate<=t&&!isDismissed('rev_'+c.id));
+  const advDue=(S.advisors||[]).filter(a=>{const lt=lastTouch(a);return lt&&daysAgo(lt)>(a.cadence||30)&&!a.nextDate&&!isDismissed('cad_'+a.id)});
   const n=overdue.length+dueToday.length;
   const badge=document.getElementById('fuBadge');badge.style.display=n?'inline-block':'none';badge.textContent=n;
   const pr={'Urgent':0,'High':1,'Medium':2,'':3,undefined:3};
@@ -860,7 +919,7 @@ function renderFollowups(){
     sec('⚠ Overdue',overdue.sort(psort),'var(--red)',row)+
     sec('Due today',dueToday.sort(psort),'#C6943E',row)+
     sec('This week ('+_wc+')',week.sort(psort),'var(--navy)',row)+
-    sec('Stale deals (no scheduled action)',stale,'⌣4F80',rowS)+
+    sec('Stale deals (no scheduled action)',stale,'#434F80',rowS)+
     sec('No action scheduled',noAction,'#8C97B8',rowS)+
     sec('Resurrect (revisit date passed)',resurrect,'var(--green)',rowR)+
     sec('Advisor check-in due',advDue,'var(--navy2)',rowA)||'<p class="muted" style="padding:14px">All clear — no overdue actions or stale deals.</p>';
@@ -873,22 +932,36 @@ function renderInbox(){
   const b=document.getElementById('inbBadge');
   b.style.display=(S.unmatched||[]).length?'inline-block':'none';b.textContent=(S.unmatched||[]).length;
   const opts='<option value="">Assign to…</option><optgroup label="Targets">'+(S.companies||[]).map(c=>'<option value="'+c.id+'">'+esc(c.name)+'</option>').join('')+'</optgroup><optgroup label="Advisors">'+(S.advisors||[]).map(a=>'<option value="'+a.id+'">'+esc(a.firm)+'</option>').join('')+'</optgroup>';
-  document.getElementById('inboxBody').innerHTML=(S.unmatched||[]).length?(S.unmatched||[]).map((u,i)=>'<div class="inbox-item"><div class="body"><b>'+esc(u.subject)+'</b><div class="snip">'+esc(u.sender)+' · '+fmtD(u.date)+' · '+u.src+'</div></div><select class="assign" onchange="assignEmail('+i+',this.value)">'+opts+'</select></div>').join(''):'<p class="muted" style="padding:14px">No unmatched emails. Sync to pull new ones.</p>';
+  document.getElementById('inboxBody').innerHTML=(S.unmatched||[]).length?(S.unmatched||[]).map((u,i)=>'<div class="inbox-item"><div class="body"><b>'+esc(u.subject)+'</b><div class="snip">'+esc(u.dir==='out'?('to: '+(u.who||u.sender)):u.sender)+' · '+fmtD(u.date)+' · '+u.src+'</div></div><select class="assign" onchange="assignEmail('+i+',this.value)">'+opts+'</select><button class="sm" onclick="ignoreUnmatched('+i+',false)" title="Ignore this sender">Ignore</button><button class="sm" onclick="ignoreUnmatched('+i+',true)" title="Ignore the whole domain">Ignore domain</button></div>').join(''):'<p class="muted" style="padding:14px">No unmatched emails. Sync to pull new ones.</p>';
+}
+function ignoreUnmatched(i,dom){
+  const u=(S.unmatched||[])[i];if(!u)return;
+  const base=u.dir==='out'?(u.who||''):(u.sender||'');
+  const a=((base.toLowerCase().match(/[\w.+-]+@[\w.-]+/))||[base.toLowerCase()])[0];
+  if(!a){return}
+  S.ignoredSenders=S.ignoredSenders||{};S.ignoredDomains=S.ignoredDomains||{};
+  if(dom&&a.includes('@'))S.ignoredDomains[a.split('@')[1].replace(/\./g,'_')]=today();
+  else S.ignoredSenders[a.replace(/\./g,'_')]=today();
+  const r=retriageUnmatched();
+  save();renderAll();
+  toast('Ignored '+(dom&&a.includes('@')?'@'+a.split('@')[1]:a)+' — '+r.dropped+' item'+(r.dropped===1?'':'s')+' cleared');
 }
 function assignEmail(i,val){
   const u=(S.unmatched||[])[i];if(!u||!val)return;
-  const senderAddr=(u.sender||'').toLowerCase().match(/[\w.+-]+@[\w.-]+/)?.[0]||'';
-  // map sender for future auto-match (Firebase key-safe: replace dots)
-  if(senderAddr){S.senderMap=S.senderMap||{};S.senderMap[senderAddr.replace(/\./g,'_')]=val}
+  const _base=u.dir==='out'?(u.who||''):(u.sender||'');
+  const senderAddr=(_base.toLowerCase().match(/[\w.+-]+@[\w.-]+/))?.[0]||'';
+  // map counterparty address for future auto-match (Firebase key-safe: replace dots)
+  if(senderAddr&&!MY_ADDR.some(m=>senderAddr.includes(m))){S.senderMap=S.senderMap||{};S.senderMap[senderAddr.replace(/\./g,'_')]=val}
   let rec;
   if(val.startsWith('r'))rec=findRec(val);
   if(!rec)return;
-  const t={date:u.date,dir:u.dir,subject:u.subject,link:u.link,src:u.src,who:u.sender,gid:u.gid};
+  const t={date:u.date,dir:u.dir,subject:u.subject,link:u.link,src:u.src,who:u.who||u.sender,prev:u.prev||'',gid:u.gid};
   addTouch(rec,u.key,t);
   // also log to linked org
   if(rec.orgId){const org=findRec(rec.orgId);if(org)addTouch(org,u.key,t)}
   if(rec.kind!=='person'){const ppl=orgPeople(rec);ppl.forEach(p=>{if(senderAddr&&(p.email||'').toLowerCase()===senderAddr)addTouch(p,u.key,t)})}
   S.unmatched=(S.unmatched||[]).filter((_,j)=>j!==i);
+  retriageUnmatched();
   save();renderAll();
 }
 
@@ -987,6 +1060,15 @@ function applyPatchOps(ops){
       }else if(o.op==='mapEmail'){
         const r=patchFind(o.match);
         if(r&&o.email){S.senderMap=S.senderMap||{};S.senderMap[o.email.toLowerCase().replace(/\./g,'_')]=r.id;made++}else skipped++;
+      }else if(o.op==='ignore'){
+        S.ignoredSenders=S.ignoredSenders||{};S.ignoredDomains=S.ignoredDomains||{};
+        if(o.email){S.ignoredSenders[o.email.toLowerCase().replace(/\./g,'_')]=today();made++}
+        else if(o.domain){S.ignoredDomains[o.domain.toLowerCase().replace(/\./g,'_')]=today();made++}
+        else skipped++;
+      }else if(o.op==='setField'){
+        const r=patchFind(o.match);
+        const _ok=['notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','detail'];
+        if(r&&o.field&&_ok.includes(o.field)){r[o.field]=o.value;made++}else skipped++;
       }else skipped++;
     }catch(e){skipped++}
   }
@@ -998,6 +1080,7 @@ function applyPatchObj(p,name,force){
   if(S.appliedPatchTitles[name]&&!force)return null;
   const r=applyPatchOps(p.ops);
   S.appliedPatchTitles[name]=today();
+  try{backfillPersonTouches();const _rt=retriageUnmatched();r.made+=_rt.assigned}catch(e){console.warn('post-patch triage:',e)}
   return r;
 }
 function applyPatchFile(ev){
@@ -1077,6 +1160,10 @@ function filesHtml(r){
   (r.driveFiles||[]).forEach(f=>{h+='<div style="margin-bottom:4px"><a href="'+esc(f.link)+'" target="_blank">'+esc(f.name)+'</a> <span class="muted">'+esc(f.type||'')+'</span></div>'});
   const _seen=new Set();
   touchList(r).forEach(t=>{(t.att||[]).forEach(n=>{if(_seen.has(n))return;_seen.add(n);h+='<div style="margin-bottom:4px">\uD83D\uDCCE '+esc(n)+' <span class="muted">'+fmtD(t.date)+(t.dir==='out'?' \u00B7 sent':' \u00B7 received')+'</span>'+(t.link?' <a href="'+esc(t.link)+'" target="_blank">\u2197</a>':'')+'</div>'})});
+  if(r.kind==='person'){
+    const o=personOrg(r);
+    if(o)touchList(o).forEach(t=>{(t.att||[]).forEach(n=>{if(_seen.has(n))return;_seen.add(n);h+='<div style="margin-bottom:4px">\uD83D\uDCCE '+esc(n)+' <span class="muted">'+fmtD(t.date)+(t.dir==='out'?' \u00B7 sent':' \u00B7 received')+' \u00B7 via '+esc(dispName(o))+'</span>'+(t.link?' <a href="'+esc(t.link)+'" target="_blank">\u2197</a>':'')+'</div>'})});
+  }
   return h||'<span class="muted">No files linked</span>';
 }
 function addLink(){const t=prompt('Link title:');if(!t)return;const u=prompt('URL:');if(!u)return;profRec.links=profRec.links||[];profRec.links.push({title:t,url:u});save();openProfile(profRec)}
