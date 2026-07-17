@@ -539,7 +539,7 @@ async function syncOutlookEmails(){
       const sAddr=(msg.sender?.emailAddress?.address||'').toLowerCase();
       const _holders=[...S.companies,...S.advisors,...(S.people||[])].filter(r=>r.touches&&r.touches[key]);
       if(_holders.length){
-        if(!_holders[0].touches[key].prev&&msg.bodyPreview)_holders.forEach(r=>{r.touches[key].prev=(msg.bodyPreview||'').replace(/\s+/g,' ').slice(0,200)});
+        if(!_holders[0].touches[key].prev&&msg.bodyPreview)_holders.forEach(r=>{r.touches[key].prev=cleanPrev(msg.bodyPreview)});
         if(msg.hasAttachments&&!_holders[0].touches[key].att)attQueue.push({key,id:msg.id,holders:_holders});
         return;
       }
@@ -551,7 +551,7 @@ async function syncOutlookEmails(){
       if(cand.every(isIgnoredAddr))return;
       let recs=[];
       cand.forEach(a=>{matchRecords(text,a,true).forEach(x=>{if(!recs.includes(x))recs.push(x)})});
-      const t={date:msg.receivedDateTime,dir,subject:msg.subject||'(no subject)',link:msg.webLink||'',src:'Kinetix',who:dir==='out'?recipients.join(', '):sAddr,prev:(msg.bodyPreview||'').replace(/\s+/g,' ').slice(0,200)};
+      const t={date:msg.receivedDateTime,dir,subject:msg.subject||'(no subject)',link:msg.webLink||'',src:'Kinetix',who:dir==='out'?recipients.join(', '):sAddr,prev:cleanPrev(msg.bodyPreview)};
       if(recs.length){recs.forEach(r=>{addTouch(r,key,t)});added++;if(msg.hasAttachments)attQueue.push({key,id:msg.id,holders:recs})}
       else{if(!(S.unmatched||[]).some(u=>u.key===key)){S.unmatched=S.unmatched||[];S.unmatched.push({...t,key,sender:sAddr})}}
     });
@@ -647,6 +647,27 @@ async function syncGmailEmails(){
 // ═══════════════════════════════════════════════════════════════
 // COMBINED SYNC
 // ═══════════════════════════════════════════════════════════════
+function cleanPrev(s){
+  if(!s)return '';
+  let t=String(s).replace(/\s+/g,' ');
+  // cut at quoted-thread markers and signature separators
+  const cutters=[/_{4,}/, / From: /i, / Von: /i, / Sent: /i, / Gesendet: /i, /-{3,}\s*(Original|Urspr)/i, / Am [A-Z][a-z]+, \d{1,2}\./, / On .{3,30} wrote:/i, /Diese E-Mail enth/i, /This e-?mail (and any attachments )?(is|are) confidential/i];
+  cutters.forEach(rx=>{const m=t.search(rx);if(m>0)t=t.slice(0,m)});
+  // drop leading salutation
+  t=t.replace(/^\s*(Hallo|Hi|Liebe[rs]?|Sehr geehrte[rs]?|Dear|Guten (Tag|Morgen|Abend))[^,!.]{0,50}[,!.]\s*/i,'');
+  // drop closing + signature
+  const closers=[/\b(Beste|Viele|Liebe|Herzliche|Freundliche) Gr(ü|u)(ß|ss)e\b/i,/\bMit freundlichen\b/i,/\bBest regards\b/i,/\bKind regards\b/i,/\bBest,\b/,/\bThanks,\b/i,/\bVielen Dank und\b/i,/\bBis sehr bald\b/i,/\bBis bald\b/i];
+  closers.forEach(rx=>{const m=t.search(rx);if(m>20)t=t.slice(0,m)});
+  return t.trim().slice(0,200);
+}
+function migratePrevClean(){
+  if(S.prevCleanV1)return;
+  [...(S.companies||[]),...(S.advisors||[]),...(S.people||[])].forEach(r=>{
+    Object.values(r.touches||{}).forEach(t=>{if(t.prev)t.prev=cleanPrev(t.prev)});
+  });
+  (S.unmatched||[]).forEach(u=>{if(u.prev)u.prev=cleanPrev(u.prev)});
+  S.prevCleanV1=1;save();
+}
 function personOrg(p){
   if(p.orgId){const o=findRec(p.orgId);if(o)return o}
   const fn=normName(p.firm||'');if(!fn)return null;
@@ -806,7 +827,7 @@ function renderOverview(){
     .filter(x=>{const k=(x.t.date||'')+'|'+(x.t.subject||'');if(_seenT.has(k))return false;_seenT.add(k);return true})
     .slice(0,30);
   document.getElementById('recentBody').innerHTML=recent.length?'<table><tr><th style="width:64px">Date</th><th style="width:20%">Name</th><th style="width:30%">Subject</th><th>Summary</th></tr>'+recent.map(x=>{
-    const sum=x.t.prev||x.t.note||'';
+    const sum=cleanPrev(x.t.prev)||x.t.note||'';
     let sec='';
     if(x.r.kind==='person')sec=x.r.firm||'';
     else{const pp=orgPeople(x.r);sec=(pp[0]&&pp[0].name)||x.r.contact||''}
@@ -1096,7 +1117,8 @@ function applyPatchOps(ops){
   return {made,skipped};
 }
 function applyPatchObj(p,name,force){
-  if(p.kinetixPatch!==1)throw new Error('not a Kinetix patch file');
+  if(!p||!p.kinetixPatch)throw new Error('not a Kinetix patch file'); // accept 1 or true
+
   S.appliedPatchTitles=S.appliedPatchTitles||{};
   if(S.appliedPatchTitles[name]&&!force)return null;
   const r=applyPatchOps(p.ops);
@@ -1142,15 +1164,17 @@ async function checkDriveUpdates(auto){
     if(!res.ok)throw new Error('Drive list failed ('+res.status+')');
     const files=((await res.json()).files||[]).filter(f=>!(S.appliedPatchTitles||{})[f.name]);
     if(!files.length){if(!auto)toast('No new CRM updates in Drive');return}
-    let tot=0;
+    let tot=0,bad=[];
     for(const f of files){
-      const dl=await fetch('https://www.googleapis.com/drive/v3/files/'+f.id+'?alt=media',{headers:{Authorization:'Bearer '+gmailToken}});
-      const p=await dl.json();
-      const r=applyPatchObj(p,f.name,false);
-      if(r)tot+=r.made;
+      try{ // one bad file must never block the rest
+        const dl=await fetch('https://www.googleapis.com/drive/v3/files/'+f.id+'?alt=media',{headers:{Authorization:'Bearer '+gmailToken}});
+        const p=await dl.json();
+        const r=applyPatchObj(p,f.name,false);
+        if(r)tot+=r.made;
+      }catch(e){bad.push(f.name+': '+e.message);console.warn('patch failed:',f.name,e)}
     }
     save();renderAll();
-    toast(tot+' updates applied from '+files.length+' Claude patch file'+(files.length>1?'s':''));
+    toast(tot+' updates applied from '+files.length+' Claude patch file'+(files.length>1?'s':'')+(bad.length?' — FAILED: '+bad.join('; '):''));
     autoDriveBackup();
   }catch(e){toast('⚠ Claude-update check FAILED: '+e.message+(String(e.message).includes('403')?' — is the Drive API enabled in the Google Cloud project?':''))}
 }
@@ -1243,7 +1267,7 @@ function openProfile(rec){
     '<div class="pbox"><h4>Files <button class="sm" onclick="addLink()">+ Link</button></h4>'+filesHtml(rec)+'</div>'+
     (isT?'<div class="pbox"><h4>Deal maths</h4><div class="pgrid">'+fld('dm_e','EBITDA (€m)',rec.ebitda,'number')+fld('dm_m','Multiple',6,'number')+fld('dm_d','Debt %',60,'number')+fld('dm_r','Interest rate %',5,'number')+fld('dm_t','Tenor (yrs)',7,'number')+'</div><button class="sm primary" onclick="calcMaths()" style="margin-top:6px">Calculate</button><div id="dm_out" style="margin-top:8px"></div></div>':'')+
   '</div><div class="mcol-r">'+
-    (function(){const lt=touchList(rec)[0];if(!lt)return '';return '<div class="pbox" style="border-left:3px solid '+(lt.dir==='out'?'#2E3C65':'#C6943E')+'"><h4>Latest activity</h4><div style="font-size:12px"><b>'+esc(lt.subject||'')+'</b><div class="muted" style="margin-top:2px">'+fmtD(lt.date)+' \u00B7 '+(lt.dir==='out'?'sent':'received')+(lt.who?' \u00B7 '+esc(lt.who):'')+(lt.src?' \u00B7 '+esc(lt.src):'')+'</div>'+(lt.prev?'<div class="tnote" style="margin-top:6px">'+esc(lt.prev)+'</div>':(lt.note?'<div class="tnote" style="margin-top:6px">'+esc(lt.note)+'</div>':''))+'</div></div>'})()+
+    (function(){const lt=touchList(rec).find(t=>!(t.src==='Note'&&/^✔/.test(t.subject||'')));if(!lt)return '';return '<div class="pbox" style="border-left:3px solid '+(lt.dir==='out'?'#2E3C65':'#C6943E')+'"><h4>Latest activity</h4><div style="font-size:12px"><b>'+esc(lt.subject||'')+'</b><div class="muted" style="margin-top:2px">'+fmtD(lt.date)+' \u00B7 '+(lt.dir==='out'?'sent':'received')+(lt.who?' \u00B7 '+esc(lt.who):'')+(lt.src?' \u00B7 '+esc(lt.src):'')+'</div>'+(lt.prev?'<div class="tnote" style="margin-top:6px">'+esc(cleanPrev(lt.prev))+'</div>':(lt.note?'<div class="tnote" style="margin-top:6px">'+esc(lt.note)+'</div>':''))+'</div></div>'})()+
     '<div class="pbox"><h4>Log activity</h4><div class="inline">'+selFld('la_type','Type',ACT_TYPES,'Call')+fld('la_date','Date',today(),'date')+fld('la_txt','Subject','')+'</div><label>Note</label><textarea id="la_note" rows="2"></textarea><button class="sm primary" onclick="logActivity()" style="margin-top:4px">Log</button></div>'+
     '<div class="pbox"><h4>Activity timeline <span class="muted" style="font-weight:400">'+Object.keys(rec.touches||{}).length+' activities</span></h4>'+
       '<div class="tl-ctl">Period: <select onchange="setTlPeriod(+this.value)"><option value="13"'+(tlPeriod===13?' selected':'')+'>13 weeks</option><option value="26"'+(tlPeriod===26?' selected':'')+'>26 weeks</option><option value="52"'+(tlPeriod===52?' selected':'')+'>52 weeks</option></select> '+
@@ -1385,7 +1409,7 @@ async function geocodeMissing(){
   }
   save();renderLocations();toast('Geocoding done');
 }
-function renderAll(){if(!S)return;renderOverview();renderOrgs();renderPeople();renderPipeline();renderFollowups();renderInbox();renderReports();renderData();if(document.getElementById('p-locations').classList.contains('active'))renderLocations()}
+function renderAll(){if(!S)return;try{migratePrevClean()}catch(e){}renderOverview();renderOrgs();renderPeople();renderPipeline();renderFollowups();renderInbox();renderReports();renderData();if(document.getElementById('p-locations').classList.contains('active'))renderLocations()}
 
 document.getElementById('tabs').addEventListener('click',e=>{
   const t=e.target.closest('.tab');if(!t)return;
