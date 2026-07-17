@@ -175,8 +175,7 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
     <select id="oKind" onchange="renderOrgs()"><option value="">All kinds</option><option value="target">Targets</option><option value="advisor">Advisors / network</option></select>
     <select id="oStage" onchange="renderOrgs()"><option value="">All stages / statuses</option></select>
     <select id="oList" onchange="renderOrgs()"><option value="">All lists</option><option value="__fav">★ Favorites</option></select>
-    <button class="sm" onclick="openProfile(newCompany())">+ Target</button>
-    <button class="sm" onclick="openProfile(newAdvisor())">+ Advisor</button>
+    <select class="sm" onchange="if(this.value==='t')openProfile(newCompany());else if(this.value==='a')openProfile(newAdvisor());this.value=''"><option value="">+ Add…</option><option value="t">Target company</option><option value="a">Advisor / partner</option></select>
     <span class="muted" id="oCount"></span>
   </div>
   <div class="section" id="orgTable"></div>
@@ -539,7 +538,11 @@ async function syncOutlookEmails(){
       const key='ol_'+(msg.internetMessageId||msg.id);
       const sAddr=(msg.sender?.emailAddress?.address||'').toLowerCase();
       const _holders=[...S.companies,...S.advisors,...(S.people||[])].filter(r=>r.touches&&r.touches[key]);
-      if(_holders.length){if(msg.hasAttachments&&!_holders[0].touches[key].att)attQueue.push({key,id:msg.id,holders:_holders});return}
+      if(_holders.length){
+        if(!_holders[0].touches[key].prev&&msg.bodyPreview)_holders.forEach(r=>{r.touches[key].prev=(msg.bodyPreview||'').replace(/\s+/g,' ').slice(0,200)});
+        if(msg.hasAttachments&&!_holders[0].touches[key].att)attQueue.push({key,id:msg.id,holders:_holders});
+        return;
+      }
       const dir=MY_ADDR.some(a=>sAddr.includes(a))?'out':'in';
       const recipients=(msg.toRecipients||[]).map(r=>(r.emailAddress?.address||'').toLowerCase()).filter(Boolean);
       const text=[msg.subject,msg.bodyPreview,...recipients].join(' ');
@@ -796,8 +799,19 @@ function renderOverview(){
   const favs=allRecs().filter(r=>r.fav);
   document.getElementById('favBody').innerHTML=favs.length?'<table>'+favs.map(r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))"><td>'+starHtml(r)+' <b>'+esc(dispName(r))+'</b></td><td class="muted">'+fmtAgo(lastTouch(r))+'</td></tr>').join('')+'</table>':'<p class="muted" style="padding:12px">Star records to pin them here.</p>';
   document.getElementById('listsBody').innerHTML=(S.customLists||[]).map(l=>{const items=allRecs().filter(r=>(r.lists||[]).includes(l));return '<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b style="cursor:pointer" onclick="goList(\''+esc(l)+'\')">'+esc(l)+'</b> <span class="muted">('+items.length+')</span> <button class="sm" onclick="delList(\''+esc(l)+'\')" style="float:right">×</button></div>'}).join('')||'<p class="muted" style="padding:12px">No custom lists yet.</p>';
-  const recent=allRecs().map(r=>{const ts=touchList(r);if(!ts.length)return null;const wk=ts.filter(t=>daysAgo(t.date)<7).length;return {r,t:ts[0],n:wk}}).filter(Boolean).sort((a,b)=>(b.t.date||'').localeCompare(a.t.date||'')).slice(0,30);
-  document.getElementById('recentBody').innerHTML=recent.length?'<table><tr><th style="width:64px">Date</th><th style="width:18%">Name</th><th style="width:30%">Subject</th><th>Summary</th></tr>'+recent.map(x=>{const sum=x.t.prev||x.t.note||'';return '<tr class="rowlink" onclick="openProfile(findRec(\''+x.r.id+'\'))"><td class="muted" style="white-space:nowrap;vertical-align:top">'+fmtD(x.t.date)+'</td><td style="vertical-align:top"><b>'+esc(dispName(x.r))+'</b>'+(x.n>1?' <span class="chip">+'+(x.n-1)+' this wk</span>':'')+'</td><td style="vertical-align:top">'+(x.t.dir==='out'?'<span style="color:#2E3C65">\u2191</span> ':'<span style="color:#C6943E">\u2193</span> ')+esc(x.t.subject)+'</td><td class="muted" style="vertical-align:top">'+esc(sum.slice(0,180))+'</td></tr>'}).join('')+'</table>':'<p class="muted" style="padding:12px">No activity yet. Sync to pull emails.</p>';
+  const isSysNote=t=>t.src==='Note'&&/^\u2714|^\u2714/.test(t.subject||'');
+  const _seenT=new Set();
+  const recent=allRecs().map(r=>{const ts=touchList(r).filter(t=>!isSysNote(t));if(!ts.length)return null;const wk=ts.filter(t=>daysAgo(t.date)<7).length;return {r,t:ts[0],n:wk}}).filter(Boolean)
+    .sort((a,b)=>((b.t.date||'').localeCompare(a.t.date||''))||((a.r.kind==='person'?0:1)-(b.r.kind==='person'?0:1)))
+    .filter(x=>{const k=(x.t.date||'')+'|'+(x.t.subject||'');if(_seenT.has(k))return false;_seenT.add(k);return true})
+    .slice(0,30);
+  document.getElementById('recentBody').innerHTML=recent.length?'<table><tr><th style="width:64px">Date</th><th style="width:20%">Name</th><th style="width:30%">Subject</th><th>Summary</th></tr>'+recent.map(x=>{
+    const sum=x.t.prev||x.t.note||'';
+    let sec='';
+    if(x.r.kind==='person')sec=x.r.firm||'';
+    else{const pp=orgPeople(x.r);sec=(pp[0]&&pp[0].name)||x.r.contact||''}
+    const subj=(x.t.dir==='out'?'<span style="color:#2E3C65">\u2191</span> ':'<span style="color:#C6943E">\u2193</span> ')+(x.t.link?'<a href="'+esc(x.t.link)+'" target="_blank" onclick="event.stopPropagation()">'+esc(x.t.subject)+'</a>':esc(x.t.subject));
+    return '<tr class="rowlink" onclick="openProfile(findRec(\''+x.r.id+'\'))"><td class="muted" style="white-space:nowrap;vertical-align:top">'+fmtD(x.t.date)+'</td><td style="vertical-align:top"><b>'+esc(x.r.kind==='person'?dispName(x.r):(sec||dispName(x.r)))+'</b><div class="muted" style="font-size:11px">'+esc(x.r.kind==='person'?sec:dispName(x.r))+'</div>'+(x.n>1?' <span class="chip">+'+(x.n-1)+' this wk</span>':'')+'</td><td style="vertical-align:top">'+subj+'</td><td class="muted" style="vertical-align:top">'+esc(sum.slice(0,180))+'</td></tr>'}).join('')+'</table>':'<p class="muted" style="padding:12px">No activity yet. Sync to pull emails.</p>';
 }
 
 function dismissSugg(k){
@@ -834,7 +848,12 @@ function renderOrgs(){
   rows.sort((a,b)=>{const va=val(a),vb=val(b);return va<vb?-sortD:va>vb?sortD:0});
   document.getElementById('oCount').textContent=rows.length+' of '+allOrgs().length;
   const hdr=(k,label)=>'<th onclick="sortOrgs(\''+k+'\')">'+label+(sortK===k?' <span class="arr">'+(sortD>0?'▲':'▼')+'</span>':'')+'</th>';
-  document.getElementById('orgTable').innerHTML='<table>'+hdr('name','Organization')+hdr('status','Stage / Status')+'<th>Contact</th>'+hdr('lastc','Last contact')+hdr('geo','Geo')+'<th></th>'+rows.map(o=>'<tr class="rowlink" onclick="openProfile(findRec(\''+o.id+'\'))"><td>'+starHtml(o)+' <b>'+esc(dispName(o))+'</b>'+(o.flag?' <span class="flag">'+esc(o.flag)+'</span>':'')+'</td><td>'+stagePill(statusOf(o)||'—')+'</td><td class="muted">'+esc(o.contact||orgPeople(o).map(p=>p.name).join(', ')||'—')+'</td><td class="muted">'+fmtAgo(lastTouch(o))+'</td><td>'+(o.geo||'')+'</td><td>'+prioChip(o)+'</td></tr>').join('')+'</table>';
+  const geoDisp=g=>({'DE':'Germany','UK':'United Kingdom','EU':'','US':'United States','CH':'Switzerland','AT':'Austria','FR':'France','NL':'Netherlands','LU':'Luxembourg'}[g]||g||'');
+  const infoCell=o=>{
+    if(o.kind==='advisor')return [o.category,o.city,(o.notes||'').slice(0,90)].filter(Boolean).join(' · ');
+    return [o.location,(o.revenue?'€'+o.revenue+'m rev':''),(o.description||'').slice(0,90)].filter(Boolean).join(' · ');
+  };
+  document.getElementById('orgTable').innerHTML='<table>'+hdr('name','Organization')+hdr('status','Stage / Status')+'<th>Contact</th>'+hdr('lastc','Last contact')+hdr('geo','Geo')+'<th>Info</th><th></th>'+rows.map(o=>'<tr class="rowlink" onclick="openProfile(findRec(\''+o.id+'\'))"><td>'+starHtml(o)+' <b>'+esc(dispName(o))+'</b>'+(o.flag?' <span class="flag">'+esc(o.flag)+'</span>':'')+'</td><td>'+stagePill(statusOf(o)||'—')+'</td><td class="muted">'+esc(o.contact||orgPeople(o).map(p=>p.name).join(', ')||'—')+'</td><td class="muted">'+fmtAgo(lastTouch(o))+'</td><td class="muted">'+esc(geoDisp(o.geo))+'</td><td class="muted" style="max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(infoCell(o))+'</td><td>'+prioChip(o)+'</td></tr>').join('')+'</table>';
 }
 function sortOrgs(k){if(sortK===k)sortD*=-1;else{sortK=k;sortD=k==='name'?1:-1}renderOrgs()}
 
@@ -1148,7 +1167,7 @@ function tlHtml(r){
   const legend='<div style="font-size:10px;color:#595959;margin-bottom:6px;line-height:1.6"><span style="color:#2E3C65">\u25CF</span> Email sent &nbsp;<span style="color:#C6943E">\u25CF</span> Email received &nbsp;<span style="color:#008A3E">\u25CF</span> Meeting/Granola &nbsp;<span style="color:#7030A0">\u25CF</span> Call &nbsp;<span style="color:#8C97B8">\u25CF</span> Note/other</div>';
   return legend+'<div class="timeline">'+ts.slice(0,30).map(t=>{
     const k=Object.keys(r.touches||{}).find(k=>(r.touches||{})[k]===t);
-    return '<div class="titem t'+tType(t)+(t.dir==='out'?' out':'')+'"><b>'+fmtD(t.date)+'</b> '+esc(t.subject)+(t.src?' <span class="chip">'+t.src+'</span>':'')+(t.who?' <span class="muted">— '+esc(t.who)+'</span>':'')+(t.link?' <a href="'+esc(t.link)+'" target="_blank">↗</a>':'')+(k?'<br><button class="sm" onclick="editNote(\''+r.id+'\',\''+k+'\')">Note</button>':'')+(t.note?'<div class="tnote">'+esc(t.note)+'</div>':'')+'</div>'
+    return '<div class="titem t'+tType(t)+(t.dir==='out'?' out':'')+'"><b>'+fmtD(t.date)+'</b> '+(t.link?'<a href="'+esc(t.link)+'" target="_blank" title="Open in mailbox">'+esc(t.subject)+'</a>':esc(t.subject))+(t.src?' <span class="chip">'+t.src+'</span>':'')+(t.who?' <span class="muted">— '+esc(t.who)+'</span>':'')+(t.link?' <a href="'+esc(t.link)+'" target="_blank">↗</a>':'')+(k?'<br><button class="sm" onclick="editNote(\''+r.id+'\',\''+k+'\')">Note</button>':'')+(t.note?'<div class="tnote">'+esc(t.note)+'</div>':'')+'</div>'
   }).join('')+'</div>';
 }
 function editNote(recId,key){
@@ -1169,7 +1188,7 @@ function filesHtml(r){
   return h||'<span class="muted">No files linked</span>';
 }
 function addLink(){const t=prompt('Link title:');if(!t)return;const u=prompt('URL:');if(!u)return;profRec.links=profRec.links||[];profRec.links.push({title:t,url:u});save();openProfile(profRec)}
-function listChips(r){return (S.customLists||[]).map(l=>'<label style="margin-right:8px;font-size:11px"><input type="checkbox" '+(((r.lists||[]).includes(l))?'checked':'')+' onchange="toggleList(\''+r.id+'\',\''+esc(l)+'\',this.checked)"> '+esc(l)+'</label>').join('')}
+function listChips(r){return '<div style="display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center">'+(S.customLists||[]).map(l=>'<label style="font-size:11px;display:inline-flex;align-items:center;gap:4px;text-transform:none;margin:0"><input type="checkbox" style="margin:0" '+(((r.lists||[]).includes(l))?'checked':'')+' onchange="toggleList(\''+r.id+'\',\''+esc(l)+'\',this.checked)"> '+esc(l)+'</label>').join('')+'</div>'}
 function toggleList(id,l,on){const r=findRec(id);r.lists=r.lists||[];if(on&&!r.lists.includes(l))r.lists.push(l);if(!on)r.lists=r.lists.filter(x=>x!==l);save()}
 
 let tlPeriod=13,tlTypes={Email:true,Meeting:true,Call:true,Note:true};
@@ -1204,7 +1223,7 @@ function openProfile(rec){
     '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+fld('e_na','Next action',rec.nextAction):
   isA?
     fld('e_firm','Firm name',rec.firm)+fld('e_contact','Primary contact',rec.contact)+fld('e_email','Email',rec.email)+fld('e_domain','Domain',rec.domain)+
-    '<div class="pgrid">'+selFld('e_cat','Category',['M&A sourcing intermediaries','Financing partners','DD advisors','Investors & family office','HR, universities & interns','Admin & infrastructure','Personal network','Other'],rec.category)+selFld('e_market','Market',['DE','UK'],rec.market||(/uk|united kingdom/i.test(rec.geo||'')?'UK':'DE'))+selFld('e_geo2','Geo (country)',['Germany','United Kingdom','Switzerland','France','Netherlands','Luxembourg','Sweden','Denmark','Austria','Other'],rec.geo)+'</div>'+
+    '<div class="pgrid">'+selFld('e_cat','Category',['M&A sourcing intermediaries','Financing partners','DD advisors','Investors & family office','HR, universities & interns','Admin & infrastructure','Personal network','Other'],rec.category)+selFld('e_market','Market',['DE','UK'],rec.market||(/uk|united kingdom/i.test(rec.geo||'')?'UK':'DE'))+selFld('e_geo2','Geo (country)',['Germany','United Kingdom','Switzerland','France','Netherlands','Luxembourg','Sweden','Denmark','Austria','United States','Other'],rec.geo)+'</div>'+
     selFld('e_status','Status',['To call','Emailed','Contact known','In dialogue','Active relationship','Dormant'],rec.status)+
     '<div class="pgrid">'+fld('e_city','City',rec.city)+fld('e_addr','Address',rec.address)+'</div>'+
     fld('e_intro','Intro path',rec.introPath)+
@@ -1303,7 +1322,12 @@ function recCity(r){return (r.city||r.location||'').split(',')[0].trim()}
 let locMap=null,locLayer=null;
 function renderLocations(){
   const kind=document.getElementById('locKind').value,geo=document.getElementById('locGeo').value;
-  const recs=allRecs().filter(r=>recCity(r)&&(!kind||r.kind===kind)&&(!geo||((r.geo||r.market||'')+'').toUpperCase().startsWith(geo)));
+  const recs=allRecs().filter(r=>{
+    if(!recCity(r)||(kind&&r.kind!==kind))return false;
+    if(!geo)return true;
+    const g=((r.geo||r.market||'')+'').toUpperCase();
+    return geo==='DE'?(g.startsWith('DE')||g.startsWith('GERMANY')):(g.startsWith('UK')||g.startsWith('UNITED KINGDOM'));
+  });
   document.getElementById('locCount').textContent=recs.length+' records with a city';
   const byCity={};recs.forEach(r=>{const c=recCity(r);(byCity[c]=byCity[c]||[]).push(r)});
   const cities=Object.keys(byCity).sort((a,b)=>byCity[b].length-byCity[a].length);
@@ -1365,6 +1389,13 @@ function renderAll(){if(!S)return;renderOverview();renderOrgs();renderPeople();r
 
 document.getElementById('tabs').addEventListener('click',e=>{
   const t=e.target.closest('.tab');if(!t)return;
+  if(t.classList.contains('active')){
+    // second click on the active tab resets all its filters
+    const reset={orgs:['oSearch','oKind','oStage','oList'],people:['pSearch','pType','pHas'],pipeline:['fSearch','fGeo'],locations:['locKind','locGeo']}[t.dataset.t]||[];
+    reset.forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
+    renderAll();
+    return;
+  }
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');
