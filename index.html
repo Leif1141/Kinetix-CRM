@@ -70,6 +70,7 @@ tr.rowlink:hover td{background:#F0F0F5}
 .pbox{background:#fff;border:1px solid var(--lgray);border-radius:5px;padding:10px 12px;margin-bottom:12px}
 .pbox h4{font-size:11px;color:var(--deep);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
 .pbox label{font-size:9px;color:var(--gray);text-transform:uppercase;display:block;margin-top:6px}
+.stagesel{font-size:11px;padding:2px 6px;border:1px solid #D3D3D2;border-radius:10px;background:#fff;color:#2E3C65;max-width:150px}
 .pbox input,.pbox select,.pbox textarea{width:100%;font-family:Arial;font-size:12px;padding:4px 6px;border:1px solid var(--lgray);border-radius:3px}
 .pbox .inline{display:flex;gap:6px;flex-wrap:wrap}
 .pbox .inline input,.pbox .inline select{width:auto}
@@ -444,7 +445,8 @@ function allRecs(){return [...(S.companies||[]),...(S.advisors||[]),...(S.people
 function findRec(id){return allRecs().find(r=>r.id===id)}
 function dispName(r){return r.name||r.firm}
 function touchList(r){return Object.values(r.touches||{}).sort((a,b)=>(b.date||'').localeCompare(a.date||''))}
-function lastTouch(r){const t=touchList(r);return t.length?t[0].date:null}
+function isSysNote(t){return !!(t&&t.src==='Note'&&/^✔/.test(t.subject||''))}
+function lastTouch(r){const t=touchList(r).find(x=>!isSysNote(x));return t?t.date:null}
 function tType(t){if(t.src==='Granola'||t.src==='Meeting')return 'Meeting';if(t.src==='Call')return 'Call';if(t.src==='Kinetix'||t.src==='Gmail')return 'Email';if(t.src==='Note'||t.src==='Letter'||t.src==='LinkedIn')return t.src;return 'Email'}
 function lastOfType(r,ty){const t=touchList(r).find(x=>tType(x)===ty);return t?t.date:null}
 function isStale(c){const th=STALE_DAYS[c.stage];if(th==null)return false;const lt=lastTouch(c);return daysAgo(lt||(c.stageLog?.slice(-1)[0]?.date)||null)>th}
@@ -769,6 +771,7 @@ async function syncEmails(){
     backfillPersonTouches();
     const _rt=retriageUnmatched();if(_rt.assigned||_rt.dropped)toast('Inbox triage: '+_rt.assigned+' auto-assigned, '+_rt.dropped+' cleared');
     const _rd=reconcileDraftActions();if(_rd)toast(_rd+' draft action'+(_rd>1?'s':'')+' auto-completed (email was sent)');
+    const _rs=reconcileStatuses();if(_rs)toast(_rs+' advisor status'+(_rs>1?'es':'')+' auto-advanced');
     S.lastSync=new Date().toISOString();
     save();
     st.textContent='Synced '+new Date().toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+' · '+total+' new';
@@ -820,18 +823,19 @@ function renderOverview(){
   const favs=allRecs().filter(r=>r.fav);
   document.getElementById('favBody').innerHTML=favs.length?'<table>'+favs.map(r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))"><td>'+starHtml(r)+' <b>'+esc(dispName(r))+'</b></td><td class="muted">'+fmtAgo(lastTouch(r))+'</td></tr>').join('')+'</table>':'<p class="muted" style="padding:12px">Star records to pin them here.</p>';
   document.getElementById('listsBody').innerHTML=(S.customLists||[]).map(l=>{const items=allRecs().filter(r=>(r.lists||[]).includes(l));return '<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b style="cursor:pointer" onclick="goList(\''+esc(l)+'\')">'+esc(l)+'</b> <span class="muted">('+items.length+')</span> <button class="sm" onclick="delList(\''+esc(l)+'\')" style="float:right">×</button></div>'}).join('')||'<p class="muted" style="padding:12px">No custom lists yet.</p>';
-  const isSysNote=t=>t.src==='Note'&&/^\u2714|^\u2714/.test(t.subject||'');
   const _seenT=new Set();
   const recent=allRecs().map(r=>{const ts=touchList(r).filter(t=>!isSysNote(t));if(!ts.length)return null;const wk=ts.filter(t=>daysAgo(t.date)<7).length;return {r,t:ts[0],n:wk}}).filter(Boolean)
     .sort((a,b)=>((b.t.date||'').localeCompare(a.t.date||''))||((a.r.kind==='person'?0:1)-(b.r.kind==='person'?0:1)))
     .filter(x=>{const k=(x.t.date||'')+'|'+(x.t.subject||'');if(_seenT.has(k))return false;_seenT.add(k);return true})
     .slice(0,30);
   document.getElementById('recentBody').innerHTML=recent.length?'<table><tr><th style="width:64px">Date</th><th style="width:20%">Name</th><th style="width:30%">Subject</th><th>Summary</th></tr>'+recent.map(x=>{
-    const sum=cleanPrev(x.t.prev)||x.t.note||'';
+    const _ai=x.r.lastSummary&&x.r.lastSummaryDate&&x.r.lastSummaryDate>=(x.t.date||'').slice(0,10);
+    const _base=cleanPrev(x.t.prev)||x.t.note||'';
+    const sum=_ai?('★ '+x.r.lastSummary):((_base?(x.t.dir==='out'?'You: ':'They: ')+_base:'')+(x.r.nextAction?' → Next: '+x.r.nextAction.slice(0,90):''));
     let sec='';
     if(x.r.kind==='person')sec=x.r.firm||'';
     else{const pp=orgPeople(x.r);sec=(pp[0]&&pp[0].name)||x.r.contact||''}
-    const subj=(x.t.dir==='out'?'<span style="color:#2E3C65">\u2191</span> ':'<span style="color:#C6943E">\u2193</span> ')+(x.t.link?'<a href="'+esc(x.t.link)+'" target="_blank" onclick="event.stopPropagation()">'+esc(x.t.subject)+'</a>':esc(x.t.subject));
+    const subj=(x.t.dir==='out'?'<span style="color:#2E3C65" title="Sent by you">\u2191</span> ':'<span style="color:#C6943E" title="Received">\u2193</span> ')+(x.t.link?'<a href="'+esc(x.t.link)+'" target="_blank" onclick="event.stopPropagation()">'+esc(x.t.subject)+'</a>':esc(x.t.subject));
     return '<tr class="rowlink" onclick="openProfile(findRec(\''+x.r.id+'\'))"><td class="muted" style="white-space:nowrap;vertical-align:top">'+fmtD(x.t.date)+'</td><td style="vertical-align:top"><b>'+esc(x.r.kind==='person'?dispName(x.r):(sec||dispName(x.r)))+'</b><div class="muted" style="font-size:11px">'+esc(x.r.kind==='person'?sec:dispName(x.r))+'</div>'+(x.n>1?' <span class="chip">+'+(x.n-1)+' this wk</span>':'')+'</td><td style="vertical-align:top">'+subj+'</td><td class="muted" style="vertical-align:top">'+esc(sum.slice(0,180))+'</td></tr>'}).join('')+'</table>':'<p class="muted" style="padding:12px">No activity yet. Sync to pull emails.</p>';
 }
 
@@ -870,13 +874,37 @@ function renderOrgs(){
   document.getElementById('oCount').textContent=rows.length+' of '+allOrgs().length;
   const hdr=(k,label)=>'<th onclick="sortOrgs(\''+k+'\')">'+label+(sortK===k?' <span class="arr">'+(sortD>0?'▲':'▼')+'</span>':'')+'</th>';
   const geoDisp=g=>({'DE':'Germany','UK':'United Kingdom','EU':'','US':'United States','CH':'Switzerland','AT':'Austria','FR':'France','NL':'Netherlands','LU':'Luxembourg'}[g]||g||'');
-  const infoCell=o=>{
-    if(o.kind==='advisor')return [o.category,o.city,(o.notes||'').slice(0,90)].filter(Boolean).join(' · ');
-    return [o.location,(o.revenue?'€'+o.revenue+'m rev':''),(o.description||'').slice(0,90)].filter(Boolean).join(' · ');
+  const typeShort=o=>o.kind==='target'?'Target':({'M&A sourcing intermediaries':'M&A / Sourcing','Financing partners':'Financing','DD advisors':'DD advisor','Investors & family office':'Investor / FO','HR, universities & interns':'HR / Talent','Admin & infrastructure':'Admin / Infra','Personal network':'Network'}[o.category]||o.category||'Advisor');
+  const detailCell=o=>{
+    if(o.kind==='advisor')return [o.city,(o.notes||o.detail||o.introPath||'').slice(0,110)].filter(Boolean).join(' · ');
+    return [o.location,(o.revenue?'€'+o.revenue+'m rev':''),(o.description||o.ownership||'').slice(0,110)].filter(Boolean).join(' · ');
   };
-  document.getElementById('orgTable').innerHTML='<table>'+hdr('name','Organization')+hdr('status','Stage / Status')+'<th>Contact</th>'+hdr('lastc','Last contact')+hdr('geo','Geo')+'<th>Info</th><th></th>'+rows.map(o=>'<tr class="rowlink" onclick="openProfile(findRec(\''+o.id+'\'))"><td>'+starHtml(o)+' <b>'+esc(dispName(o))+'</b>'+(o.flag?' <span class="flag">'+esc(o.flag)+'</span>':'')+'</td><td>'+stagePill(statusOf(o)||'—')+'</td><td class="muted">'+esc(o.contact||orgPeople(o).map(p=>p.name).join(', ')||'—')+'</td><td class="muted">'+fmtAgo(lastTouch(o))+'</td><td class="muted">'+esc(geoDisp(o.geo))+'</td><td class="muted" style="max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(infoCell(o))+'</td><td>'+prioChip(o)+'</td></tr>').join('')+'</table>';
+  const statusSel=o=>{
+    const opts=o.kind==='target'?STAGES:['To call','Emailed','Contact known','In dialogue','Active relationship','Dormant'];
+    const cur=statusOf(o)||'';
+    return '<select class="stagesel" onclick="event.stopPropagation()" onchange="setStatusInline(\''+o.id+'\',this.value)">'+opts.map(s=>'<option'+(s===cur?' selected':'')+'>'+esc(s)+'</option>').join('')+(opts.includes(cur)?'':'<option selected>'+esc(cur||'—')+'</option>')+'</select>';
+  };
+  document.getElementById('orgTable').innerHTML='<table>'+hdr('name','Organization')+hdr('status','Stage / Status')+'<th>Type</th><th>Contact</th>'+hdr('lastc','Last contact')+hdr('geo','Geo')+'<th>Detail</th><th></th>'+rows.map(o=>'<tr class="rowlink" onclick="openProfile(findRec(\''+o.id+'\'))"><td>'+starHtml(o)+' <b>'+esc(dispName(o))+'</b>'+(o.flag?' <span class="flag">'+esc(o.flag)+'</span>':'')+'</td><td>'+statusSel(o)+'</td><td class="muted">'+esc(typeShort(o))+'</td><td class="muted">'+esc(o.contact||orgPeople(o).map(p=>p.name).join(', ')||'—')+'</td><td class="muted">'+fmtAgo(lastTouch(o))+'</td><td class="muted">'+esc(geoDisp(o.geo))+'</td><td class="muted" style="max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(detailCell(o))+'</td><td>'+prioChip(o)+'</td></tr>').join('')+'</table>';
 }
 function sortOrgs(k){if(sortK===k)sortD*=-1;else{sortK=k;sortD=k==='name'?1:-1}renderOrgs()}
+function setStatusInline(id,val){
+  const r=findRec(id);if(!r)return;
+  if(r.kind==='target'){if(val!==r.stage){r.stage=val;r.stageLog=r.stageLog||[];r.stageLog.push({stage:val,date:today()})}}
+  else r.status=val;
+  save();renderAll();
+}
+function reconcileStatuses(){
+  let n=0;const rank={'To call':0,'Emailed':1,'Contact known':2,'In dialogue':3};
+  (S.advisors||[]).forEach(a=>{
+    if(!(a.status in rank))return; // never touch Active relationship / Dormant / custom statuses
+    const ts=touchList(a).filter(t=>!isSysNote(t)&&t.src!=='Note');
+    const hasIn=ts.some(t=>t.dir==='in'||tType(t)==='Meeting'||tType(t)==='Call');
+    const hasOut=ts.some(t=>t.dir==='out');
+    const want=hasIn?'In dialogue':(hasOut?'Emailed':a.status);
+    if(rank[want]>rank[a.status]){a.status=want;n++}
+  });
+  return n;
+}
 
 // ═══════════════════════════════════════════════════════════════
 // RENDER: PEOPLE
@@ -1109,7 +1137,7 @@ function applyPatchOps(ops){
         else skipped++;
       }else if(o.op==='setField'){
         const r=patchFind(o.match);
-        const _ok=['notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','detail'];
+        const _ok=['notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','detail','lastSummary','lastSummaryDate'];
         if(r&&o.field&&_ok.includes(o.field)){r[o.field]=o.value;made++}else skipped++;
       }else skipped++;
     }catch(e){skipped++}
