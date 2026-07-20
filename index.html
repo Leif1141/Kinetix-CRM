@@ -1138,7 +1138,13 @@ function applyPatchOps(ops){
       }else if(o.op==='setField'){
         const r=patchFind(o.match);
         const _ok=['notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','detail','lastSummary','lastSummaryDate'];
-        if(r&&o.field&&_ok.includes(o.field)){r[o.field]=o.value;made++}else skipped++;
+        if(r&&o.field&&_ok.includes(o.field)){r[o.field]=o.value;made++}else if(o.op==='addList'){
+        if(o.name){S.customLists=S.customLists||[];if(!S.customLists.includes(o.name))S.customLists.push(o.name);made++}else skipped++;
+      }else if(o.op==='renameList'){
+        if(o.from&&o.to&&(S.customLists||[]).includes(o.from)){S.customLists=S.customLists.map(x=>x===o.from?o.to:x);allRecs().forEach(r=>{if(r.lists)r.lists=r.lists.map(x=>x===o.from?o.to:x)});made++}else skipped++;
+      }else if(o.op==='removeList'){
+        if(o.name&&(S.customLists||[]).includes(o.name)){S.customLists=S.customLists.filter(x=>x!==o.name);allRecs().forEach(r=>{if(r.lists)r.lists=r.lists.filter(x=>x!==o.name)});made++}else skipped++;
+      }else skipped++;
       }else skipped++;
     }catch(e){skipped++}
   }
