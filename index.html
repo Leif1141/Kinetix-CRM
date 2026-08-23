@@ -798,6 +798,13 @@ function statusOf(r){return r.kind==='target'?r.stage:r.status}
 // ═══════════════════════════════════════════════════════════════
 // SUGGESTIONS ENGINE
 // ═══════════════════════════════════════════════════════════════
+function sugHead(r){
+  const n=dispName(r);
+  const extra = r.kind==='advisor' ? (r.contact||'') : (r.kind==='person' ? (r.firm||'') : (r.location||''));
+  const t = r.category||r.ptype||r.type||'';
+  const bits=[extra,t].filter(Boolean).join(', ');
+  return bits ? n+' ('+bits+')' : n;
+}
 function suggestions(){
   const out=[];const t=today();
   allRecs().filter(r=>r.nextDate&&r.nextDate<=t).forEach(r=>{const k='due_'+r.id;if(!S.dismissed[k])out.push({rec:r,why:'Action due: '+(r.nextAction||'follow up'),tag:'Due',color:'var(--red)',key:k})});
@@ -819,10 +826,10 @@ function renderOverview(){
   const k=[['Organizations',orgs.length,'orgs'],['People',(S.people||[]).length,'people'],['Live deals',live.length,'pipeline'],['Due today',due,'followups']];
   document.getElementById('ovKpis').innerHTML=k.map(x=>'<div class="kpi'+(x[0]==='Due today'&&x[1]?' warn':'')+'" onclick="goTab(\''+x[2]+'\')"><div class="v">'+x[1]+'</div><div class="l">'+x[0]+'</div></div>').join('');
   const b=document.getElementById('sugBadge');b.style.display=sug.length?'inline-block':'none';b.textContent=sug.length;
-  document.getElementById('suggBody').innerHTML=sug.length?sug.map(s=>'<div class="sugg"><span class="tag" style="background:'+s.color+'">'+s.tag+'</span><div><b style="cursor:pointer" onclick="openProfile(findRec(\''+s.rec.id+'\'))">'+esc(dispName(s.rec))+'</b><div class="why">'+esc(s.why)+'</div></div><button class="sm" onclick="dismissSugg(\''+s.key+'\')">Dismiss</button></div>').join(''):'<p class="muted" style="padding:12px">No suggested actions right now.</p>';
+  document.getElementById('suggBody').innerHTML=sug.length?sug.map(s=>'<div class="sugg"><span class="tag" style="background:'+s.color+'">'+s.tag+'</span><div><b style="cursor:pointer" onclick="openProfile(findRec(\''+s.rec.id+'\'))">'+esc(sugHead(s.rec))+'</b><div class="why">'+esc(s.why)+'</div></div><button class="sm" onclick="dismissSugg(\''+s.key+'\')">Dismiss</button></div>').join(''):'<p class="muted" style="padding:12px">No suggested actions right now.</p>';
   const favs=allRecs().filter(r=>r.fav);
   document.getElementById('favBody').innerHTML=favs.length?'<table>'+favs.map(r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))"><td>'+starHtml(r)+' <b>'+esc(dispName(r))+'</b></td><td class="muted">'+fmtAgo(lastTouch(r))+'</td></tr>').join('')+'</table>':'<p class="muted" style="padding:12px">Star records to pin them here.</p>';
-  document.getElementById('listsBody').innerHTML=(S.customLists||[]).map(l=>{const items=allRecs().filter(r=>(r.lists||[]).includes(l));return '<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b style="cursor:pointer" onclick="goList(\''+esc(l)+'\')">'+esc(l)+'</b> <span class="muted">('+items.length+')</span> <button class="sm" onclick="delList(\''+esc(l)+'\')" style="float:right">×</button></div>'}).join('')||'<p class="muted" style="padding:12px">No custom lists yet.</p>';
+  document.getElementById('listsBody').innerHTML=(S.customLists||[]).map(l=>{const items=allRecs().filter(r=>(r.lists||[]).includes(l));const open=(S._openLists||[]).includes(l);return '<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC">'+'<b style="cursor:pointer" onclick="toggleListOpen(\''+esc(l)+'\')">'+(open?'&#9662; ':'&#9656; ')+esc(l)+'</b> <span class="muted">('+items.length+')</span>'+'<button class="sm" onclick="delList(\''+esc(l)+'\')" style="float:right">&times;</button>'+'<button class="sm" onclick="goList(\''+esc(l)+'\')" style="float:right;margin-right:4px">Orgs tab</button>'+(open?'<table style="margin-top:6px">'+items.map(r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))"><td><b>'+esc(dispName(r))+'</b></td><td class="muted">'+esc(r.kind==='person'?(r.firm||''):(r.contact||''))+'</td><td class="muted">'+esc(r.kind==='person'?(r.title||''):(r.category||''))+'</td></tr>').join('')+'</table>':'')+'</div>'}).join('')||'<p class="muted" style="padding:12px">No custom lists yet.</p>';
   const _seenT=new Set();
   const recent=allRecs().map(r=>{const ts=touchList(r).filter(t=>!isSysNote(t));if(!ts.length)return null;const wk=ts.filter(t=>daysAgo(t.date)<7).length;return {r,t:ts[0],n:wk}}).filter(Boolean)
     .sort((a,b)=>((b.t.date||'').localeCompare(a.t.date||''))||((a.r.kind==='person'?0:1)-(b.r.kind==='person'?0:1)))
@@ -848,6 +855,7 @@ function isDismissed(k){return !!(S.dismissed&&S.dismissed[k]&&daysAgo(S.dismiss
 function newList(){const n=prompt('List name:');if(n&&!(S.customLists||[]).includes(n)){S.customLists=S.customLists||[];S.customLists.push(n);save();renderOverview()}}
 function delList(n){if(!confirm('Delete list "'+n+'"? Records stay.'))return;S.customLists=(S.customLists||[]).filter(x=>x!==n);allRecs().forEach(r=>{if(r.lists)r.lists=r.lists.filter(x=>x!==n)});save();renderAll()}
 function goTab(t){document.querySelector('.tab[data-t="'+t+'"]')?.click()}
+function toggleListOpen(l){S._openLists=S._openLists||[];S._openLists=S._openLists.includes(l)?S._openLists.filter(x=>x!==l):[...S._openLists,l];renderOverview()}
 function goList(l){goTab('orgs');document.getElementById('oList').value=l;renderOrgs()}
 
 // ═══════════════════════════════════════════════════════════════
@@ -1176,16 +1184,59 @@ function applyPatchFile(ev){
   rd.readAsText(f);ev.target.value='';
 }
 const DRIVE_CRM_FOLDER='19NSMw1zEmNctsmWuPnXCLZeX09ehO6bW';
+async function driveArchiveId(){
+  if(S._driveArchiveId)return S._driveArchiveId;
+  const q=encodeURIComponent("'"+DRIVE_CRM_FOLDER+"' in parents and name='0. Archive' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  const r=await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id)',{headers:{Authorization:'Bearer '+gmailToken}});
+  const f=((await r.json()).files||[])[0];
+  if(f){S._driveArchiveId=f.id;return f.id}
+  const c=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',
+    headers:{Authorization:'Bearer '+gmailToken,'Content-Type':'application/json'},
+    body:JSON.stringify({name:'0. Archive',parents:[DRIVE_CRM_FOLDER],mimeType:'application/vnd.google-apps.folder'})});
+  const j=await c.json(); S._driveArchiveId=j.id; return j.id;
+}
+async function driveMoveToArchive(fileId){
+  try{
+    const arc=await driveArchiveId();
+    await fetch('https://www.googleapis.com/drive/v3/files/'+fileId+'?addParents='+arc+'&removeParents='+DRIVE_CRM_FOLDER+'&fields=id',
+      {method:'PATCH',headers:{Authorization:'Bearer '+gmailToken}});
+    return true;
+  }catch(e){console.warn('archive move failed',e);return false}
+}
 async function autoDriveBackup(){
   if(!gmailToken)return;
   try{
-    const name=today().replace(/-/g,'')+' KinetixCRM Backup.json';
-    const meta={name:name,parents:[DRIVE_CRM_FOLDER],mimeType:'application/json'};
-    const boundary='kinetix'+Date.now();
-    const body='--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify(meta)+
-      '\r\n--'+boundary+'\r\nContent-Type: application/json\r\n\r\n'+JSON.stringify(S)+'\r\n--'+boundary+'--';
-    const res=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{Authorization:'Bearer '+gmailToken,'Content-Type':'multipart/related; boundary='+boundary},body:body});
+    const name='KinetixCRM Backup.json';
+    // Eine rollierende Datei: vorhandene suchen und ueberschreiben statt jedes Mal neu anzulegen.
+    const q=encodeURIComponent("'"+DRIVE_CRM_FOLDER+"' in parents and name='"+name+"' and trashed=false");
+    const lr=await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id)',{headers:{Authorization:'Bearer '+gmailToken}});
+    const ex=((await lr.json()).files||[])[0];
+    let res;
+    if(ex){
+      res=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+ex.id+'?uploadType=media',
+        {method:'PATCH',headers:{Authorization:'Bearer '+gmailToken,'Content-Type':'application/json'},body:JSON.stringify(S)});
+    }else{
+      const meta={name:name,parents:[DRIVE_CRM_FOLDER],mimeType:'application/json'};
+      const boundary='kinetix'+Date.now();
+      const body='--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify(meta)+
+        '\r\n--'+boundary+'\r\nContent-Type: application/json\r\n\r\n'+JSON.stringify(S)+'\r\n--'+boundary+'--';
+      res=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{Authorization:'Bearer '+gmailToken,'Content-Type':'multipart/related; boundary='+boundary},body:body});
+    }
     if(!res.ok)throw new Error('upload '+res.status);
+    // Wochenschnappschuss ins Archiv, hoechstens einmal pro Kalenderwoche.
+    const wk=(function(d){const t=new Date(d);t.setHours(0,0,0,0);t.setDate(t.getDate()+3-((t.getDay()+6)%7));const f=new Date(t.getFullYear(),0,4);return t.getFullYear()+'-'+String(1+Math.round(((t-f)/864e5-3+((f.getDay()+6)%7))/7)).padStart(2,'0')})(new Date());
+    if(S._lastSnapshotWeek!==wk){
+      try{
+        const arc=await driveArchiveId();
+        const sm={name:today().replace(/-/g,'')+' KinetixCRM Backup.json',parents:[arc],mimeType:'application/json'};
+        const sb='snap'+Date.now();
+        await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',
+          headers:{Authorization:'Bearer '+gmailToken,'Content-Type':'multipart/related; boundary='+sb},
+          body:'--'+sb+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify(sm)+
+               '\r\n--'+sb+'\r\nContent-Type: application/json\r\n\r\n'+JSON.stringify(S)+'\r\n--'+sb+'--'});
+        S._lastSnapshotWeek=wk;
+      }catch(e){console.warn('weekly snapshot failed',e)}
+    }
     S.lastDriveBackup=new Date().toISOString();save();
     console.log('Drive auto-backup: '+name);
   }catch(e){toast('⚠ Drive backup FAILED: '+e.message+' — data is safe in Firebase, but weekly briefings go stale');console.warn('Drive backup failed:',e)}
@@ -1198,17 +1249,17 @@ async function checkDriveUpdates(auto){
     if(!res.ok)throw new Error('Drive list failed ('+res.status+')');
     const files=((await res.json()).files||[]).filter(f=>!(S.appliedPatchTitles||{})[f.name]);
     if(!files.length){if(!auto)toast('No new CRM updates in Drive');return}
-    let tot=0,bad=[];
+    let tot=0,bad=[],moved=0;
     for(const f of files){
       try{ // one bad file must never block the rest
         const dl=await fetch('https://www.googleapis.com/drive/v3/files/'+f.id+'?alt=media',{headers:{Authorization:'Bearer '+gmailToken}});
         const p=await dl.json();
         const r=applyPatchObj(p,f.name,false);
-        if(r)tot+=r.made;
+        if(r){tot+=r.made;moved+=(await driveMoveToArchive(f.id))?1:0}
       }catch(e){bad.push(f.name+': '+e.message);console.warn('patch failed:',f.name,e)}
     }
     save();renderAll();
-    toast(tot+' updates applied from '+files.length+' Claude patch file'+(files.length>1?'s':'')+(bad.length?' — FAILED: '+bad.join('; '):''));
+    toast(tot+' updates applied from '+files.length+' Claude patch file'+(files.length>1?'s':'')+(moved?', '+moved+' archived':'')+(bad.length?' | FAILED: '+bad.join('; '):''));
     autoDriveBackup();
   }catch(e){toast('⚠ Claude-update check FAILED: '+e.message+(String(e.message).includes('403')?' — is the Drive API enabled in the Google Cloud project?':''))}
 }
