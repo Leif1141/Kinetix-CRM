@@ -311,6 +311,7 @@ function initFirebase(){
   fbApp=firebase.initializeApp(FIREBASE_CONFIG);
   db=firebase.database();
   auth=firebase.auth();
+  try{auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)}catch(e){console.warn('persistence',e)}
   stateRef=db.ref('crm');
   return true;
 }
@@ -320,9 +321,14 @@ function initFirebase(){
 // ═══════════════════════════════════════════════════════════════
 function signIn(){
   const provider=new firebase.auth.GoogleAuthProvider();
-  auth.signInWithPopup(provider).catch(e=>{
-    document.getElementById('authError').textContent='Sign-in failed: '+e.message;
-  });
+  provider.setCustomParameters({prompt:'select_account'});
+  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+    .then(()=>auth.signInWithPopup(provider))
+    .catch(e=>{
+      const c=(e&&e.code)||'';
+      if(c.indexOf('popup')>-1||c.indexOf('cancelled-popup')>-1){auth.signInWithRedirect(provider);return}
+      document.getElementById('authError').textContent='Sign-in failed: '+e.message;
+    });
 }
 function signOut(){
   auth.signOut();
@@ -1515,6 +1521,7 @@ document.getElementById('tabs').addEventListener('click',e=>{
 
 // BOOT
 if(initFirebase()){
+  auth.getRedirectResult().catch(()=>{});
   auth.onAuthStateChanged(user=>{
     if(user){
       if(ALLOWED_EMAILS.length&&!ALLOWED_EMAILS.includes(user.email)){
