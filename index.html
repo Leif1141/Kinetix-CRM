@@ -116,7 +116,7 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
 </head>
 <body>
 
-<div id="authScreen">
+<div id="authScreen" style="display:none">
   <div class="auth-box">
     <h1>Kinetix Deal CRM</h1>
     <p>Sign in to access the shared deal pipeline</p>
@@ -1521,8 +1521,10 @@ document.getElementById('tabs').addEventListener('click',e=>{
 
 // BOOT
 if(initFirebase()){
+  window.__authGate=setTimeout(()=>{const a=document.getElementById('authScreen');if(a&&!currentUser)a.style.display='flex'},6000);
   auth.getRedirectResult().catch(()=>{});
   auth.onAuthStateChanged(user=>{
+    clearTimeout(window.__authGate);
     if(user){
       if(ALLOWED_EMAILS.length&&!ALLOWED_EMAILS.includes(user.email)){
         auth.signOut();
