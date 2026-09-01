@@ -1151,7 +1151,7 @@ function applyPatchOps(ops){
         else skipped++;
       }else if(o.op==='setField'){
         const r=patchFind(o.match);
-        const _ok=['notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','detail','lastSummary','lastSummaryDate'];
+        const _ok=['notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale'];
         if(r&&o.field&&_ok.includes(o.field)){r[o.field]=o.value;made++}else if(o.op==='addList'){
         if(o.name){S.customLists=S.customLists||[];if(!S.customLists.includes(o.name))S.customLists.push(o.name);made++}else skipped++;
       }else if(o.op==='renameList'){
