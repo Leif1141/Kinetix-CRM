@@ -142,8 +142,8 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
   <span style="font-weight:600;color:var(--deep)">Connections:</span>
   <span id="outlookConn" class="conn-status off">Outlook: not connected</span>
   <button class="sm" onclick="connectOutlook()">Connect Outlook</button>
-  <span id="gmailConn" class="conn-status off">Gmail: not connected</span>
-  <button class="sm" onclick="connectGmail()">Connect Gmail</button>
+  <span id="gmailConn" class="conn-status off">Drive: not connected</span>
+  <button class="sm" onclick="connectGmail()">Connect Drive</button>
 </div>
 
 <div class="tabs" id="tabs">
@@ -581,11 +581,11 @@ async function syncOutlookEmails(){
 let _gClient=null;
 function gClient(){
   if(_gClient)return _gClient;
-  _gClient=google.accounts.oauth2.initTokenClient({client_id:GMAIL_CLIENT_ID,scope:'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/drive',callback:(resp)=>{
+  _gClient=google.accounts.oauth2.initTokenClient({client_id:GMAIL_CLIENT_ID,scope:'https://www.googleapis.com/auth/drive',callback:(resp)=>{
     if(resp.error){console.warn('Google auth:',resp.error);return}
     gmailToken=resp.access_token;
     localStorage.setItem('kx_gAuth','1');
-    setConnUI('gmailConn','Gmail: connected');
+    setConnUI('gmailConn','Drive: connected');
     checkDriveUpdates(true);
     autoPipeline();
   }});
@@ -611,12 +611,16 @@ async function autoConnect(){
   }else if(outlookToken){autoPipeline()}
 }
 async function syncGmailEmails(){
+  // Disabled 01.09.2026 on Leif's instruction: nothing Kinetix-related runs through Gmail,
+  // so no Gmail content is pulled into the CRM. The Google token is retained for Drive only
+  // (backup file + patch pipeline), which is why the connection itself stays.
+  return 0;
   if(!gmailToken)return 0;
   let added=0;
   try{
     // list threads
     const listRes=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/threads?q=newer_than:45d+-category:promotions+-category:social&maxResults=80',{headers:{Authorization:'Bearer '+gmailToken}});
-    if(!listRes.ok){if(listRes.status===401){gmailToken=null;document.getElementById('gmailConn').className='conn-status off';document.getElementById('gmailConn').textContent='Gmail: session expired'}throw new Error('Gmail API '+listRes.status)}
+    if(!listRes.ok){if(listRes.status===401){gmailToken=null;document.getElementById('gmailConn').className='conn-status off';document.getElementById('gmailConn').textContent='Drive: session expired'}throw new Error('Gmail API '+listRes.status)}
     const listData=await listRes.json();
     const threads=listData.threads||[];
     // fetch each thread metadata (batch of 10)
@@ -1108,7 +1112,7 @@ function patchFind(m){
   let pool=allRecs();
   if(m.kind)pool=pool.filter(r=>r.kind===m.kind);
   else if(m.firm)pool=pool.filter(r=>r.kind==='advisor');
-  return pool.find(r=>normName(dispName(r))===nn)||pool.find(r=>{const rn=normName(dispName(r));return rn&&(rn.includes(nn)||nn.includes(rn))})||null;
+  return pool.find(r=>normName(dispName(r))===nn)||pool.find(r=>{const rn=normName(dispName(r));if(!rn)return false;// Hardened 01.09.2026: plain substring matching merged 'EURA AG' into the 'Idinvest / Eurazeo'// record because 'eura' sits inside 'eurazeo'. Require the shorter name's tokens to appear as// whole tokens in the longer one, and require some length, before treating it as the same firm.const A=rn.split(' ').filter(Boolean),B=nn.split(' ').filter(Boolean);const shortT=A.length<=B.length?A:B,longT=A.length<=B.length?B:A;if(!shortT.length)return false;if(shortT.join('').length<6)return false;return shortT.every(t=>longT.includes(t));})||null;
 }
 function patchSet(r,set){
   if(!set)return;
