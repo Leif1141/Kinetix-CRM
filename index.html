@@ -1112,7 +1112,17 @@ function patchFind(m){
   let pool=allRecs();
   if(m.kind)pool=pool.filter(r=>r.kind===m.kind);
   else if(m.firm)pool=pool.filter(r=>r.kind==='advisor');
-  return pool.find(r=>normName(dispName(r))===nn)||pool.find(r=>{const rn=normName(dispName(r));if(!rn)return false;// Hardened 01.09.2026: plain substring matching merged 'EURA AG' into the 'Idinvest / Eurazeo'// record because 'eura' sits inside 'eurazeo'. Require the shorter name's tokens to appear as// whole tokens in the longer one, and require some length, before treating it as the same firm.const A=rn.split(' ').filter(Boolean),B=nn.split(' ').filter(Boolean);const shortT=A.length<=B.length?A:B,longT=A.length<=B.length?B:A;if(!shortT.length)return false;if(shortT.join('').length<6)return false;return shortT.every(t=>longT.includes(t));})||null;
+  // Hardened 01.09.2026: plain substring matching merged 'EURA AG' into the 'Idinvest / Eurazeo'
+  // record because 'eura' sits inside 'eurazeo'. Require the shorter name's tokens to appear as
+  // whole tokens in the longer one, and require some length, before treating it as the same firm.
+  return pool.find(r=>normName(dispName(r))===nn)||pool.find(r=>{
+    const rn=normName(dispName(r));if(!rn)return false;
+    const A=rn.split(' ').filter(Boolean),B=nn.split(' ').filter(Boolean);
+    const shortT=A.length<=B.length?A:B,longT=A.length<=B.length?B:A;
+    if(!shortT.length)return false;
+    if(shortT.join('').length<6)return false;
+    return shortT.every(t=>longT.includes(t));
+  })||null;
 }
 function patchSet(r,set){
   if(!set)return;
