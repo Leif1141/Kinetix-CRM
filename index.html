@@ -982,6 +982,20 @@ function completeAction(id,ev){
   const r=findRec(id);if(!r)return;
   r.nextDate='';r.nextAction='';r.priority='';save();renderAll();
 }
+function quickSetAction(id,ev){
+  if(ev)ev.stopPropagation();
+  const r=findRec(id);if(!r)return;
+  const a=prompt('Next action for '+dispName(r)+':',r.nextAction||'');
+  if(a===null||!a.trim())return;
+  const d=new Date();d.setDate(d.getDate()+7);const def=d.toISOString().slice(0,10);
+  const dt=prompt('Due date (YYYY-MM-DD):',def);
+  if(dt===null)return;
+  r.nextAction=a.trim();
+  r.nextDate=/^\d{4}-\d{2}-\d{2}$/.test((dt||'').trim())?dt.trim():def;
+  r.nextSet=today();
+  save();renderAll();
+}
+function snoozeSugg(k,ev){if(ev)ev.stopPropagation();dismissSugg(k)}
 function renderFollowups(){
   const t=today();
   const live=(S.companies||[]).filter(c=>LIVE.includes(c.stage));
@@ -999,9 +1013,10 @@ function renderFollowups(){
   const psort=(a,b)=>pr[a.priority]-pr[b.priority]||((a.nextDate||'9').localeCompare(b.nextDate||'9'));
   const sec=(title,items,color,render)=>items.length?'<div class="section"><div class="section-hdr" style="background:'+color+'">'+title+' ('+items.length+')</div><table>'+items.map(render).join('')+'</table></div>':'';
   const row=r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))"><td style="width:24px"><input type="checkbox" onclick="completeAction(\''+r.id+'\',event)" title="Mark done"></td><td style="width:30%"><b>'+esc(dispName(r))+'</b></td><td>'+esc(r.nextAction||'')+'</td><td>'+dueChip(r.nextDate)+'</td><td>'+prioChip(r)+'</td><td class="muted">'+fmtAgo(lastTouch(r))+'</td></tr>';
-  const rowS=c=>'<tr class="rowlink" onclick="openProfile(findRec(\''+c.id+'\'))"><td style="width:30%"><b>'+esc(c.name)+'</b></td><td>'+stagePill(c.stage)+'</td><td class="muted">Last: '+fmtAgo(lastTouch(c))+'</td></tr>';
-  const rowR=c=>'<tr class="rowlink" onclick="openProfile(findRec(\''+c.id+'\'))"><td style="width:30%"><b>'+esc(c.name)+'</b></td><td class="muted">Revisit date: '+fmtD(c.revisitDate)+'</td></tr>';
-  const rowA=a=>'<tr class="rowlink" onclick="openProfile(findRec(\''+a.id+'\'))"><td style="width:30%"><b>'+esc(a.firm)+'</b></td><td class="muted">Last: '+fmtAgo(lastTouch(a))+' (cadence: '+(a.cadence||30)+'d)</td></tr>';
+  const acts=(id,key)=>'<td style="width:180px;text-align:right;white-space:nowrap"><button class="sm" onclick="quickSetAction(\''+id+'\',event)">Set action</button> <button class="sm" onclick="snoozeSugg(\''+key+'\',event)">Dismiss</button></td>';
+  const rowS=c=>'<tr class="rowlink" onclick="openProfile(findRec(\''+c.id+'\'))"><td style="width:30%"><b>'+esc(c.name)+'</b></td><td>'+stagePill(c.stage)+'</td><td class="muted">Last: '+fmtAgo(lastTouch(c))+'</td>'+acts(c.id,'stale_'+c.id)+'</tr>';
+  const rowR=c=>'<tr class="rowlink" onclick="openProfile(findRec(\''+c.id+'\'))"><td style="width:30%"><b>'+esc(c.name)+'</b></td><td class="muted">Revisit date: '+fmtD(c.revisitDate)+'</td>'+acts(c.id,'rev_'+c.id)+'</tr>';
+  const rowA=a=>'<tr class="rowlink" onclick="openProfile(findRec(\''+a.id+'\'))"><td style="width:30%"><b>'+esc(dispName(a))+'</b></td><td class="muted">Last: '+fmtAgo(lastTouch(a))+' (cadence: '+(a.cadence||30)+'d)</td>'+acts(a.id,'cad_'+a.id)+'</tr>';
   const _mon=new Date();_mon.setHours(0,0,0,0);_mon.setDate(_mon.getDate()-((_mon.getDay()+6)%7));const _wc='w/c '+_mon.getDate()+' '+_mon.toLocaleString('en-GB',{month:'short'});
   document.getElementById('fuBody').innerHTML=
     sec('⚠ Overdue',overdue.sort(psort),'var(--red)',row)+
