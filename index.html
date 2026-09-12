@@ -229,6 +229,17 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
     <span class="muted" id="locCount"></span>
   </div>
   <div id="locMap" style="height:440px;border:1px solid var(--lgray);border-radius:5px;margin-bottom:14px"></div>
+  <div class="section" style="margin-bottom:14px"><div class="section-hdr">Umkreis: wer sitzt in der Nähe</div>
+    <div style="padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span>Ort</span><input id="locNear" placeholder="z.B. Bonn" style="width:170px" onkeydown="if(event.key==='Enter')nearbyBriefing()">
+      <span>Umkreis</span><input id="locKm" type="number" value="75" style="width:64px"> <span>km</span>
+      <button class="sm" onclick="nearbyBriefing()">Zeigen</button>
+      <button class="sm" onclick="copyBriefing()">Als Text kopieren</button>
+      <label style="font-size:12px"><input type="checkbox" id="locOnlyOpen"> nur mit offenem Punkt</label>
+    </div>
+    <div id="locNearOut"></div>
+  </div>
+  <div class="section" style="margin-bottom:14px"><div class="section-hdr">Reise lohnt sich: Regionen mit mehreren Zielunternehmen</div><div id="locClusters"></div></div>
   <div class="section"><div class="section-hdr">By city</div><div id="locList"></div></div>
 </div>
 
@@ -1462,7 +1473,93 @@ function calcMaths(){
 // ═══════════════════════════════════════════════════════════════
 // RENDER ALL + INIT
 // ═══════════════════════════════════════════════════════════════
-function recCity(r){return (r.city||r.location||'').split(',')[0].trim()}
+function cleanCity(s){
+  s=(s||'').trim(); if(!s)return '';
+  s=s.split(/\s*[\/;,|]\s*| und | & | \+ /)[0].trim();
+  s=s.replace(/\s*\(.*?\)\s*/g,' ')
+     .replace(/\s+i\.?\s*d\.?\s+\S+$/i,'')
+     .replace(/\s+(i\.|im)\s+\S+$/i,'')
+     .replace(/\s{2,}/g,' ').trim();
+  return s;
+}
+function recCity(r){return cleanCity(r.city||r.location||'')}
+function cityLL(c){return (S.geoCache||{})[(c||'').toLowerCase()]||null}
+function distKm(a,b){const R=6371,t=x=>x*Math.PI/180;
+  const dLat=t(b[0]-a[0]),dLon=t(b[1]-a[1]);
+  const h=Math.sin(dLat/2)**2+Math.cos(t(a[0]))*Math.cos(t(b[0]))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));}
+const MEET_RE=/kaffee|coffee|treffen|pers[oö]nlich|vorbeikommen|besuch|vor ort|wenn ich (da|dort|in)\b|sobald ich|lunch|mittagessen|meet in person|come by|drop by|in t[oó]uch once/i;
+function meetSignal(r){return MEET_RE.test(((r.nextAction||'')+' '+(r.notes||'')+' '+(r.detail||'')+' '+(r.lastSummary||'')))}
+function nearRecords(city,km){
+  const ll=cityLL(city); if(!ll)return null;
+  const out=[];
+  allRecs().forEach(r=>{
+    const c=recCity(r); if(!c)return;
+    const g=cityLL(c); if(!g)return;
+    const d=distKm(ll,g); if(d>km)return;
+    out.push({r,city:c,km:Math.round(d),open:!!(r.nextAction&&r.nextAction.trim()),meet:meetSignal(r),lt:lastTouch(r)});
+  });
+  out.sort((a,b)=>(b.meet-a.meet)||(b.open-a.open)||(a.km-b.km));
+  return out;
+}
+function nearbyBriefing(){
+  const city=cleanCity(document.getElementById('locNear').value);
+  const km=+document.getElementById('locKm').value||75;
+  const onlyOpen=document.getElementById('locOnlyOpen').checked;
+  const box=document.getElementById('locNearOut');
+  if(!city){box.innerHTML='<p class="muted" style="padding:12px">Ort eingeben.</p>';return}
+  let rows=nearRecords(city,km);
+  if(rows===null){box.innerHTML='<p class="muted" style="padding:12px">'+esc(city)+' ist noch nicht geocodiert. Erst auf "Geocode new cities" klicken.</p>';return}
+  if(onlyOpen)rows=rows.filter(x=>x.open);
+  if(!rows.length){box.innerHTML='<p class="muted" style="padding:12px">Niemand im Umkreis von '+km+' km.</p>';return}
+  const GRP=x=>x.r.kind==='target'?'Zielunternehmen':x.r.kind==='person'?'Personen':'Berater und Partner';
+  const g={};rows.forEach(x=>{(g[GRP(x)]=g[GRP(x)]||[]).push(x)});
+  let html='',txt='Im Umkreis von '+km+' km um '+city+':\n';
+  ['Zielunternehmen','Berater und Partner','Personen'].forEach(k=>{
+    if(!g[k])return;
+    html+='<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b>'+k+' ('+g[k].length+')</b></div>';
+    txt+='\n'+k+':\n';
+    g[k].forEach(x=>{
+      const age=x.lt?daysAgo(x.lt)+' Tage her':'kein Kontakt';
+      html+='<div style="padding:7px 12px;border-bottom:1px solid #F2F2F5">'
+        +'<span style="cursor:pointer;font-weight:600" onclick="openProfile(findRec(\''+x.r.id+'\'))">'+esc(dispName(x.r))+'</span>'
+        +(x.r.contact?' <span class="muted">'+esc(x.r.contact)+'</span>':'')
+        +' <span class="chip">'+esc(x.city)+' · '+x.km+' km</span>'
+        +(x.meet?' <span class="chip" style="background:#C00000;color:#fff">Treffen offen</span>':'')
+        +' <span class="muted" style="font-size:11px">'+age+'</span>'
+        +(x.open?'<div class="muted" style="font-size:12px;margin-top:2px">'+esc(x.r.nextAction.slice(0,170))+'</div>':'')
+        +'</div>';
+      txt+='- '+dispName(x.r)+(x.r.contact?' ('+x.r.contact+')':'')+', '+x.city+', '+x.km+' km, '+age
+        +(x.meet?' [Treffen offen]':'')+(x.open?'\n  offen: '+x.r.nextAction.slice(0,170):'')+'\n';
+    });
+  });
+  window.__brief=txt;
+  box.innerHTML=html;
+}
+function copyBriefing(){
+  if(!window.__brief){toast('Erst "Zeigen" klicken');return}
+  navigator.clipboard.writeText(window.__brief).then(()=>toast('Briefing kopiert'),()=>toast('Kopieren blockiert'));
+}
+function renderClusters(){
+  const box=document.getElementById('locClusters'); if(!box)return;
+  const km=+((document.getElementById('locKm')||{}).value)||75;
+  const tg=allRecs().filter(r=>r.kind==='target'&&r.stage!=='Dead'&&cityLL(recCity(r)));
+  const seen={},rows=[];
+  tg.forEach(r=>{const c=recCity(r); if(seen[c])return; seen[c]=1;
+    const near=nearRecords(c,km)||[];
+    const t=near.filter(x=>x.r.kind==='target'&&x.r.stage!=='Dead');
+    const a=near.filter(x=>x.r.kind!=='target');
+    if(t.length>=3)rows.push({c,t,a});
+  });
+  rows.sort((x,y)=>y.t.length-x.t.length);
+  box.innerHTML=rows.length?rows.slice(0,10).map(x=>
+    '<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b>'+esc(x.c)+'</b> '
+    +'<span class="chip" style="background:#C00000;color:#fff">'+x.t.length+' Ziele</span> '
+    +'<span class="chip">'+x.a.length+' Kontakte</span> '
+    +'<button class="sm" onclick="document.getElementById(\'locNear\').value=\''+esc(x.c).replace(/'/g,"")+'\';nearbyBriefing();">Briefing</button>'
+    +'<div class="muted" style="font-size:12px;margin-top:3px">'+x.t.slice(0,6).map(y=>esc(dispName(y.r))).join(' · ')+(x.t.length>6?' …':'')+'</div></div>'
+  ).join(''):'<p class="muted" style="padding:12px">Noch keine Region mit drei oder mehr Zielunternehmen im Umkreis von '+km+' km.</p>';
+}
 let locMap=null,locLayer=null;
 function renderLocations(){
   const kind=document.getElementById('locKind').value,geo=document.getElementById('locGeo').value;
@@ -1512,6 +1609,7 @@ function renderLocations(){
     lg.addTo(locMap);locMap._legend=lg;
   }
   if(cities.length&&plotted<cities.length)toast((cities.length-plotted)+' cities not geocoded yet — click "Geocode new cities"');
+  try{renderClusters()}catch(e){}
   setTimeout(()=>locMap.invalidateSize(),120);
 }
 async function geocodeMissing(){
