@@ -1604,7 +1604,7 @@ function renderLocations(){
   }
   if(cities.length&&plotted<cities.length)toast((cities.length-plotted)+' cities not geocoded yet — click "Geocode new cities"');
   try{renderClusters()}catch(e){}
-  if(pts.length&&!locMap._fitted){try{locMap.fitBounds(pts,{padding:[30,30],maxZoom:8});locMap._fitted=1}catch(e){}}
+  if(pts.length&&!locMap._fitted){try{const de=pts.filter(p=>p[0]>=45&&p[0]<=56&&p[1]>=4&&p[1]<=17);locMap.fitBounds(de.length?de:pts,{padding:[30,30],maxZoom:8});locMap._fitted=1}catch(e){}}
   setTimeout(()=>locMap.invalidateSize(),120);
 }
 async function geocodeMissing(){
