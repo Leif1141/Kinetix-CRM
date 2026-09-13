@@ -224,7 +224,6 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
 <div class="panel" id="p-locations">
   <div class="filterbar">
     <select id="locKind" onchange="renderLocations()"><option value="">Everyone</option><option value="advisor">Advisors</option><option value="person">People</option><option value="target">Targets</option></select>
-    <select id="locGeo" onchange="renderLocations()"><option value="">All regions</option><option value="DE">Germany</option><option value="UK">UK</option></select>
     <button class="sm" onclick="geocodeMissing()">Geocode new cities</button>
     <span class="muted" id="locCount"></span>
   </div>
@@ -1562,13 +1561,8 @@ function renderClusters(){
 }
 let locMap=null,locLayer=null;
 function renderLocations(){
-  const kind=document.getElementById('locKind').value,geo=document.getElementById('locGeo').value;
-  const recs=allRecs().filter(r=>{
-    if(!recCity(r)||(kind&&r.kind!==kind))return false;
-    if(!geo)return true;
-    const g=((r.geo||r.market||'')+'').toUpperCase();
-    return geo==='DE'?(g.startsWith('DE')||g.startsWith('GERMANY')):(g.startsWith('UK')||g.startsWith('UNITED KINGDOM'));
-  });
+  const kind=document.getElementById('locKind').value;
+  const recs=allRecs().filter(r=>!(!recCity(r)||(kind&&r.kind!==kind)));
   document.getElementById('locCount').textContent=recs.length+' records with a city';
   const byCity={};recs.forEach(r=>{const c=recCity(r);(byCity[c]=byCity[c]||[]).push(r)});
   const cities=Object.keys(byCity).sort((a,b)=>byCity[b].length-byCity[a].length);
@@ -1586,9 +1580,9 @@ function renderLocations(){
     r.category==='HR, universities & interns'?['HR / interns','#FFC000']:
     r.category==='Admin & infrastructure'?['Admin','#595959']:
     r.category==='Personal network'?['Personal','#A9A4C6']:['Other','#8C97B8'];
-  let plotted=0;
+  let plotted=0;const pts=[];
   cities.forEach(c=>{
-    const g=S.geoCache[c.toLowerCase()];if(!g)return;plotted++;
+    const g=S.geoCache[c.toLowerCase()];if(!g)return;plotted++;pts.push(g);
     byCity[c].forEach((r,i)=>{
       const n=byCity[c].length;
       const ang=2*Math.PI*i/Math.max(n,1);
@@ -1610,6 +1604,7 @@ function renderLocations(){
   }
   if(cities.length&&plotted<cities.length)toast((cities.length-plotted)+' cities not geocoded yet — click "Geocode new cities"');
   try{renderClusters()}catch(e){}
+  if(pts.length&&!locMap._fitted){try{locMap.fitBounds(pts,{padding:[30,30],maxZoom:8});locMap._fitted=1}catch(e){}}
   setTimeout(()=>locMap.invalidateSize(),120);
 }
 async function geocodeMissing(){
@@ -1633,7 +1628,7 @@ document.getElementById('tabs').addEventListener('click',e=>{
   const t=e.target.closest('.tab');if(!t)return;
   if(t.classList.contains('active')){
     // second click on the active tab resets all its filters
-    const reset={orgs:['oSearch','oKind','oStage','oList'],people:['pSearch','pType','pHas'],pipeline:['fSearch','fGeo'],locations:['locKind','locGeo']}[t.dataset.t]||[];
+    const reset={orgs:['oSearch','oKind','oStage','oList'],people:['pSearch','pType','pHas'],pipeline:['fSearch','fGeo'],locations:['locKind']}[t.dataset.t]||[];
     reset.forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
     renderAll();
     return;
