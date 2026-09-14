@@ -850,7 +850,7 @@ function renderOverview(){
   document.getElementById('suggBody').innerHTML=sug.length?sug.map(s=>'<div class="sugg"><span class="tag" style="background:'+s.color+'">'+s.tag+'</span><div><b style="cursor:pointer" onclick="openProfile(findRec(\''+s.rec.id+'\'))">'+esc(sugHead(s.rec))+'</b><div class="why">'+esc(s.why)+'</div></div><button class="sm" onclick="dismissSugg(\''+s.key+'\')">Dismiss</button></div>').join(''):'<p class="muted" style="padding:12px">No suggested actions right now.</p>';
   const favs=allRecs().filter(r=>r.fav);
   document.getElementById('favBody').innerHTML=favs.length?'<table>'+favs.map(r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))"><td>'+starHtml(r)+' <b>'+esc(dispName(r))+'</b></td><td class="muted">'+fmtAgo(lastTouch(r))+'</td></tr>').join('')+'</table>':'<p class="muted" style="padding:12px">Star records to pin them here.</p>';
-  document.getElementById('listsBody').innerHTML=(S.customLists||[]).map(l=>{const items=allRecs().filter(r=>(r.lists||[]).includes(l));const open=(S._openLists||[]).includes(l);return '<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC">'+'<b style="cursor:pointer" onclick="toggleListOpen(\''+esc(l)+'\')">'+(open?'&#9662; ':'&#9656; ')+esc(l)+'</b> <span class="muted">('+items.length+')</span>'+'<button class="sm" onclick="delList(\''+esc(l)+'\')" style="float:right">&times;</button>'+'<button class="sm" onclick="goList(\''+esc(l)+'\')" style="float:right;margin-right:4px">Orgs tab</button>'+(open?'<table style="margin-top:6px">'+items.map(r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))"><td><b>'+esc(dispName(r))+'</b></td><td class="muted">'+esc(r.kind==='person'?(r.firm||''):(r.contact||''))+'</td><td class="muted">'+esc(r.kind==='person'?(r.title||''):(r.category||''))+'</td></tr>').join('')+'</table>':'')+'</div>'}).join('')||'<p class="muted" style="padding:12px">No custom lists yet.</p>';
+  document.getElementById('listsBody').innerHTML='<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959;margin-bottom:5px">Categories</div>'+autoCats().map(c=>{const n=allOrgs().filter(o=>catOf(o)===c).length;return '<button class="sm" style="margin:0 4px 4px 0" onclick="goCat(\''+esc(c).replace(/'/g,"\\'")+'\')">'+esc(c)+' ('+n+')</button>'}).join('')+'</div>'+(((S.customLists||[]).length?'':'<p class="muted" style="padding:12px 12px 0">No custom lists yet.</p>')+(S.customLists||[]).map(l=>{const items=allRecs().filter(r=>(r.lists||[]).includes(l));const open=(S._openLists||[]).includes(l);return '<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC">'+'<b style="cursor:pointer" onclick="toggleListOpen(\''+esc(l)+'\')">'+(open?'&#9662; ':'&#9656; ')+esc(l)+'</b> <span class="muted">('+items.length+')</span>'+'<button class="sm" onclick="delList(\''+esc(l)+'\')" style="float:right">&times;</button>'+'<button class="sm" onclick="goList(\''+esc(l)+'\')" style="float:right;margin-right:4px">Orgs tab</button>'+(open?'<table style="margin-top:6px">'+items.map(r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))"><td><b>'+esc(dispName(r))+'</b></td><td class="muted">'+esc(r.kind==='person'?(r.firm||''):(r.contact||''))+'</td><td class="muted">'+esc(r.kind==='person'?(r.title||''):(r.category||''))+'</td></tr>').join('')+'</table>':'')+'</div>'}).join(''));
   const _seenT=new Set();
   const recent=allRecs().map(r=>{const ts=touchList(r).filter(t=>!isSysNote(t));if(!ts.length)return null;const wk=ts.filter(t=>daysAgo(t.date)<7).length;return {r,t:ts[0],n:wk}}).filter(Boolean)
     .sort((a,b)=>((b.t.date||'').localeCompare(a.t.date||''))||((a.r.kind==='person'?0:1)-(b.r.kind==='person'?0:1)))
@@ -882,6 +882,9 @@ function goList(l){goTab('orgs');document.getElementById('oList').value=l;render
 // ═══════════════════════════════════════════════════════════════
 // RENDER: ORGANIZATIONS
 // ═══════════════════════════════════════════════════════════════
+function catOf(o){return o.kind==='target'?'Targets':((o.category||'').trim()||'Uncategorised')}
+function autoCats(){const m={};allOrgs().forEach(o=>{const c=catOf(o);m[c]=(m[c]||0)+1});return Object.keys(m).sort((a,b)=>m[b]-m[a])}
+function goCat(c){goTab('orgs');const s=document.getElementById('oList');s.value='cat:'+c;if(s.value!=='cat:'+c){renderOrgs();s.value='cat:'+c}renderOrgs()}
 function renderOrgs(){
   const sel=document.getElementById('oStage');
   if(sel.options.length<3){STAGES.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o)});['Active','Inactive','Engaged','Paused'].forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o)})}
@@ -889,6 +892,7 @@ function renderOrgs(){
   const keepList=lsel.value;
   while(lsel.options.length>2)lsel.remove(2);
   (S.customLists||[]).forEach(l=>{const o=document.createElement('option');o.value=l;o.textContent=l;lsel.appendChild(o)});
+  {const g=document.createElement('optgroup');g.label='By category';autoCats().forEach(c=>{const o=document.createElement('option');o.value='cat:'+c;o.textContent=c;g.appendChild(o)});if(g.children.length)lsel.appendChild(g)}
   if(keepList&&[...lsel.options].some(o=>o.value===keepList))lsel.value=keepList;
   const q=(document.getElementById('oSearch').value||'').toLowerCase();
   const kind=document.getElementById('oKind').value,stg=sel.value,list=lsel.value;
@@ -896,7 +900,7 @@ function renderOrgs(){
     (!q||dispName(o).toLowerCase().includes(q)||(o.description||'').toLowerCase().includes(q)||(o.contact||'').toLowerCase().includes(q))&&
     (!kind||(kind==='target'?o.kind==='target':o.kind==='advisor'))&&
     (!stg||statusOf(o)===stg)&&
-    (!list||(list==='__fav'?o.fav:(o.lists||[]).includes(list)))
+    (!list||(list==='__fav'?o.fav:list.slice(0,4)==='cat:'?catOf(o)===list.slice(4):(o.lists||[]).includes(list)))
   );
   const val=o=>{switch(sortK){case 'name':return dispName(o).toLowerCase();case 'status':return statusOf(o)||'';case 'lastc':return lastTouch(o)||'';case 'geo':return o.geo||'';default:return ''}};
   rows.sort((a,b)=>{const va=val(a),vb=val(b);return va<vb?-sortD:va>vb?sortD:0});
@@ -938,21 +942,36 @@ function reconcileStatuses(){
 // ═══════════════════════════════════════════════════════════════
 // RENDER: PEOPLE
 // ═══════════════════════════════════════════════════════════════
+function contactRows(){
+  const out=[];
+  allOrgs().forEach(o=>{
+    const c=(o.contact||'').trim();if(!c)return;
+    const nc=normName(c);
+    if((S.people||[]).some(p=>(p.orgId===o.id||normName(p.firm||'')===normName(dispName(o)))&&normName(p.name||'')===nc))return;
+    out.push({__org:true,id:o.id,kind:'person',name:c,title:'Primary contact',firm:dispName(o),
+      email:o.email||'',phone:o.phone||'',linkedin:'',city:o.city||'',
+      networkPath:o.introPath||'',ptype:o.category||'',angle:o.notes||o.detail||'',
+      touches:o.touches||{},fav:o.fav,lists:o.lists||[],nextAction:o.nextAction,nextDate:o.nextDate,priority:o.priority});
+  });
+  return out;
+}
+function allPeopleRows(){return [...(S.people||[]),...contactRows()]}
 function renderPeople(){
   const tsel=document.getElementById('pType');
-  if(tsel.options.length<3){const types=[...new Set((S.people||[]).map(p=>p.ptype).filter(Boolean))].sort();types.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;tsel.appendChild(o)})}
+  if(tsel.options.length<3){const types=[...new Set(allPeopleRows().map(p=>p.ptype).filter(Boolean))].sort();types.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;tsel.appendChild(o)})}
   const q=(document.getElementById('pSearch').value||'').toLowerCase();
   const ty=tsel.value,has=document.getElementById('pHas').value;
-  let rows=(S.people||[]).filter(p=>
+  const BASE=allPeopleRows();
+  let rows=BASE.filter(p=>
     (!q||(p.name||'').toLowerCase().includes(q)||(p.firm||'').toLowerCase().includes(q)||(p.title||'').toLowerCase().includes(q))&&
     (!ty||p.ptype===ty)&&
     (!has||(has==='email'&&p.email)||(has==='linkedin'&&p.linkedin)||(has==='path'&&p.networkPath)||(has==='touch'&&Object.keys(p.touches||{}).length))
   );
   const val=p=>{switch(psortK){case 'name':return (p.name||'').toLowerCase();case 'firm':return (p.firm||'').toLowerCase();case 'lastc':return lastTouch(p)||'';default:return ''}};
   rows.sort((a,b)=>{const va=val(a),vb=val(b);return va<vb?-psortD:va>vb?psortD:0});
-  document.getElementById('pCount').textContent=rows.length+' of '+(S.people||[]).length;
+  document.getElementById('pCount').textContent=rows.length+' of '+BASE.length;
   const hdr=(k,label)=>'<th onclick="sortPeople(\''+k+'\')">'+label+(psortK===k?' <span class="arr">'+(psortD>0?'▲':'▼')+'</span>':'')+'</th>';
-  document.getElementById('peopleTable').innerHTML='<table>'+hdr('name','Name')+hdr('firm','Organization')+'<th>Title</th><th>Email</th>'+hdr('lastc','Last contact')+'<th>Network path</th>'+rows.slice(0,200).map(p=>'<tr class="rowlink" onclick="openProfile(findRec(\''+p.id+'\'))"><td>'+starHtml(p)+' <b>'+esc(p.name)+'</b></td><td class="muted">'+esc(p.firm||'—')+'</td><td class="muted">'+esc(p.title||'')+'</td><td class="muted">'+esc(p.email||'')+'</td><td class="muted">'+fmtAgo(lastTouch(p))+'</td><td class="muted" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.networkPath||'')+'</td></tr>').join('')+'</table>';
+  document.getElementById('peopleTable').innerHTML='<table>'+hdr('name','Name')+hdr('firm','Organization')+'<th>Title</th><th>Email</th>'+hdr('lastc','Last contact')+'<th>Network path</th>'+rows.slice(0,400).map(p=>'<tr class="rowlink" onclick="openProfile(findRec(\''+p.id+'\'))"><td>'+starHtml(p)+' <b>'+esc(p.name)+'</b>'+(p.__org?' <span class="chip" title="Primary contact stored on the organization record">org</span>':'')+'</td><td class="muted">'+esc(p.firm||'—')+'</td><td class="muted">'+esc(p.title||'')+'</td><td class="muted">'+esc(p.email||'')+'</td><td class="muted">'+fmtAgo(lastTouch(p))+'</td><td class="muted" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.networkPath||'')+'</td></tr>').join('')+'</table>';
 }
 function sortPeople(k){if(psortK===k)psortD*=-1;else{psortK=k;psortD=k==='lastc'?-1:1}renderPeople()}
 
@@ -1352,14 +1371,41 @@ function drawTimeline(r){
   if(profChart){try{profChart.destroy()}catch(e){}}
   const wks=tlPeriod;
   const labels=[],out=[],inn=[];
-  for(let i=0;i<wks;i++){
-    const start=i*7,end=(i+1)*7;
-    const mon=new Date();mon.setHours(0,0,0,0);mon.setDate(mon.getDate()-((mon.getDay()+6)%7)-start);labels.unshift('W/c '+mon.getDate()+' '+mon.toLocaleString('en-GB',{month:'short'}));
-    const ts=touchList(r).filter(t=>{const d=daysAgo(t.date);return d>=start&&d<end&&tlTypes[tType(t)]});
-    out.unshift(ts.filter(t=>t.dir==='out').length);
-    inn.unshift(ts.filter(t=>t.dir==='in').length);
+  const mon0=new Date();mon0.setHours(0,0,0,0);mon0.setDate(mon0.getDate()-((mon0.getDay()+6)%7));
+  const all=touchList(r).filter(t=>t.date&&tlTypes[tType(t)]);
+  for(let i=wks-1;i>=0;i--){
+    const ws=new Date(mon0);ws.setDate(ws.getDate()-i*7);
+    const we=new Date(ws);we.setDate(we.getDate()+7);
+    labels.push('W/c '+ws.getDate()+' '+ws.toLocaleString('en-GB',{month:'short'}));
+    const ts=all.filter(t=>{const d=new Date(t.date);return d>=ws&&d<we});
+    out.push(ts.filter(t=>t.dir==='out').length);
+    inn.push(ts.filter(t=>t.dir==='in').length);
   }
   profChart=new Chart(el,{type:'bar',data:{labels,datasets:[{label:'Out (sent)',data:out,backgroundColor:'#2E3C65'},{label:'In (received)',data:inn,backgroundColor:'#FFC000'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{font:{size:10}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
+}
+function convTouches(r){
+  let ts=touchList(r).filter(t=>!isSysNote(t));
+  if(r.kind==='person'){const o=personOrg(r);if(o){const seen=new Set(ts.map(t=>(t.date||'')+'|'+(t.subject||'')));touchList(o).forEach(t=>{if(isSysNote(t))return;const k=(t.date||'')+'|'+(t.subject||'');if(!seen.has(k)){seen.add(k);ts.push(t)}});ts.sort((a,b)=>(b.date||'').localeCompare(a.date||''))}}
+  return ts;
+}
+function wrapUpHtml(r){
+  const ts=convTouches(r);
+  if(!ts.length)return '';
+  const newest=ts[0];
+  const lastIn=ts.find(t=>t.dir==='in'),lastOut=ts.find(t=>t.dir==='out');
+  const ball=newest.dir==='in'
+    ? 'Ball with you - they wrote last, '+fmtAgo(newest.date)
+    : 'Ball with them - you wrote last, '+fmtAgo(newest.date);
+  const cut=(s,n)=>{s=(s||'').replace(/\s+/g,' ').trim();return s.length>n?s.slice(0,n)+' …':s};
+  const blk=(t,lab)=>!t?'':'<div style="margin-bottom:9px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">'+lab+' &middot; '+fmtD(t.date)+' &middot; '+fmtAgo(t.date)+(t.who?' &middot; '+esc(t.who):'')+'</div><b style="font-size:12px">'+esc(t.subject||'(no subject)')+'</b>'+((t.prev||t.note)?'<div class="tnote" style="margin-top:4px">'+esc(cut(cleanPrev(t.prev||t.note),700))+'</div>':'')+'</div>';
+  const older=ts.filter(t=>t!==lastIn&&t!==lastOut).slice(0,4);
+  return '<div class="pbox" style="border-left:3px solid '+(newest.dir==='in'?'#C6943E':'#2E3C65')+'">'+
+    '<h4>Where we left things</h4>'+
+    '<div style="font-size:12px;font-weight:bold;margin-bottom:9px">'+ball+'</div>'+
+    blk(lastIn,'Last received')+blk(lastOut,'Last sent')+
+    (r.nextAction?'<div style="margin-top:4px;padding-top:6px;border-top:1px solid var(--lgray)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">Open item</div><div style="font-size:12px">'+esc(r.nextAction)+(r.nextDate?' <span class="muted">('+fmtD(r.nextDate)+')</span>':'')+'</div></div>':'')+
+    (older.length?'<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--lgray)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">Earlier in this thread</div>'+older.map(t=>'<div style="font-size:11px;margin-top:5px">'+fmtD(t.date)+' <span class="muted">'+(t.dir==='out'?'sent':'received')+'</span> <b>'+esc(t.subject||'')+'</b>'+(t.prev?'<div class="tnote" style="margin-top:2px">'+esc(cut(cleanPrev(t.prev),260))+'</div>':'')+'</div>').join('')+'</div>':'')+
+    '</div>';
 }
 function setTlPeriod(w){tlPeriod=w;drawTimeline(profRec)}
 function toggleTlType(ty,on){tlTypes[ty]=on;drawTimeline(profRec)}
@@ -1375,7 +1421,7 @@ function openProfile(rec){
     '<label>Ownership</label><input id="e_own" value="'+esc(rec.ownership||'')+'">'+
     '<label>Flag</label><input id="e_flag" value="'+esc(rec.flag||'')+'">'+
     (rec.stage==='Dead'?selFld('e_dr','Dead reason',DEADREASONS,rec.deadReason)+fld('e_revd','Revisit date',rec.revisitDate,'date'):'')+
-    '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+fld('e_na','Next action',rec.nextAction):
+    '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+'<label>Next action</label><textarea id="e_na" rows="3" style="width:100%">'+esc(rec.nextAction||'')+'</textarea>':
   isA?
     fld('e_firm','Firm name',rec.firm)+fld('e_contact','Primary contact',rec.contact)+fld('e_email','Email',rec.email)+fld('e_domain','Domain',rec.domain)+
     '<div class="pgrid">'+selFld('e_cat','Category',['M&A sourcing intermediaries','Financing partners','DD advisors','Investors & family office','HR, universities & interns','Admin & infrastructure','Personal network','Other'],rec.category)+selFld('e_market','Market',['DE','UK'],rec.market||(/uk|united kingdom/i.test(rec.geo||'')?'UK':'DE'))+selFld('e_geo2','Geo (country)',['Germany','United Kingdom','Switzerland','France','Netherlands','Luxembourg','Sweden','Denmark','Austria','United States','Other'],rec.geo)+'</div>'+
@@ -1384,9 +1430,9 @@ function openProfile(rec){
     fld('e_intro','Intro path',rec.introPath)+
     '<label>Notes</label><textarea id="e_notes" rows="3">'+esc(rec.notes||'')+'</textarea>'+
     fld('e_cad','Check-in cadence (days)',rec.cadence||30,'number')+
-    '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+fld('e_na','Next action',rec.nextAction):
+    '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+'<label>Next action</label><textarea id="e_na" rows="3" style="width:100%">'+esc(rec.nextAction||'')+'</textarea>':
     fld('e_pname','Full name',rec.name)+fld('e_ptitle','Title',rec.title)+fld('e_pfirm','Organization',rec.firm)+fld('e_pemail','Email',rec.email)+fld('e_pphone','Phone',rec.phone)+fld('e_plinkedin','LinkedIn',rec.linkedin)+fld('e_pcity','City',rec.city)+fld('e_pangle','Angle / notes',rec.angle)+fld('e_ppath','Network path',rec.networkPath)+
-    '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+fld('e_na','Next action',rec.nextAction);
+    '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+'<label>Next action</label><textarea id="e_na" rows="3" style="width:100%">'+esc(rec.nextAction||'')+'</textarea>';
 
   const ppl=isP?[]:orgPeople(rec);
 
@@ -1398,7 +1444,7 @@ function openProfile(rec){
     '<div class="pbox"><h4>Files <button class="sm" onclick="addLink()">+ Link</button></h4>'+filesHtml(rec)+'</div>'+
     (isT?'<div class="pbox"><h4>Deal maths</h4><div class="pgrid">'+fld('dm_e','EBITDA (€m)',rec.ebitda,'number')+fld('dm_m','Multiple',6,'number')+fld('dm_d','Debt %',60,'number')+fld('dm_r','Interest rate %',5,'number')+fld('dm_t','Tenor (yrs)',7,'number')+'</div><button class="sm primary" onclick="calcMaths()" style="margin-top:6px">Calculate</button><div id="dm_out" style="margin-top:8px"></div></div>':'')+
   '</div><div class="mcol-r">'+
-    (function(){const lt=touchList(rec).find(t=>!(t.src==='Note'&&/^✔/.test(t.subject||'')));if(!lt)return '';return '<div class="pbox" style="border-left:3px solid '+(lt.dir==='out'?'#2E3C65':'#C6943E')+'"><h4>Latest activity</h4><div style="font-size:12px"><b>'+esc(lt.subject||'')+'</b><div class="muted" style="margin-top:2px">'+fmtD(lt.date)+' \u00B7 '+(lt.dir==='out'?'sent':'received')+(lt.who?' \u00B7 '+esc(lt.who):'')+(lt.src?' \u00B7 '+esc(lt.src):'')+'</div>'+(lt.prev?'<div class="tnote" style="margin-top:6px">'+esc(cleanPrev(lt.prev))+'</div>':(lt.note?'<div class="tnote" style="margin-top:6px">'+esc(lt.note)+'</div>':''))+'</div></div>'})()+
+    wrapUpHtml(rec)+
     '<div class="pbox"><h4>Log activity</h4><div class="inline">'+selFld('la_type','Type',ACT_TYPES,'Call')+fld('la_date','Date',today(),'date')+fld('la_txt','Subject','')+'</div><label>Note</label><textarea id="la_note" rows="2"></textarea><button class="sm primary" onclick="logActivity()" style="margin-top:4px">Log</button></div>'+
     '<div class="pbox"><h4>Activity timeline <span class="muted" style="font-weight:400">'+Object.keys(rec.touches||{}).length+' activities</span></h4>'+
       '<div class="tl-ctl">Period: <select onchange="setTlPeriod(+this.value)"><option value="13"'+(tlPeriod===13?' selected':'')+'>13 weeks</option><option value="26"'+(tlPeriod===26?' selected':'')+'>26 weeks</option><option value="52"'+(tlPeriod===52?' selected':'')+'>52 weeks</option></select> '+
