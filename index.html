@@ -685,7 +685,7 @@ async function syncGmailEmails(){
 // ═══════════════════════════════════════════════════════════════
 // COMBINED SYNC
 // ═══════════════════════════════════════════════════════════════
-function cleanPrev(s){
+function cleanPrev(s,max){
   if(!s)return '';
   let t=String(s).replace(/\s+/g,' ');
   // cut at quoted-thread markers and signature separators
@@ -696,7 +696,7 @@ function cleanPrev(s){
   // drop closing + signature
   const closers=[/\b(Beste|Viele|Liebe|Herzliche|Freundliche) Gr(ü|u)(ß|ss)e\b/i,/\bMit freundlichen\b/i,/\bBest regards\b/i,/\bKind regards\b/i,/\bBest,\b/,/\bThanks,\b/i,/\bVielen Dank und\b/i,/\bBis sehr bald\b/i,/\bBis bald\b/i];
   closers.forEach(rx=>{const m=t.search(rx);if(m>20)t=t.slice(0,m)});
-  return t.trim().slice(0,200);
+  return t.trim().slice(0,max||200);
 }
 function migratePrevClean(){
   if(S.prevCleanV1)return;
@@ -937,7 +937,7 @@ function renderOrgs(){
     const cur=statusOf(o)||'';
     return '<select class="stagesel" onclick="event.stopPropagation()" onchange="setStatusInline(\''+o.id+'\',this.value)">'+opts.map(s=>'<option'+(s===cur?' selected':'')+'>'+esc(s)+'</option>').join('')+(opts.includes(cur)?'':'<option selected>'+esc(cur||'—')+'</option>')+'</select>';
   };
-  document.getElementById('orgTable').innerHTML='<table>'+hdr('name','Organization')+hdr('status','Stage / Status')+'<th>Type</th><th>Contact</th>'+hdr('lastc','Last contact')+hdr('geo','Geo')+'<th>Detail</th><th></th>'+rows.map(o=>'<tr class="rowlink" onclick="openProfile(findRec(\''+o.id+'\'))"><td>'+starHtml(o)+' <b>'+esc(dispName(o))+'</b>'+(o.flag?' <span class="flag">'+esc(o.flag)+'</span>':'')+'</td><td>'+statusSel(o)+'</td><td class="muted">'+esc(typeShort(o))+'</td><td class="muted">'+esc(o.contact||orgPeople(o).map(p=>p.name).join(', ')||'—')+'</td><td class="muted">'+fmtAgo(lastTouch(o))+'</td><td class="muted">'+esc(geoDisp(o.geo))+'</td><td class="muted" style="max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(detailCell(o))+'</td><td>'+prioChip(o)+'</td></tr>').join('')+'</table>';
+  document.getElementById('orgTable').innerHTML='<table>'+hdr('name','Organization')+hdr('status','Stage / Status')+'<th>Type</th><th>Contact</th>'+hdr('lastc','Last contact')+'<th>Address</th><th>Detail</th><th></th>'+rows.map(o=>'<tr class="rowlink" onclick="openProfile(findRec(\''+o.id+'\'))"><td>'+starHtml(o)+' <b>'+esc(dispName(o))+'</b>'+(o.flag?' <span class="flag">'+esc(o.flag)+'</span>':'')+'</td><td>'+statusSel(o)+'</td><td class="muted">'+esc(typeShort(o))+'</td><td class="muted">'+esc(o.contact||orgPeople(o).map(p=>p.name).join(', ')||'—')+'</td><td class="muted">'+fmtAgo(lastTouch(o))+'</td><td class="muted" style="max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc([o.address,o.city].filter(Boolean).join(', ')||o.location||'')+'</td><td class="muted" style="max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(detailCell(o))+'</td><td>'+prioChip(o)+'</td></tr>').join('')+'</table>';
 }
 function sortOrgs(k){if(sortK===k)sortD*=-1;else{sortK=k;sortD=k==='name'?1:-1}renderOrgs()}
 function setStatusInline(id,val){
@@ -1415,7 +1415,7 @@ function tlHtml(r){
   const legend='<div style="font-size:10px;color:#595959;margin-bottom:6px;line-height:1.6"><span style="color:#2E3C65">\u25CF</span> Email sent &nbsp;<span style="color:#C6943E">\u25CF</span> Email received &nbsp;<span style="color:#008A3E">\u25CF</span> Meeting/Granola &nbsp;<span style="color:#7030A0">\u25CF</span> Call &nbsp;<span style="color:#8C97B8">\u25CF</span> Note/other</div>';
   return legend+'<div class="timeline">'+ts.slice(0,30).map(t=>{
     const k=Object.keys(r.touches||{}).find(k=>(r.touches||{})[k]===t);
-    return '<div class="titem t'+tType(t)+(t.dir==='out'?' out':'')+'"><b>'+fmtD(t.date)+'</b> '+(t.link?'<a href="'+esc(t.link)+'" target="_blank" title="Open in mailbox">'+esc(t.subject)+'</a>':esc(t.subject))+(t.src?' <span class="chip">'+t.src+'</span>':'')+(t.who?' <span class="muted">— '+esc(t.who)+'</span>':'')+(t.link?' <a href="'+esc(t.link)+'" target="_blank">↗</a>':'')+(k?'<br><button class="sm" onclick="editNote(\''+r.id+'\',\''+k+'\')">Note</button>':'')+(t.note?'<div class="tnote">'+esc(t.note)+'</div>':'')+'</div>'
+    return '<div class="titem t'+tType(t)+(t.dir==='out'?' out':'')+'"><b>'+fmtD(t.date)+'</b> '+(t.link?'<a href="'+esc(t.link)+'" target="_blank" title="Open original">'+esc(fixUml(t.subject))+'</a>':esc(fixUml(t.subject)))+' <span class="chip">'+esc(srcLabel(t))+'</span>'+(t.who?' <span class="muted">— '+esc(fixUml(t.who))+'</span>':'')+(t.link?' <a href="'+esc(t.link)+'" target="_blank">↗</a>':'')+(k?'<br><button class="sm" onclick="editNote(\''+r.id+'\',\''+k+'\')">Note</button>':'')+(t.note?'<div class="tnote">'+esc(fixUml(t.note))+'</div>':(t.prev?'<div class="tnote">'+esc(fixUml(cleanPrev(t.prev,400)))+'</div>':''))+'</div>'
   }).join('')+'</div>';
 }
 function editNote(recId,key){
@@ -1436,7 +1436,7 @@ function filesHtml(r){
   return h||'<span class="muted">No files linked</span>';
 }
 function addLink(){const t=prompt('Link title:');if(!t)return;const u=prompt('URL:');if(!u)return;profRec.links=profRec.links||[];profRec.links.push({title:t,url:u});save();openProfile(profRec)}
-function listChips(r){return '<div style="display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center">'+(S.customLists||[]).map(l=>'<label style="font-size:11px;display:inline-flex;align-items:center;gap:4px;text-transform:none;margin:0"><input type="checkbox" style="margin:0" '+(((r.lists||[]).includes(l))?'checked':'')+' onchange="toggleList(\''+r.id+'\',\''+esc(l)+'\',this.checked)"> '+esc(l)+'</label>').join('')+'</div>'}
+function listChips(r){return '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px;align-items:start">'+(S.customLists||[]).map(l=>'<label style="font-size:11px;display:flex;align-items:flex-start;gap:5px;text-transform:none;margin:0;line-height:1.3"><input type="checkbox" style="margin:0" '+(((r.lists||[]).includes(l))?'checked':'')+' onchange="toggleList(\''+r.id+'\',\''+esc(l)+'\',this.checked)"> '+esc(l)+'</label>').join('')+'</div>'}
 function toggleList(id,l,on){const r=findRec(id);r.lists=r.lists||[];if(on&&!r.lists.includes(l))r.lists.push(l);if(!on)r.lists=r.lists.filter(x=>x!==l);save()}
 
 let tlPeriod=13,tlTypes={Email:true,Meeting:true,Call:true,Note:true};
@@ -1444,7 +1444,7 @@ function drawTimeline(r){
   const el=document.getElementById('profTl');if(!el)return;
   if(profChart){try{profChart.destroy()}catch(e){}}
   const wks=tlPeriod;
-  const labels=[],out=[],inn=[];
+  const labels=[],out=[],inn=[],mtg=[];
   const mon0=new Date();mon0.setHours(0,0,0,0);mon0.setDate(mon0.getDate()-((mon0.getDay()+6)%7));
   const all=touchList(r).filter(t=>t.date&&tlTypes[tType(t)]);
   for(let i=wks-1;i>=0;i--){
@@ -1452,11 +1452,33 @@ function drawTimeline(r){
     const we=new Date(ws);we.setDate(we.getDate()+7);
     labels.push('W/c '+ws.getDate()+' '+ws.toLocaleString('en-GB',{month:'short'}));
     const ts=all.filter(t=>{const d=new Date(t.date);return d>=ws&&d<we});
-    out.push(ts.filter(t=>t.dir==='out').length);
-    inn.push(ts.filter(t=>t.dir==='in').length);
+    const isMeet=t=>tType(t)==='Meeting'||tType(t)==='Call';
+    mtg.push(ts.filter(isMeet).length);
+    out.push(ts.filter(t=>!isMeet(t)&&t.dir==='out').length);
+    inn.push(ts.filter(t=>!isMeet(t)&&t.dir==='in').length);
   }
-  profChart=new Chart(el,{type:'bar',data:{labels,datasets:[{label:'Out (sent)',data:out,backgroundColor:'#2E3C65'},{label:'In (received)',data:inn,backgroundColor:'#FFC000'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{font:{size:10}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
+  profChart=new Chart(el,{type:'bar',data:{labels,datasets:[{label:'Out (sent)',data:out,backgroundColor:'#2E3C65'},{label:'In (received)',data:inn,backgroundColor:'#FFC000'},{label:'Calls / meetings',data:mtg,backgroundColor:'#2E7D32'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{font:{size:10}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
 }
+let _umlMap=null;
+function foldUml(w){return w.replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/Ä/g,'Ae').replace(/Ö/g,'Oe').replace(/Ü/g,'Ue').replace(/ß/g,'ss')}
+function umlMap(){
+  if(_umlMap)return _umlMap;
+  const out=[],seen=new Set();
+  allRecs().forEach(r=>[r.contact,r.name,r.firm].forEach(v=>{
+    if(!v||!/[äöüÄÖÜß]/.test(v))return;
+    String(v).split(/[\s,\/()]+/).forEach(w=>{
+      if(!/[äöüÄÖÜß]/.test(w)||w.length<4)return;
+      const f=foldUml(w);
+      if(f===w||seen.has(f))return;
+      seen.add(f);out.push([f,w]);
+    });
+  }));
+  out.sort((a,b)=>b[0].length-a[0].length);
+  _umlMap=out;return out;
+}
+function fixUml(s){if(!s)return s;let t=String(s);umlMap().forEach(p=>{if(t.indexOf(p[0])>=0)t=t.split(p[0]).join(p[1])});return t}
+function srcLabel(t){const s=t.src||'';if(s==='Granola'||s==='Meeting')return 'Call';if(s==='Kinetix'||s==='Gmail'||s==='Email')return 'Email';return s}
+function linkWrap(t,inner){return t.link?'<a href="'+esc(t.link)+'" target="_blank" title="Open original">'+inner+'</a>':inner}
 function convTouches(r){
   let ts=touchList(r).filter(t=>!isSysNote(t));
   if(r.kind==='person'){const o=personOrg(r);if(o){const seen=new Set(ts.map(t=>(t.date||'')+'|'+(t.subject||'')));touchList(o).forEach(t=>{if(isSysNote(t))return;const k=(t.date||'')+'|'+(t.subject||'');if(!seen.has(k)){seen.add(k);ts.push(t)}});ts.sort((a,b)=>(b.date||'').localeCompare(a.date||''))}}
@@ -1467,18 +1489,21 @@ function wrapUpHtml(r){
   if(!ts.length)return '';
   const newest=ts[0];
   const lastIn=ts.find(t=>t.dir==='in'),lastOut=ts.find(t=>t.dir==='out');
-  const ball=newest.dir==='in'
-    ? 'Ball with you - they wrote last, '+fmtAgo(newest.date)
-    : 'Ball with them - you wrote last, '+fmtAgo(newest.date);
+  const open=(r.nextAction||'').trim();
+  const ball=open
+    ? 'Ball with you - open item below (last exchange '+(newest.dir==='in'?'received ':'sent ')+fmtAgo(newest.date)+')'
+    : (newest.dir==='in'
+      ? 'Ball with you - they wrote last, '+fmtAgo(newest.date)
+      : 'Ball with them - you wrote last, '+fmtAgo(newest.date));
   const cut=(s,n)=>{s=(s||'').replace(/\s+/g,' ').trim();return s.length>n?s.slice(0,n)+' …':s};
-  const blk=(t,lab)=>!t?'':'<div style="margin-bottom:9px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">'+lab+' &middot; '+fmtD(t.date)+' &middot; '+fmtAgo(t.date)+(t.who?' &middot; '+esc(t.who):'')+'</div><b style="font-size:12px">'+esc(t.subject||'(no subject)')+'</b>'+((t.prev||t.note)?'<div class="tnote" style="margin-top:4px">'+esc(cut(cleanPrev(t.prev||t.note),700))+'</div>':'')+'</div>';
+  const blk=(t,lab)=>!t?'':'<div style="margin-bottom:9px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">'+lab+' &middot; '+fmtD(t.date)+' &middot; '+fmtAgo(t.date)+' &middot; '+esc(srcLabel(t))+(t.who?' &middot; '+esc(fixUml(t.who)):'')+'</div><b style="font-size:12px">'+linkWrap(t,esc(fixUml(t.subject||'(no subject)')))+(t.link?' <span class="muted">&#8599;</span>':'')+'</b>'+((t.prev||t.note)?'<div class="tnote" style="margin-top:4px">'+esc(cut(fixUml(cleanPrev(t.prev||t.note,1200)),1200))+'</div>':'')+'</div>';
   const older=ts.filter(t=>t!==lastIn&&t!==lastOut).slice(0,4);
   return '<div class="pbox" style="border-left:3px solid '+(newest.dir==='in'?'#C6943E':'#2E3C65')+'">'+
     '<h4>Where we left things</h4>'+
     '<div style="font-size:12px;font-weight:bold;margin-bottom:9px">'+ball+'</div>'+
     blk(lastIn,'Last received')+blk(lastOut,'Last sent')+
     (r.nextAction?'<div style="margin-top:4px;padding-top:6px;border-top:1px solid var(--lgray)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">Open item</div><div style="font-size:12px">'+esc(r.nextAction)+(r.nextDate?' <span class="muted">('+fmtD(r.nextDate)+')</span>':'')+'</div></div>':'')+
-    (older.length?'<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--lgray)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">Earlier in this thread</div>'+older.map(t=>'<div style="font-size:11px;margin-top:5px">'+fmtD(t.date)+' <span class="muted">'+(t.dir==='out'?'sent':'received')+'</span> <b>'+esc(t.subject||'')+'</b>'+(t.prev?'<div class="tnote" style="margin-top:2px">'+esc(cut(cleanPrev(t.prev),260))+'</div>':'')+'</div>').join('')+'</div>':'')+
+    (older.length?'<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--lgray)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">Earlier in this thread</div>'+older.map(t=>'<div style="font-size:11px;margin-top:5px">'+fmtD(t.date)+' <span class="muted">'+(t.dir==='out'?'sent':'received')+' &middot; '+esc(srcLabel(t))+'</span> <b>'+linkWrap(t,esc(fixUml(t.subject||'')))+'</b>'+(t.prev?'<div class="tnote" style="margin-top:2px">'+esc(cut(fixUml(cleanPrev(t.prev,400)),400))+'</div>':'')+'</div>').join('')+'</div>':'')+
     '</div>';
 }
 function setTlPeriod(w){tlPeriod=w;drawTimeline(profRec)}
