@@ -1030,59 +1030,62 @@ function renderQueue(){
 function realTouches(r,days){
   return touchList(r).filter(t=>!isSysNote(t)&&(!days||daysAgo(t.date)<days));
 }
+function partnerStats(a){
+  const ts=realTouches(a);
+  const out=ts.filter(t=>t.dir==='out').length, inn=ts.filter(t=>t.dir==='in').length;
+  const dates=ts.map(t=>(t.date||'').slice(0,10)).filter(Boolean).sort();
+  const first=dates[0]||'', last=dates[dates.length-1]||'';
+  const nm=foldSearch(dispName(a));
+  const sourced=(S.companies||[]).filter(c=>{const ch=foldSearch(c.channel||'');return ch&&nm&&(ch.includes(nm)||nm.includes(ch))});
+  const given=sharedByRec(a);
+  return {a,out,inn,tot:out+inn,first,last,age:first?daysAgo(first):0,sourced,given};
+}
 function renderYield(){
   const el=document.getElementById('yieldBody');if(!el)return;
   const D=90;
-  const PROGRESSED=['Replied','Meeting','NDA','Info received','IOI/LOI','Diligence','Closed'];
+  const stats=(S.advisors||[]).map(partnerStats);
+  const link=x=>'<b style="cursor:pointer" onclick="openProfile(findRec(\''+x.a.id+'\'))">'+esc(fixUml(dispName(x.a)))+'</b>';
+  const hdr=cols=>'<tr>'+cols.map((c,i)=>'<th'+(i?' style="text-align:right"':'')+'>'+c+'</th>').join('')+'</tr>';
+  const sub=t=>'<div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959;margin:10px 0 4px">'+t+'</div>';
+  const none=(n,msg)=>'<tr><td colspan="'+n+'" class="muted">'+msg+'</td></tr>';
 
-  // --- A. sourcing channel: which route actually delivers targets
-  const chan={};
-  (S.companies||[]).forEach(c=>{
-    const k=(c.channel||'').trim()||'(not recorded)';
-    const x=chan[k]||(chan[k]={n:0,prog:0,dead:0});
-    x.n++; if(PROGRESSED.includes(c.stage))x.prog++; if(c.stage==='Dead')x.dead++;
-  });
-  const chanRows=Object.entries(chan).sort((a,b)=>b[1].n-a[1].n).map(([k,x])=>
-    '<tr><td>'+esc(k)+'</td><td style="text-align:right">'+x.n+'</td><td style="text-align:right">'+x.prog+'</td><td style="text-align:right">'+x.dead+'</td><td style="text-align:right">'+(x.n?Math.round(x.prog/x.n*100):0)+'%</td></tr>').join('');
+  // A. partners who have actually put a name in front of you
+  const producing=stats.filter(x=>x.sourced.length).sort((a,b)=>b.sourced.length-a.sourced.length);
+  const prodRows=producing.length?producing.map(x=>
+    '<tr class="rowlink" onclick="openProfile(findRec(\''+x.a.id+'\'))"><td>'+link(x)+'</td><td class="muted">'+esc(catOf(x.a)||'')+'</td><td style="text-align:right">'+x.sourced.length+'</td><td style="text-align:right">'+x.tot+'</td><td class="muted" style="text-align:right">'+esc(x.sourced.map(c=>fixUml(dispName(c))).join(', ').slice(0,60))+'</td></tr>').join('')
+    :none(5,'No target yet carries a sourcing route. Fill in Channel on a target and this table starts working.');
 
-  // --- B. effort vs response, by partner category
-  const cat={};
-  (S.advisors||[]).forEach(a=>{
-    const k=catOf(a)||'(uncategorised)';
-    const x=cat[k]||(cat[k]={firms:0,active:0,out:0,inn:0});
-    x.firms++;
-    const ts=realTouches(a,D);
-    if(ts.length)x.active++;
-    x.out+=ts.filter(t=>t.dir==='out').length;
-    x.inn+=ts.filter(t=>t.dir==='in').length;
-  });
-  const catRows=Object.entries(cat).sort((a,b)=>b[1].out-a[1].out).map(([k,x])=>
-    '<tr><td>'+esc(k)+'</td><td style="text-align:right">'+x.firms+'</td><td style="text-align:right">'+x.active+'</td><td style="text-align:right">'+x.out+'</td><td style="text-align:right">'+x.inn+'</td><td style="text-align:right"><b>'+(x.out?(x.inn/x.out).toFixed(2):'-')+'</b></td></tr>').join('');
+  // B. long two-way conversations that have produced nothing
+  const talk=stats.filter(x=>x.tot>=10&&x.inn>=3&&x.age>=90&&!x.sourced.length)
+    .sort((a,b)=>b.tot-a.tot).slice(0,12);
+  const talkRows=talk.length?talk.map(x=>
+    '<tr class="rowlink" onclick="openProfile(findRec(\''+x.a.id+'\'))"><td>'+link(x)+'</td><td class="muted">'+esc(catOf(x.a)||'')+'</td><td style="text-align:right">'+x.tot+'</td><td style="text-align:right">'+Math.round(x.age/30)+'m</td><td style="text-align:right">'+x.given.length+'</td><td class="muted">'+fmtAgo(lastTouch(x.a))+'</td></tr>').join('')
+    :none(6,'Nothing here.');
 
-  // --- C. time sinks: repeated outbound, nothing coming back
-  const sinks=(S.advisors||[]).map(a=>{
-    const ts=realTouches(a,180);
-    const out=ts.filter(t=>t.dir==='out').length, inn=ts.filter(t=>t.dir==='in').length;
-    return {a,out,inn};
-  }).filter(x=>x.out>=3&&x.inn===0).sort((a,b)=>b.out-a.out).slice(0,12);
-  const sinkRows=sinks.length?sinks.map(x=>
-    '<tr class="rowlink" onclick="openProfile(findRec(\''+x.a.id+'\'))"><td><b>'+esc(fixUml(dispName(x.a)))+'</b></td><td class="muted">'+esc(catOf(x.a)||'')+'</td><td style="text-align:right">'+x.out+'</td><td class="muted">'+fmtAgo(lastTouch(x.a))+'</td></tr>').join('')
-    :'<tr><td colspan="4" class="muted">Nothing here - every partner you have chased has come back to you.</td></tr>';
+  // C. approached, no answer - a channel problem, not a write-off
+  const silent=stats.filter(x=>x.out>=3&&x.inn===0).sort((a,b)=>b.out-a.out).slice(0,12);
+  const silRows=silent.length?silent.map(x=>
+    '<tr class="rowlink" onclick="openProfile(findRec(\''+x.a.id+'\'))"><td>'+link(x)+'</td><td class="muted">'+esc(catOf(x.a)||'')+'</td><td style="text-align:right">'+x.out+'</td><td class="muted">'+fmtAgo(lastTouch(x.a))+'</td><td class="muted">'+esc(x.a.phone?'phone on file':'no phone on file')+'</td></tr>').join('')
+    :none(5,'Everyone you have written to more than twice has answered.');
 
-  // --- D. headline numbers
-  const allOut=(S.advisors||[]).reduce((n,a)=>n+realTouches(a,D).filter(t=>t.dir==='out').length,0);
-  const allIn=(S.advisors||[]).reduce((n,a)=>n+realTouches(a,D).filter(t=>t.dir==='in').length,0);
-  const sourced=(S.companies||[]).filter(c=>(c.channel||'').trim()).length;
-  const tot=(S.companies||[]).length;
-  const hdr=(t,cols)=>'<tr>'+cols.map((c,i)=>'<th'+(i?' style="text-align:right"':'')+'>'+c+'</th>').join('')+'</tr>';
+  // headline
+  const out90=stats.reduce((n,x)=>n+realTouches(x.a,D).filter(t=>t.dir==='out').length,0);
+  const in90=stats.reduce((n,x)=>n+realTouches(x.a,D).filter(t=>t.dir==='in').length,0);
+  const sourcedN=(S.companies||[]).filter(c=>(c.channel||'').trim()).length, tot=(S.companies||[]).length;
+  const givenN=Object.keys(shareIndex()).length;
 
   el.innerHTML=
-    '<div style="padding:10px 12px;font-size:11px" class="muted">Last '+D+' days: you sent <b style="color:#000">'+allOut+'</b> messages to your network and got <b style="color:#000">'+allIn+'</b> back, so <b style="color:#000">'+(allOut?(allIn/allOut).toFixed(2):0)+'</b> inbound per message sent (above 1.00 means that group writes to you more than you write to them). Sourcing route recorded on <b style="color:#000">'+sourced+' of '+tot+'</b> targets'+(sourced<tot*0.5?' - until that is filled in, the table below cannot tell you which partner is worth your time.':'.')+'</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px;padding:0 12px 12px">'+
-      '<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959;margin:4px 0">Targets by sourcing route</div><table>'+hdr('',['Route','Targets','Progressed','Dead','Hit rate'])+chanRows+'</table></div>'+
-      '<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959;margin:4px 0">Effort and response by partner type ('+D+'d)</div><table>'+hdr('',['Type','Firms','Active','Sent','Back','Back per sent'])+catRows+'</table></div>'+
-    '</div>'+
-    '<div style="padding:0 12px 12px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959;margin:4px 0">Time sinks - three or more messages out, nothing back in 180 days</div><table>'+hdr('',['Partner','Type','Sent','Last contact'])+sinkRows+'</table></div>';
+    '<div style="padding:10px 12px;font-size:11px" class="muted">Last '+D+' days: <b style="color:#000">'+out90+'</b> messages out, <b style="color:#000">'+in90+'</b> in, across <b style="color:#000">'+stats.filter(x=>realTouches(x.a,D).length).length+'</b> of '+stats.length+' partners. You have put <b style="color:#000">'+givenN+'</b> target names into the network. Sourcing route recorded on <b style="color:#000">'+sourcedN+' of '+tot+'</b> targets'+(sourcedN<tot*0.5?' - fill in Channel on a target and the first table below tells you who actually delivers.':'.')+'</div>'+
+    '<div style="padding:0 12px 12px">'+
+      sub('Partners who have put a name in front of you')+
+      '<table>'+hdr(['Partner','Type','Targets sourced','Touches','Which'])+prodRows+'</table>'+
+      sub('Long conversation, nothing sourced - at least 10 exchanges both ways over 3+ months')+
+      '<table>'+hdr(['Partner','Type','Touches','Known for','Names given','Last contact'])+talkRows+'</table>'+
+      '<div class="muted" style="font-size:11px;margin-top:3px">These are real relationships, not wasted time. But if you have given someone names and months have passed, the honest move is to ask directly what they can do, or drop the cadence and stop spending the hours.</div>'+
+      sub('Approached, no answer yet - three or more messages out, nothing back')+
+      '<table>'+hdr(['Partner','Type','Sent','Last attempt','Phone'])+silRows+'</table>'+
+      '<div class="muted" style="font-size:11px;margin-top:3px">Silence on email usually means the channel is wrong, not that the person is uninterested. Try a call or an introduction through someone they know before writing them off.</div>'+
+    '</div>';
 }
 
 function dismissSugg(k){
