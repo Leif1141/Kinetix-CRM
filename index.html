@@ -160,8 +160,15 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
 </div>
 
 <div class="panel active" id="p-overview">
+  <div class="filterbar" style="margin-bottom:10px">
+    <input id="gSearch" placeholder="Search everything - organizations, people, contacts, emails..." oninput="renderGlobalSearch()" style="flex:1;min-width:320px">
+    <button class="sm" onclick="document.getElementById('gSearch').value='';renderGlobalSearch()">Clear</button>
+  </div>
+  <div class="section" id="gSearchWrap" style="display:none"><div class="section-hdr">Search results <span id="gCount" style="font-weight:400;font-size:11px"></span></div><div id="gSearchBody"></div></div>
   <div class="kpis" id="ovKpis"></div>
   <div class="section"><div class="section-hdr">Suggested actions <span style="font-weight:400;font-size:11px">rule-based — act or dismiss</span></div><div id="suggBody"></div></div>
+  <div class="section"><div class="section-hdr">Where the time is paying off <span style="font-weight:400;font-size:11px">last 90 days &middot; sourcing yield by channel and by partner</span></div><div id="yieldBody"></div></div>
+  <div class="section"><div class="section-hdr">Researched, not yet approached <span style="font-weight:400;font-size:11px">ranked by score - no chasing, just the queue</span></div><div id="queueBody"></div></div>
   <div class="section"><div class="section-hdr">Recent activity</div><div id="recentBody"></div></div>
   <div class="ov-grid">
     <div>
@@ -298,6 +305,13 @@ const STAGES=['Identified','Contacted','Replied','Meeting','NDA','Info received'
 const LIVE=STAGES.filter(s=>!['Closed','Dead'].includes(s));
 const CHANNELS=['','Cold email','Letter','Cold call','LinkedIn','Broker','Referral','Platform','Event','Inbound'];
 const DEADREASONS=['No response','Not for sale','Valuation gap','Too small','Too large','Bad fit','Lost to buyer','Other'];
+const VERDICTS=['','pursue','keep looking','watch','passed'];
+function parseFlag(c){
+  if(c.score==null||c.score===''){const m=/score\s+([\d]+(?:[.,][\d]+)?)/i.exec(c.flag||'');if(m)c.score=parseFloat(m[1].replace(',','.'))}
+  if(!c.verdict){const f=(c.flag||'').toLowerCase();const hit=VERDICTS.slice(1).find(v=>f.includes(v));if(hit)c.verdict=hit}
+  return c;
+}
+function backfillScores(){let n=0;(S.companies||[]).forEach(c=>{const b=[c.score,c.verdict].join('|');parseFlag(c);if([c.score,c.verdict].join('|')!==b)n++});return n}
 const STALE_DAYS={'Identified':null,'Contacted':7,'Replied':5,'Meeting':7,'NDA':10,'Info received':10,'IOI/LOI':7,'Diligence':14};
 const MY_ADDR=['leif@kinetixcap.com','leif.berger26@gmail.com','leif@kinetix-industries.de','leif@kinetix-industries.com','tommy@kinetix-industries.com'];
 const ACT_TYPES=['Call','Meeting','Note','Letter','LinkedIn'];
@@ -848,13 +862,14 @@ function sugHead(r){
 }
 function suggestions(){
   const out=[];const t=today();
-  allRecs().filter(r=>r.nextDate&&r.nextDate<=t).forEach(r=>{const k='due_'+r.id;if(!S.dismissed[k])out.push({rec:r,why:'Action due: '+(r.nextAction||'follow up'),tag:'Due',color:'var(--red)',key:k})});
-  S.companies.filter(c=>LIVE.includes(c.stage)&&c.stage!=='Identified'&&isStale(c)).forEach(c=>{const k='stale_'+c.id;if(!S.dismissed[k])out.push({rec:c,why:c.stage+' for '+daysAgo(lastTouch(c)||(c.stageLog?.slice(-1)[0]?.date)||null)+'d with no activity',tag:'Stale',color:'#C6943E',key:k})});
-  S.advisors.filter(a=>{const lt=lastTouch(a);return lt&&daysAgo(lt)>(a.cadence||30)}).forEach(a=>{const k='cad_'+a.id;if(!S.dismissed[k])out.push({rec:a,why:'Last contact '+fmtAgo(lastTouch(a))+' (cadence: '+(a.cadence||30)+'d)',tag:'Check-in',color:'var(--navy)',key:k})});
-  S.companies.filter(c=>c.stage==='Dead'&&c.revisitDate&&c.revisitDate<=t).forEach(c=>{const k='rev_'+c.id;if(!S.dismissed[k])out.push({rec:c,why:'Revisit date reached — consider re-engaging',tag:'Revisit',color:'var(--green)',key:k})});
-  allRecs().filter(r=>r.nextAction&&r.nextSet&&lastTouch(r)&&lastTouch(r).slice(0,10)>r.nextSet).forEach(r=>{const k='ovt_'+r.id+'_'+lastTouch(r).slice(0,10);if(!S.dismissed[k])out.push({rec:r,why:'Next action may be outdated — new activity since it was set ("'+r.nextAction.slice(0,60)+'"). Review and update.',tag:'Overtaken',color:'#7030A0',key:k})});
-  const seen=new Set();
-  return out.filter(s=>{if(seen.has(s.rec.id))return false;seen.add(s.rec.id);return true});
+  allRecs().filter(r=>r.nextDate&&r.nextDate<=t).forEach(r=>{const k='due_'+r.id;if(!isDismissed(k))out.push({rec:r,why:'Action due: '+(r.nextAction||'follow up'),tag:'Due',color:'var(--red)',key:k})});
+  S.companies.filter(c=>LIVE.includes(c.stage)&&c.stage!=='Identified'&&isStale(c)).forEach(c=>{const k='stale_'+c.id;if(!isDismissed(k))out.push({rec:c,why:c.stage+' for '+daysAgo(lastTouch(c)||(c.stageLog?.slice(-1)[0]?.date)||null)+'d with no activity',tag:'Stale',color:'#C6943E',key:k})});
+  S.advisors.filter(a=>{const lt=lastTouch(a);return lt&&daysAgo(lt)>(a.cadence||30)}).forEach(a=>{const k='cad_'+a.id;if(!isDismissed(k))out.push({rec:a,why:'Last contact '+fmtAgo(lastTouch(a))+' (cadence: '+(a.cadence||30)+'d)',tag:'Check-in',color:'var(--navy)',key:k})});
+  S.companies.filter(c=>c.stage==='Dead'&&c.revisitDate&&c.revisitDate<=t).forEach(c=>{const k='rev_'+c.id;if(!isDismissed(k))out.push({rec:c,why:'Revisit date reached — consider re-engaging',tag:'Revisit',color:'var(--green)',key:k})});
+  allRecs().filter(r=>r.nextAction&&r.nextSet&&lastTouch(r)&&lastTouch(r).slice(0,10)>r.nextSet).forEach(r=>{const k='ovt_'+r.id+'_'+lastTouch(r).slice(0,10);if(!isDismissed(k))out.push({rec:r,why:'Next action may be outdated — new activity since it was set ("'+r.nextAction.slice(0,60)+'"). Review and update.',tag:'Overtaken',color:'#7030A0',key:k})});
+  const byRec=new Map();
+  out.forEach(s=>{const g=byRec.get(s.rec.id);if(!g){s.also=[];byRec.set(s.rec.id,s)}else{g.also.push(s)}});
+  return [...byRec.values()];
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -867,7 +882,7 @@ function renderOverview(){
   const k=[['Organizations',orgs.length,'orgs'],['People',(S.people||[]).length,'people'],['Live deals',live.length,'pipeline'],['Due today',due,'followups']];
   document.getElementById('ovKpis').innerHTML=k.map(x=>'<div class="kpi'+(x[0]==='Due today'&&x[1]?' warn':'')+'" onclick="goTab(\''+x[2]+'\')"><div class="v">'+x[1]+'</div><div class="l">'+x[0]+'</div></div>').join('');
   const b=document.getElementById('sugBadge');b.style.display=sug.length?'inline-block':'none';b.textContent=sug.length;
-  document.getElementById('suggBody').innerHTML=sug.length?sug.map(s=>'<div class="sugg"><span class="tag" style="background:'+s.color+'">'+s.tag+'</span><div><b style="cursor:pointer" onclick="openProfile(findRec(\''+s.rec.id+'\'))">'+esc(sugHead(s.rec))+'</b><div class="why">'+esc(s.why)+'</div></div><button class="sm" onclick="dismissSugg(\''+s.key+'\')">Dismiss</button></div>').join(''):'<p class="muted" style="padding:12px">No suggested actions right now.</p>';
+  document.getElementById('suggBody').innerHTML=sug.length?sug.map(s=>'<div class="sugg"><span class="tag" style="background:'+s.color+'">'+s.tag+'</span><div><b style="cursor:pointer" onclick="openProfile(findRec(\''+s.rec.id+'\'))">'+esc(sugHead(s.rec))+'</b><div class="why">'+esc(s.why)+(s.also&&s.also.length?'<div style="margin-top:3px">'+s.also.map(a=>'<span class="chip" style="background:'+a.color+';color:#fff">'+a.tag+'</span> '+esc(a.why)).join('<br>')+'</div>':'')+'</div></div><button class="sm" onclick="dismissSugg(\''+s.key+'\')">Dismiss</button></div>').join(''):'<p class="muted" style="padding:12px">No suggested actions right now.</p>';
   const favs=allRecs().filter(r=>r.fav);
   document.getElementById('favBody').innerHTML=favs.length?'<table>'+favs.map(r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))"><td>'+starHtml(r)+' <b>'+esc(dispName(r))+'</b></td><td class="muted">'+fmtAgo(lastTouch(r))+'</td></tr>').join('')+'</table>':'<p class="muted" style="padding:12px">Star records to pin them here.</p>';
   document.getElementById('listsBody').innerHTML='<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959;margin-bottom:5px">Categories</div>'+autoCats().map(c=>{const n=allOrgs().filter(o=>catOf(o)===c).length;return '<button class="sm" style="margin:0 4px 4px 0" onclick="goCat(\''+esc(c).replace(/'/g,"\\'")+'\')">'+esc(c)+' ('+n+')</button>'}).join('')+'</div>'+(((S.customLists||[]).length?'':'<p class="muted" style="padding:12px 12px 0">No custom lists yet.</p>')+(S.customLists||[]).map(l=>{const items=allRecs().filter(r=>(r.lists||[]).includes(l));const open=(S._openLists||[]).includes(l);return '<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC">'+'<b style="cursor:pointer" onclick="toggleListOpen(\''+esc(l)+'\')">'+(open?'&#9662; ':'&#9656; ')+esc(l)+'</b> <span class="muted">('+items.length+')</span>'+'<button class="sm" onclick="delList(\''+esc(l)+'\')" style="float:right">&times;</button>'+'<button class="sm" onclick="goList(\''+esc(l)+'\')" style="float:right;margin-right:4px">Orgs tab</button>'+(open?'<table style="margin-top:6px">'+items.map(r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))"><td><b>'+esc(dispName(r))+'</b></td><td class="muted">'+esc(r.kind==='person'?(r.firm||''):(r.contact||''))+'</td><td class="muted">'+esc(r.kind==='person'?(r.title||''):(r.category||''))+'</td></tr>').join('')+'</table>':'')+'</div>'}).join(''));
@@ -887,12 +902,122 @@ function renderOverview(){
     return '<tr class="rowlink" onclick="openProfile(findRec(\''+x.r.id+'\'))"><td class="muted" style="white-space:nowrap;vertical-align:top">'+fmtD(x.t.date)+'</td><td style="vertical-align:top"><b>'+esc(x.r.kind==='person'?dispName(x.r):(sec||dispName(x.r)))+'</b><div class="muted" style="font-size:11px">'+esc(x.r.kind==='person'?sec:dispName(x.r))+'</div>'+(x.n>1?' <span class="chip">+'+(x.n-1)+' this wk</span>':'')+'</td><td style="vertical-align:top">'+subj+'</td><td class="muted" style="vertical-align:top">'+esc(sum.slice(0,180))+'</td></tr>'}).join('')+'</table>':'<p class="muted" style="padding:12px">No activity yet. Sync to pull emails.</p>';
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+// GLOBAL SEARCH  (umlaut-blind: Koehler = Köhler = Kohler)
+// ═══════════════════════════════════════════════════════════════
+function foldSearch(s){
+  return (s||'').toLowerCase()
+    .replace(/ä/g,'a').replace(/ö/g,'o').replace(/ü/g,'u').replace(/ß/g,'s')
+    .replace(/ae/g,'a').replace(/oe/g,'o').replace(/ue/g,'u').replace(/ss/g,'s')
+    .replace(/[^a-z0-9@. ]+/g,' ').replace(/\s+/g,' ').trim();
+}
+function searchHay(r){
+  return foldSearch([dispName(r),r.name,r.firm,r.contact,r.email,r.domain,r.city,r.location,r.title,r.category,r.ptype,r.stage,r.status,(r.lists||[]).join(' ')].filter(Boolean).join(' '));
+}
+function renderGlobalSearch(){
+  const q=foldSearch((document.getElementById('gSearch')||{}).value||'');
+  const wrap=document.getElementById('gSearchWrap');
+  if(!wrap)return;
+  if(q.length<2){wrap.style.display='none';return}
+  wrap.style.display='';
+  const terms=q.split(' ').filter(Boolean);
+  const hits=allRecs().map(r=>({r,h:searchHay(r)})).filter(x=>terms.every(t=>x.h.includes(t)));
+  const kindRank={target:0,advisor:1,person:2};
+  hits.sort((a,b)=>(kindRank[a.r.kind]-kindRank[b.r.kind])||((lastTouch(b.r)||'').localeCompare(lastTouch(a.r)||'')));
+  document.getElementById('gCount').textContent=hits.length+' match'+(hits.length===1?'':'es');
+  const kindLbl={target:'Target',advisor:'Organization',person:'Person'};
+  document.getElementById('gSearchBody').innerHTML=hits.length
+    ? '<table><tr><th style="width:78px">Type</th><th style="width:26%">Name</th><th style="width:22%">Contact</th><th>Detail</th><th style="width:88px">Last contact</th></tr>'+hits.slice(0,80).map(x=>{
+        const r=x.r;
+        const contact=r.kind==='person'?(r.firm||''):(r.contact||'');
+        const detail=[r.kind==='person'?r.title:'',r.category||r.ptype||'',r.email||'',r.city||r.location||''].filter(Boolean).join(' &middot; ');
+        return '<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))"><td><span class="chip">'+kindLbl[r.kind]+'</span></td><td><b>'+esc(fixUml(dispName(r)))+'</b></td><td class="muted">'+esc(fixUml(contact))+'</td><td class="muted">'+detail+'</td><td class="muted">'+fmtAgo(lastTouch(r))+'</td></tr>';
+      }).join('')+'</table>'+(hits.length>80?'<p class="muted" style="padding:8px 12px">Showing the first 80.</p>':'')
+    : '<p class="muted" style="padding:12px">Nothing found. Umlauts do not matter here - Koehler, Kohler and Köhler all match.</p>';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RESEARCHED, NOT YET APPROACHED
+// ═══════════════════════════════════════════════════════════════
+function renderQueue(){
+  const el=document.getElementById('queueBody');if(!el)return;
+  const q=(S.companies||[]).filter(c=>c.stage==='Identified').map(parseFlag)
+    .sort((a,b)=>((b.score??-1)-(a.score??-1))||dispName(a).localeCompare(dispName(b)));
+  const vChip=v=>v?'<span class="chip">'+esc(v)+'</span>':'';
+  el.innerHTML=q.length
+    ? '<table><tr><th style="width:52px">Score</th><th style="width:24%">Company</th><th style="width:92px">Verdict</th><th style="width:120px">Location</th><th style="width:130px">Rev / EBIT (€m)</th><th>Business</th><th style="width:70px"></th></tr>'+q.map(c=>
+        '<tr class="rowlink" onclick="openProfile(findRec(\''+c.id+'\'))"><td><b>'+(c.score!=null?c.score:'<span class="muted">-</span>')+'</b></td><td><b>'+esc(fixUml(dispName(c)))+'</b></td><td>'+vChip(c.verdict)+'</td><td class="muted">'+esc(c.location||'')+'</td><td class="muted">'+(c.revenue!=null?Math.round(c.revenue):'-')+' / '+(c.ebit!=null?c.ebit:'-')+'</td><td class="muted" style="max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.description||'')+'</td><td><button class="sm" onclick="event.stopPropagation();quickSetAction(\''+c.id+'\',event)">Work it</button></td></tr>'
+      ).join('')+'</table>'
+    : '<p class="muted" style="padding:12px">No researched targets waiting.</p>';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// YIELD  -  where the effort actually pays
+// ═══════════════════════════════════════════════════════════════
+function realTouches(r,days){
+  return touchList(r).filter(t=>!isSysNote(t)&&(!days||daysAgo(t.date)<days));
+}
+function renderYield(){
+  const el=document.getElementById('yieldBody');if(!el)return;
+  const D=90;
+  const PROGRESSED=['Replied','Meeting','NDA','Info received','IOI/LOI','Diligence','Closed'];
+
+  // --- A. sourcing channel: which route actually delivers targets
+  const chan={};
+  (S.companies||[]).forEach(c=>{
+    const k=(c.channel||'').trim()||'(not recorded)';
+    const x=chan[k]||(chan[k]={n:0,prog:0,dead:0});
+    x.n++; if(PROGRESSED.includes(c.stage))x.prog++; if(c.stage==='Dead')x.dead++;
+  });
+  const chanRows=Object.entries(chan).sort((a,b)=>b[1].n-a[1].n).map(([k,x])=>
+    '<tr><td>'+esc(k)+'</td><td style="text-align:right">'+x.n+'</td><td style="text-align:right">'+x.prog+'</td><td style="text-align:right">'+x.dead+'</td><td style="text-align:right">'+(x.n?Math.round(x.prog/x.n*100):0)+'%</td></tr>').join('');
+
+  // --- B. effort vs response, by partner category
+  const cat={};
+  (S.advisors||[]).forEach(a=>{
+    const k=catOf(a)||'(uncategorised)';
+    const x=cat[k]||(cat[k]={firms:0,active:0,out:0,inn:0});
+    x.firms++;
+    const ts=realTouches(a,D);
+    if(ts.length)x.active++;
+    x.out+=ts.filter(t=>t.dir==='out').length;
+    x.inn+=ts.filter(t=>t.dir==='in').length;
+  });
+  const catRows=Object.entries(cat).sort((a,b)=>b[1].out-a[1].out).map(([k,x])=>
+    '<tr><td>'+esc(k)+'</td><td style="text-align:right">'+x.firms+'</td><td style="text-align:right">'+x.active+'</td><td style="text-align:right">'+x.out+'</td><td style="text-align:right">'+x.inn+'</td><td style="text-align:right"><b>'+(x.out?Math.round(x.inn/x.out*100):0)+'%</b></td></tr>').join('');
+
+  // --- C. time sinks: repeated outbound, nothing coming back
+  const sinks=(S.advisors||[]).map(a=>{
+    const ts=realTouches(a,180);
+    const out=ts.filter(t=>t.dir==='out').length, inn=ts.filter(t=>t.dir==='in').length;
+    return {a,out,inn};
+  }).filter(x=>x.out>=3&&x.inn===0).sort((a,b)=>b.out-a.out).slice(0,12);
+  const sinkRows=sinks.length?sinks.map(x=>
+    '<tr class="rowlink" onclick="openProfile(findRec(\''+x.a.id+'\'))"><td><b>'+esc(fixUml(dispName(x.a)))+'</b></td><td class="muted">'+esc(catOf(x.a)||'')+'</td><td style="text-align:right">'+x.out+'</td><td class="muted">'+fmtAgo(lastTouch(x.a))+'</td></tr>').join('')
+    :'<tr><td colspan="4" class="muted">Nothing here - every partner you have chased has come back to you.</td></tr>';
+
+  // --- D. headline numbers
+  const allOut=(S.advisors||[]).reduce((n,a)=>n+realTouches(a,D).filter(t=>t.dir==='out').length,0);
+  const allIn=(S.advisors||[]).reduce((n,a)=>n+realTouches(a,D).filter(t=>t.dir==='in').length,0);
+  const sourced=(S.companies||[]).filter(c=>(c.channel||'').trim()).length;
+  const tot=(S.companies||[]).length;
+  const hdr=(t,cols)=>'<tr>'+cols.map((c,i)=>'<th'+(i?' style="text-align:right"':'')+'>'+c+'</th>').join('')+'</tr>';
+
+  el.innerHTML=
+    '<div style="padding:10px 12px;font-size:11px" class="muted">Last '+D+' days: you sent <b style="color:#000">'+allOut+'</b> messages to your network and got <b style="color:#000">'+allIn+'</b> back ('+(allOut?Math.round(allIn/allOut*100):0)+'% reply rate). Sourcing route recorded on <b style="color:#000">'+sourced+' of '+tot+'</b> targets'+(sourced<tot*0.5?' - until that is filled in, the table below cannot tell you which partner is worth your time.':'.')+'</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px;padding:0 12px 12px">'+
+      '<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959;margin:4px 0">Targets by sourcing route</div><table>'+hdr('',['Route','Targets','Progressed','Dead','Hit rate'])+chanRows+'</table></div>'+
+      '<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959;margin:4px 0">Effort and response by partner type ('+D+'d)</div><table>'+hdr('',['Type','Firms','Active','Sent','Back','Reply'])+catRows+'</table></div>'+
+    '</div>'+
+    '<div style="padding:0 12px 12px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959;margin:4px 0">Time sinks - three or more messages out, nothing back in 180 days</div><table>'+hdr('',['Partner','Type','Sent','Last contact'])+sinkRows+'</table></div>';
+}
+
 function dismissSugg(k){
   S.dismissed[k]=today();
-  if(k.startsWith('due_')){const r=findRec(k.slice(4));if(r){r.nextAction='';r.nextDate='';r.priority='';r.nextSet=''}}
-  save();renderAll();
+  save();renderAll();toast('Snoozed for 30 days');
 }
-function isDismissed(k){return !!(S.dismissed&&S.dismissed[k]&&daysAgo(S.dismissed[k])<14)}
+function isDismissed(k){return !!(S.dismissed&&S.dismissed[k]&&daysAgo(S.dismissed[k])<30)}
 function newList(){const n=prompt('List name:');if(n&&!(S.customLists||[]).includes(n)){S.customLists=S.customLists||[];S.customLists.push(n);save();renderOverview()}}
 function delList(n){if(!confirm('Delete list "'+n+'"? Records stay.'))return;S.customLists=(S.customLists||[]).filter(x=>x!==n);allRecs().forEach(r=>{if(r.lists)r.lists=r.lists.filter(x=>x!==n)});save();renderAll()}
 function goTab(t){document.querySelector('.tab[data-t="'+t+'"]')?.click()}
@@ -1027,10 +1152,20 @@ function dropCard(ev,colEl){
 // ═══════════════════════════════════════════════════════════════
 // RENDER: FOLLOW-UPS
 // ═══════════════════════════════════════════════════════════════
+function logDone(r,what){
+  if(!what)return;
+  r.touches=r.touches||{};
+  r.touches['done_'+uid()]={date:today()+'T12:00:00Z',dir:'out',src:'Note',subject:'\u2714 '+what,who:'',note:'Marked done '+today()};
+  r.actionLog=r.actionLog||[];
+  r.actionLog.push({done:today(),due:r.nextDate||'',set:r.nextSet||'',what:what});
+}
 function completeAction(id,ev){
-  ev.stopPropagation();
+  if(ev)ev.stopPropagation();
   const r=findRec(id);if(!r)return;
-  r.nextDate='';r.nextAction='';r.priority='';save();renderAll();
+  logDone(r,r.nextAction);
+  r.nextDate='';r.nextAction='';r.priority='';r.nextSet='';
+  if(S.dismissed)delete S.dismissed['due_'+r.id];
+  save();renderAll();toast('Logged as done');
 }
 function quickSetAction(id,ev){
   if(ev)ev.stopPropagation();
@@ -1515,10 +1650,12 @@ function openProfile(rec){
   const m=document.getElementById('modal');
   const detailL=isT?
     fld('e_name','Company name',rec.name)+
+    '<div class="pgrid">'+fld('e_tcontact','Primary contact (owner / MD)',rec.contact)+fld('e_temail','Email',rec.email)+fld('e_tphone','Phone',rec.phone)+fld('e_tdomain','Website',rec.domain)+'</div>'+
     '<div class="pgrid">'+selFld('e_stage','Stage',STAGES,rec.stage)+selFld('e_geo','Geo',['DE','UK','Other'],rec.geo)+fld('e_rev','Revenue (€m)',rec.revenue,'number')+fld('e_ebitda','EBITDA (€m)',rec.ebitda,'number')+fld('e_ebit','EBIT (€m)',rec.ebit,'number')+fld('e_gm','Gross margin %',rec.gm?rec.gm*100:null,'number')+selFld('e_chan','Channel',CHANNELS,rec.channel)+fld('e_loc','Location',rec.location)+'</div>'+
     '<label>Description</label><textarea id="e_desc" rows="2">'+esc(rec.description||'')+'</textarea>'+
     '<label>Ownership</label><input id="e_own" value="'+esc(rec.ownership||'')+'">'+
     '<label>Flag</label><input id="e_flag" value="'+esc(rec.flag||'')+'">'+
+    '<div class="pgrid">'+fld('e_score','Score /100',rec.score,'number')+selFld('e_verdict','Verdict',VERDICTS,rec.verdict)+'</div>'+
     (rec.stage==='Dead'?selFld('e_dr','Dead reason',DEADREASONS,rec.deadReason)+fld('e_revd','Revisit date',rec.revisitDate,'date'):'')+
     '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+'<label>Next action</label><textarea id="e_na" rows="3" style="width:100%">'+esc(rec.nextAction||'')+'</textarea>':
   isA?
@@ -1567,6 +1704,8 @@ function saveProfile(){
     r.geo=gv('e_geo');r.revenue=+gv('e_rev')||null;r.ebitda=+gv('e_ebitda')||null;r.ebit=+gv('e_ebit')||null;
     const gm=+gv('e_gm');r.gm=gm?gm/100:null;
     r.channel=gv('e_chan');r.location=gv('e_loc');r.description=gv('e_desc');r.ownership=gv('e_own');r.flag=gv('e_flag');
+    r.contact=gv('e_tcontact');r.email=gv('e_temail');r.phone=gv('e_tphone');r.domain=gv('e_tdomain');
+    r.score=gv('e_score')!==''?+gv('e_score'):(r.score??null);r.verdict=gv('e_verdict')||'';
     if(r.stage==='Dead'){r.deadReason=gv('e_dr');r.revisitDate=gv('e_revd')}
   } else if(r.kind==='advisor'){
     r.firm=gv('e_firm')||r.firm;r.contact=gv('e_contact');r.email=gv('e_email');r.domain=gv('e_domain');
@@ -1768,7 +1907,7 @@ async function geocodeMissing(){
   }
   save();renderLocations();toast('Geocoding done');
 }
-function renderAll(){if(!S)return;try{migratePrevClean()}catch(e){}renderOverview();renderOrgs();renderPeople();renderPipeline();renderFollowups();renderInbox();renderReports();renderData();if(document.getElementById('p-locations').classList.contains('active'))renderLocations()}
+function renderAll(){if(!S)return;try{migratePrevClean()}catch(e){}renderOverview();renderYield();renderQueue();renderGlobalSearch();renderOrgs();renderPeople();renderPipeline();renderFollowups();renderInbox();renderReports();renderData();if(document.getElementById('p-locations').classList.contains('active'))renderLocations()}
 
 document.getElementById('tabs').addEventListener('click',e=>{
   const t=e.target.closest('.tab');if(!t)return;
