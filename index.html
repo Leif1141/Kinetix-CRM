@@ -610,11 +610,26 @@ let _autoRan=false;
 async function autoPipeline(){
   if(_autoRan)return;
   const stale=!S||!S.lastSync||Date.now()-new Date(S.lastSync).getTime()>6*3600e3;
-  if(stale&&(outlookToken||gmailToken)){_autoRan=true;toast('Auto-sync running…');syncEmails()}
-  else if(gmailToken&&S&&(!S.lastDriveBackup||Date.now()-new Date(S.lastDriveBackup).getTime()>24*3600e3)){_autoRan=true;autoDriveBackup()}
+  if(stale&&(outlookToken||driveReady())){_autoRan=true;toast('Auto-sync running…');syncEmails()}
+  else if(driveReady()&&S&&(!S.lastDriveBackup||Date.now()-new Date(S.lastDriveBackup).getTime()>24*3600e3)){_autoRan=true;autoDriveBackup()}
 }
 async function autoConnect(){
   await silentOutlook();
+  if(await loadDriveProxy()){
+    try{
+      await driveCall('ping');
+      setConnUI('gmailConn','Drive: connected');
+      const b=document.querySelector('button[onclick="connectGmail()"]');if(b)b.style.display='none';
+      checkDriveUpdates(true);
+      autoPipeline();
+      return;
+    }catch(e){
+      console.warn('Drive proxy ping failed',e);
+      setConnUI('gmailConn','Drive: proxy error');
+      document.getElementById('gmailConn').className='conn-status off';
+      driveProxy=null; // fall through to the old token path
+    }
+  }
   if(localStorage.getItem('kx_gAuth')&&GMAIL_CLIENT_ID){
     const kick=()=>{if(!gmailToken){try{gClient().requestAccessToken({prompt:''})}catch(e){}}};
     document.addEventListener('pointerdown',kick,{once:true});
@@ -750,20 +765,25 @@ function reconcileDraftActions(){
   return n;
 }
 async function syncGranolaCalls(){
-  if(!gmailToken)return 0;
+  if(!driveReady())return 0;
   try{
-    if(!S.granolaFolderId){
+    let gfiles=null;
+    if(driveProxy){gfiles=(await driveCall('granola')).files||[]}
+    else if(!S.granolaFolderId){
       const q0=encodeURIComponent("name='Granola Call Notes' and mimeType='application/vnd.google-apps.folder' and trashed=false");
       const r0=await fetch('https://www.googleapis.com/drive/v3/files?q='+q0+'&fields=files(id,name)',{headers:{Authorization:'Bearer '+gmailToken}});
       const ff=((await r0.json()).files||[])[0];
       if(!ff)return 0;
       S.granolaFolderId=ff.id;
     }
-    const q=encodeURIComponent("'"+S.granolaFolderId+"' in parents and trashed=false");
-    const res=await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&orderBy=createdTime desc&pageSize=60&fields=files(id,name,webViewLink,createdTime)',{headers:{Authorization:'Bearer '+gmailToken}});
-    if(!res.ok)throw new Error('Drive '+res.status);
+    if(!gfiles){
+      const q=encodeURIComponent("'"+S.granolaFolderId+"' in parents and trashed=false");
+      const res=await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&orderBy=createdTime desc&pageSize=60&fields=files(id,name,webViewLink,createdTime)',{headers:{Authorization:'Bearer '+gmailToken}});
+      if(!res.ok)throw new Error('Drive '+res.status);
+      gfiles=(await res.json()).files||[];
+    }
     let added=0;
-    for(const f of ((await res.json()).files||[])){
+    for(const f of gfiles){
       const key='gr_'+f.id;
       if(allRecs().some(r=>r.touches&&r.touches[key]))continue;
       if((S.unmatched||[]).some(u=>u.key===key))continue;
@@ -1249,8 +1269,40 @@ function applyPatchFile(ev){
   rd.readAsText(f);ev.target.value='';
 }
 const DRIVE_CRM_FOLDER='19NSMw1zEmNctsmWuPnXCLZeX09ehO6bW';
+// ── Drive proxy (15.09.2026) ──────────────────────────────────────
+// Apps Script web app (_drive_proxy.gs) that runs as Leif and owns all Drive I/O.
+// URL and key are NOT in this file: they are read from Firebase at crm-config/driveProxy
+// (rules restrict it to Leif's uid) with a localStorage fallback. While configured, the
+// browser OAuth token (gmailToken) is never needed and "Drive: not connected" cannot occur.
+let driveProxy=null; // {url,key}
+function driveReady(){return !!(driveProxy||gmailToken)}
+async function loadDriveProxy(){
+  try{
+    const snap=await db.ref('crm-config/driveProxy').once('value');
+    const v=snap.val();
+    if(v&&v.url&&v.key){driveProxy={url:v.url,key:v.key};localStorage.setItem('kx_driveProxy',JSON.stringify(driveProxy));return driveProxy}
+  }catch(e){console.warn('driveProxy from Firebase failed',e)}
+  try{const l=JSON.parse(localStorage.getItem('kx_driveProxy')||'null');if(l&&l.url&&l.key)driveProxy=l}catch(e){}
+  return driveProxy;
+}
+async function driveCall(action,params,body){
+  if(!driveProxy)throw new Error('Drive proxy not configured');
+  let res;
+  if(body){
+    res=await fetch(driveProxy.url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify(Object.assign({key:driveProxy.key,action:action},params||{},body))});
+  }else{
+    const q=new URLSearchParams(Object.assign({key:driveProxy.key,action:action},params||{}));
+    res=await fetch(driveProxy.url+'?'+q.toString());
+  }
+  if(!res.ok)throw new Error('proxy '+res.status);
+  const j=await res.json();
+  if(j.error)throw new Error('proxy: '+j.error);
+  return j;
+}
 async function driveArchiveId(){
   if(S._driveArchiveId)return S._driveArchiveId;
+  if(driveProxy)return 'proxy'; // the proxy resolves the archive folder itself
   const q=encodeURIComponent("'"+DRIVE_CRM_FOLDER+"' in parents and name='0. Archive' and mimeType='application/vnd.google-apps.folder' and trashed=false");
   const r=await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id)',{headers:{Authorization:'Bearer '+gmailToken}});
   const f=((await r.json()).files||[])[0];
@@ -1262,14 +1314,27 @@ async function driveArchiveId(){
 }
 async function driveMoveToArchive(fileId){
   try{
+    if(driveProxy){await driveCall('archive',{id:fileId});return true}
     const arc=await driveArchiveId();
     await fetch('https://www.googleapis.com/drive/v3/files/'+fileId+'?addParents='+arc+'&removeParents='+DRIVE_CRM_FOLDER+'&fields=id',
       {method:'PATCH',headers:{Authorization:'Bearer '+gmailToken}});
     return true;
   }catch(e){console.warn('archive move failed',e);return false}
 }
+function isoWeekKey(d){const t=new Date(d);t.setHours(0,0,0,0);t.setDate(t.getDate()+3-((t.getDay()+6)%7));const f=new Date(t.getFullYear(),0,4);return t.getFullYear()+'-'+String(1+Math.round(((t-f)/864e5-3+((f.getDay()+6)%7))/7)).padStart(2,'0')}
 async function autoDriveBackup(){
-  if(!gmailToken)return;
+  if(!driveReady())return;
+  if(driveProxy){
+    try{
+      const wk=isoWeekKey(new Date());
+      const snap=S._lastSnapshotWeek!==wk;
+      const r=await driveCall('backup',{snapshot:snap},{data:S});
+      if(snap&&r.snapshot)S._lastSnapshotWeek=wk;
+      S.lastDriveBackup=new Date().toISOString();save();
+      console.log('Drive auto-backup via proxy: '+r.bytes+' bytes'+(r.snapshot?', snapshot '+r.snapshot:''));
+    }catch(e){toast('⚠ Drive backup FAILED: '+e.message+' — data is safe in Firebase, but weekly briefings go stale');console.warn('Drive backup failed:',e)}
+    return;
+  }
   try{
     const name='KinetixCRM Backup.json';
     // Eine rollierende Datei: vorhandene suchen und ueberschreiben statt jedes Mal neu anzulegen.
@@ -1307,18 +1372,27 @@ async function autoDriveBackup(){
   }catch(e){toast('⚠ Drive backup FAILED: '+e.message+' — data is safe in Firebase, but weekly briefings go stale');console.warn('Drive backup failed:',e)}
 }
 async function checkDriveUpdates(auto){
-  if(!gmailToken){if(!auto){toast('Connect Google first (Data tab, Gmail) — one-time consent adds Drive read access');}return}
+  if(!driveReady()){if(!auto){toast('Drive proxy not configured (crm-config/driveProxy in Firebase) and no Google token');}return}
   try{
-    const q=encodeURIComponent("'"+DRIVE_CRM_FOLDER+"' in parents and name contains 'KinetixCRM Patch' and trashed=false");
-    const res=await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&orderBy=name&fields=files(id,name)',{headers:{Authorization:'Bearer '+gmailToken}});
-    if(!res.ok)throw new Error('Drive list failed ('+res.status+')');
-    const files=((await res.json()).files||[]).filter(f=>!(S.appliedPatchTitles||{})[f.name]);
+    let all;
+    if(driveProxy){all=(await driveCall('list')).files||[]}
+    else{
+      const q=encodeURIComponent("'"+DRIVE_CRM_FOLDER+"' in parents and name contains 'KinetixCRM Patch' and trashed=false");
+      const res=await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&orderBy=name&fields=files(id,name)',{headers:{Authorization:'Bearer '+gmailToken}});
+      if(!res.ok)throw new Error('Drive list failed ('+res.status+')');
+      all=(await res.json()).files||[];
+    }
+    const files=all.filter(f=>!(S.appliedPatchTitles||{})[f.name]);
     if(!files.length){if(!auto)toast('No new CRM updates in Drive');return}
     let tot=0,bad=[],moved=0;
     for(const f of files){
       try{ // one bad file must never block the rest
-        const dl=await fetch('https://www.googleapis.com/drive/v3/files/'+f.id+'?alt=media',{headers:{Authorization:'Bearer '+gmailToken}});
-        const p=await dl.json();
+        let p;
+        if(driveProxy){p=JSON.parse((await driveCall('get',{id:f.id})).content)}
+        else{
+          const dl=await fetch('https://www.googleapis.com/drive/v3/files/'+f.id+'?alt=media',{headers:{Authorization:'Bearer '+gmailToken}});
+          p=await dl.json();
+        }
         const r=applyPatchObj(p,f.name,false);
         if(r){tot+=r.made;moved+=(await driveMoveToArchive(f.id))?1:0}
       }catch(e){bad.push(f.name+': '+e.message);console.warn('patch failed:',f.name,e)}
