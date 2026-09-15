@@ -904,6 +904,78 @@ function renderOverview(){
 
 
 // ═══════════════════════════════════════════════════════════════
+// NAME SHARING  -  which targets have I put in front of whom
+// Avoids double-dipping: two advisors working the same name.
+// ═══════════════════════════════════════════════════════════════
+function shareTokens(c){
+  // distinctive tokens of a company name, legal forms stripped, umlaut-blind
+  const base=foldSearch(normName(dispName(c)));
+  const stop=new Set(['und','the','group','gruppe','deutschland','germany','technik','industrie','werke','sohn','sohne','co']);
+  return base.split(' ').filter(w=>w.length>=5&&!stop.has(w));
+}
+let _shareIdx=null;
+function shareIndex(){
+  if(_shareIdx)return _shareIdx;
+  const idx={};                       // companyId -> [{recId,date,subject,auto}]
+  const cos=(S.companies||[]).map(c=>({c,tok:shareTokens(c)})).filter(x=>x.tok.length);
+  [...(S.advisors||[]),...(S.people||[])].forEach(r=>{
+    touchList(r).filter(t=>!isSysNote(t)&&t.dir==='out').forEach(t=>{
+      const hay=foldSearch((t.subject||'')+' '+(t.prev||'')+' '+(t.note||''));
+      if(!hay)return;
+      cos.forEach(x=>{
+        if(!x.tok.every(w=>hay.includes(w)))return;
+        (idx[x.c.id]=idx[x.c.id]||[]).push({recId:r.id,date:(t.date||'').slice(0,10),subject:t.subject||'',auto:true,link:t.link||''});
+      });
+    });
+  });
+  // fold in anything recorded by hand on the company
+  (S.companies||[]).forEach(c=>(c.sharedWith||[]).forEach(e=>{
+    (idx[c.id]=idx[c.id]||[]).push({recId:e.recId,date:e.date||'',subject:e.note||'recorded by hand',auto:false});
+  }));
+  // one row per counterparty, earliest date wins
+  Object.keys(idx).forEach(k=>{
+    const best={};
+    idx[k].forEach(e=>{const b=best[e.recId];if(!b||(e.date&&e.date<b.date))best[e.recId]=e});
+    idx[k]=Object.values(best).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  });
+  _shareIdx=idx;return idx;
+}
+function sharesFor(c){return shareIndex()[c.id]||[]}
+function sharedByRec(r){
+  const out=[];const idx=shareIndex();
+  (S.companies||[]).forEach(c=>{const e=(idx[c.id]||[]).find(x=>x.recId===r.id);if(e)out.push({c,e})});
+  return out.sort((a,b)=>(b.e.date||'').localeCompare(a.e.date||''));
+}
+function shareHtml(rec){
+  if(rec.kind==='target'){
+    const sh=sharesFor(rec);
+    if(!sh.length)return '<div class="muted" style="font-size:11px">Not shared with anyone yet.</div>';
+    const warn=sh.length>1?'<div style="font-size:11px;margin-bottom:4px"><b>'+sh.length+' parties have this name.</b> Check before you promise exclusivity.</div>':'';
+    return warn+sh.map(e=>{
+      const r=findRec(e.recId);
+      return '<div style="font-size:11px;margin-bottom:2px">'+(e.date?'<span class="muted">'+fmtD(e.date)+'</span> ':'')+'<b style="cursor:pointer" onclick="openProfile(findRec(\''+e.recId+'\'))">'+esc(fixUml(r?dispName(r):e.recId))+'</b>'+(e.auto?'':' <span class="chip">by hand</span>')+(e.subject?' <span class="muted">'+esc(fixUml(e.subject.slice(0,70)))+'</span>':'')+'</div>';
+    }).join('');
+  }
+  const names=sharedByRec(rec);
+  if(!names.length)return '<div class="muted" style="font-size:11px">You have not given them any names yet.</div>';
+  return names.map(x=>'<div style="font-size:11px;margin-bottom:2px">'+(x.e.date?'<span class="muted">'+fmtD(x.e.date)+'</span> ':'')+'<b style="cursor:pointer" onclick="openProfile(findRec(\''+x.c.id+'\'))">'+esc(fixUml(dispName(x.c)))+'</b> <span class="muted">'+esc(x.c.stage||'')+'</span>'+(sharesFor(x.c).length>1?' <span class="chip" style="background:#C6943E;color:#fff">also with '+(sharesFor(x.c).length-1)+'</span>':'')+'</div>').join('');
+}
+function addShare(){
+  const rec=profRec;if(!rec||rec.kind!=='target')return;
+  const who=prompt('Which partner did you give '+dispName(rec)+' to? Type part of their name:');
+  if(!who)return;
+  const q=foldSearch(who);
+  const hits=[...(S.advisors||[]),...(S.people||[])].filter(r=>searchHay(r).includes(q));
+  if(!hits.length){toast('No match for "'+who+'"');return}
+  const pick=hits.length===1?hits[0]:hits[Math.max(0,(+prompt(hits.map((h,i)=>i+': '+dispName(h)).join('\n')+'\n\nNumber:','0')||0))];
+  if(!pick)return;
+  const d=prompt('Date shared (YYYY-MM-DD):',today())||today();
+  rec.sharedWith=rec.sharedWith||[];
+  rec.sharedWith.push({recId:pick.id,date:d,note:'recorded by hand'});
+  _shareIdx=null;save();openProfile(rec);
+}
+
+// ═══════════════════════════════════════════════════════════════
 // GLOBAL SEARCH  (umlaut-blind: Koehler = Köhler = Kohler)
 // ═══════════════════════════════════════════════════════════════
 function foldSearch(s){
@@ -1681,6 +1753,7 @@ function openProfile(rec){
     (isT?'<div class="pbox"><h4>Deal maths</h4><div class="pgrid">'+fld('dm_e','EBITDA (€m)',rec.ebitda,'number')+fld('dm_m','Multiple',6,'number')+fld('dm_d','Debt %',60,'number')+fld('dm_r','Interest rate %',5,'number')+fld('dm_t','Tenor (yrs)',7,'number')+'</div><button class="sm primary" onclick="calcMaths()" style="margin-top:6px">Calculate</button><div id="dm_out" style="margin-top:8px"></div></div>':'')+
   '</div><div class="mcol-r">'+
     wrapUpHtml(rec)+
+    '<div class="pbox"><h4>'+(isT?'Shared with':'Names you gave them')+(isT?' <button class="sm" onclick="addShare()">+ Add</button>':'')+'</h4>'+shareHtml(rec)+'</div>'+
     '<div class="pbox"><h4>Log activity</h4><div class="inline">'+selFld('la_type','Type',ACT_TYPES,'Call')+fld('la_date','Date',today(),'date')+fld('la_txt','Subject','')+'</div><label>Note</label><textarea id="la_note" rows="2"></textarea><button class="sm primary" onclick="logActivity()" style="margin-top:4px">Log</button></div>'+
     '<div class="pbox"><h4>Activity timeline <span class="muted" style="font-weight:400">'+Object.keys(rec.touches||{}).length+' activities</span></h4>'+
       '<div class="tl-ctl">Period: <select onchange="setTlPeriod(+this.value)"><option value="13"'+(tlPeriod===13?' selected':'')+'>13 weeks</option><option value="26"'+(tlPeriod===26?' selected':'')+'>26 weeks</option><option value="52"'+(tlPeriod===52?' selected':'')+'>52 weeks</option></select> '+
@@ -1907,7 +1980,7 @@ async function geocodeMissing(){
   }
   save();renderLocations();toast('Geocoding done');
 }
-function renderAll(){if(!S)return;try{migratePrevClean()}catch(e){}renderOverview();renderYield();renderQueue();renderGlobalSearch();renderOrgs();renderPeople();renderPipeline();renderFollowups();renderInbox();renderReports();renderData();if(document.getElementById('p-locations').classList.contains('active'))renderLocations()}
+function renderAll(){if(!S)return;_shareIdx=null;try{migratePrevClean()}catch(e){}renderOverview();renderYield();renderQueue();renderGlobalSearch();renderOrgs();renderPeople();renderPipeline();renderFollowups();renderInbox();renderReports();renderData();if(document.getElementById('p-locations').classList.contains('active'))renderLocations()}
 
 document.getElementById('tabs').addEventListener('click',e=>{
   const t=e.target.closest('.tab');if(!t)return;
