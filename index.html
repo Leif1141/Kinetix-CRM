@@ -1057,7 +1057,7 @@ function renderYield(){
     x.inn+=ts.filter(t=>t.dir==='in').length;
   });
   const catRows=Object.entries(cat).sort((a,b)=>b[1].out-a[1].out).map(([k,x])=>
-    '<tr><td>'+esc(k)+'</td><td style="text-align:right">'+x.firms+'</td><td style="text-align:right">'+x.active+'</td><td style="text-align:right">'+x.out+'</td><td style="text-align:right">'+x.inn+'</td><td style="text-align:right"><b>'+(x.out?Math.round(x.inn/x.out*100):0)+'%</b></td></tr>').join('');
+    '<tr><td>'+esc(k)+'</td><td style="text-align:right">'+x.firms+'</td><td style="text-align:right">'+x.active+'</td><td style="text-align:right">'+x.out+'</td><td style="text-align:right">'+x.inn+'</td><td style="text-align:right"><b>'+(x.out?(x.inn/x.out).toFixed(2):'-')+'</b></td></tr>').join('');
 
   // --- C. time sinks: repeated outbound, nothing coming back
   const sinks=(S.advisors||[]).map(a=>{
@@ -1077,10 +1077,10 @@ function renderYield(){
   const hdr=(t,cols)=>'<tr>'+cols.map((c,i)=>'<th'+(i?' style="text-align:right"':'')+'>'+c+'</th>').join('')+'</tr>';
 
   el.innerHTML=
-    '<div style="padding:10px 12px;font-size:11px" class="muted">Last '+D+' days: you sent <b style="color:#000">'+allOut+'</b> messages to your network and got <b style="color:#000">'+allIn+'</b> back ('+(allOut?Math.round(allIn/allOut*100):0)+'% reply rate). Sourcing route recorded on <b style="color:#000">'+sourced+' of '+tot+'</b> targets'+(sourced<tot*0.5?' - until that is filled in, the table below cannot tell you which partner is worth your time.':'.')+'</div>'+
+    '<div style="padding:10px 12px;font-size:11px" class="muted">Last '+D+' days: you sent <b style="color:#000">'+allOut+'</b> messages to your network and got <b style="color:#000">'+allIn+'</b> back, so <b style="color:#000">'+(allOut?(allIn/allOut).toFixed(2):0)+'</b> inbound per message sent (above 1.00 means that group writes to you more than you write to them). Sourcing route recorded on <b style="color:#000">'+sourced+' of '+tot+'</b> targets'+(sourced<tot*0.5?' - until that is filled in, the table below cannot tell you which partner is worth your time.':'.')+'</div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px;padding:0 12px 12px">'+
       '<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959;margin:4px 0">Targets by sourcing route</div><table>'+hdr('',['Route','Targets','Progressed','Dead','Hit rate'])+chanRows+'</table></div>'+
-      '<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959;margin:4px 0">Effort and response by partner type ('+D+'d)</div><table>'+hdr('',['Type','Firms','Active','Sent','Back','Reply'])+catRows+'</table></div>'+
+      '<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959;margin:4px 0">Effort and response by partner type ('+D+'d)</div><table>'+hdr('',['Type','Firms','Active','Sent','Back','Back per sent'])+catRows+'</table></div>'+
     '</div>'+
     '<div style="padding:0 12px 12px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959;margin:4px 0">Time sinks - three or more messages out, nothing back in 180 days</div><table>'+hdr('',['Partner','Type','Sent','Last contact'])+sinkRows+'</table></div>';
 }
