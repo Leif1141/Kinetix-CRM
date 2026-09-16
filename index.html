@@ -254,6 +254,7 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
   <div class="section"><div class="section-hdr">Data management</div>
     <div style="padding:12px">
       <p id="dataInfo" class="muted" style="margin-bottom:8px"></p>
+      <div id="archInfo" style="margin-bottom:10px;padding:8px;background:#F4F5F9;border:1px solid var(--lgray);border-radius:4px"></div>
       <button onclick="exportJSON()">Export full state (.json)</button>
       <button onclick="document.getElementById('importFile2').click()">Import (.json)</button>
       <input type="file" id="importFile2" accept=".json" style="display:none" onchange="importJSON(event)">
@@ -471,9 +472,20 @@ function buildInitialState(){
 // ═══════════════════════════════════════════════════════════════
 // RECORD HELPERS
 // ═══════════════════════════════════════════════════════════════
-function allOrgs(){return [...(S.companies||[]),...(S.advisors||[])]}
-function allRecs(){return [...(S.companies||[]),...(S.advisors||[]),...(S.people||[])]}
-function findRec(id){return allRecs().find(r=>r.id===id)}
+// Archived records stay in the database but disappear from every view, count,
+// suggestion and search. Nothing is deleted. Data tab has the restore switch.
+function isArch(r){return !!(r&&r.archived)}
+function liveOnly(a){return S.showArchived?a:a.filter(r=>!isArch(r))}
+function allOrgs(){return liveOnly([...(S.companies||[]),...(S.advisors||[])])}
+function allRecs(){return liveOnly([...(S.companies||[]),...(S.advisors||[]),...(S.people||[])])}
+function rawRecs(){return [...(S.companies||[]),...(S.advisors||[]),...(S.people||[])]}
+function archiveRecs(recs,reason){
+  let n=0;recs.forEach(r=>{if(!r.archived){r.archived=true;r.archivedAt=today();r.archivedReason=reason||'';n++}});
+  return n;
+}
+function unarchiveAll(){let n=0;rawRecs().forEach(r=>{if(r.archived){delete r.archived;delete r.archivedAt;delete r.archivedReason;n++}});save();renderAll();toast(n+' records restored');}
+function toggleArchived(on){S.showArchived=!!on;save();renderAll()}
+function findRec(id){return rawRecs().find(r=>r.id===id)}
 function dispName(r){return r.name||r.firm}
 function touchList(r){return Object.values(r.touches||{}).sort((a,b)=>(b.date||'').localeCompare(a.date||''))}
 function isSysNote(t){return !!(t&&t.src==='Note'&&/^✔/.test(t.subject||''))}
@@ -1361,7 +1373,14 @@ async function weeklyDigest(){
 // ═══════════════════════════════════════════════════════════════
 function renderData(){
   const el=document.getElementById('dataInfo');
-  if(el)el.textContent=(S.companies||[]).length+' companies · '+(S.advisors||[]).length+' advisors · '+(S.people||[]).length+' people · '+(S.unmatched||[]).length+' unmatched · last sync: '+(S.lastSync?new Date(S.lastSync).toLocaleString('en-GB'):'never')+' · Firebase: '+(stateRef?'connected':'not configured');
+  const arch=rawRecs().filter(isArch);
+  if(el)el.textContent=(S.companies||[]).length+' companies · '+(S.advisors||[]).length+' advisors · '+(S.people||[]).length+' people · '+(S.unmatched||[]).length+' unmatched · '+arch.length+' archived · last sync: '+(S.lastSync?new Date(S.lastSync).toLocaleString('en-GB'):'never')+' · Firebase: '+(stateRef?'connected':'not configured');
+  const ael=document.getElementById('archInfo');
+  if(ael)ael.innerHTML=arch.length
+    ? '<label style="font-size:11px;display:inline-flex;align-items:center;gap:5px;text-transform:none"><input type="checkbox" '+(S.showArchived?'checked':'')+' onchange="toggleArchived(this.checked)"> Show archived records in every view</label> <button class="sm" onclick="if(confirm(\'Restore all '+arch.length+' archived records?\'))unarchiveAll()">Restore all</button>'
+      +'<div class="muted" style="font-size:11px;margin-top:5px">'+arch.length+' records are archived: hidden from every view, count, suggestion and search, but nothing is deleted. '
+      +Object.entries(arch.reduce((m,r)=>{const k=r.archivedReason||'no reason recorded';m[k]=(m[k]||0)+1;return m},{})).map(([k,n])=>esc(k)+' ('+n+')').join(', ')+'</div>'
+    : '<div class="muted" style="font-size:11px">Nothing archived.</div>';
 }
 function resetData(){if(!confirm('Reset CRM to seed data? This cannot be undone.'))return;S=buildInitialState();save();renderAll();toast('Reset to seed data')}
 function exportJSON(){
@@ -1735,7 +1754,7 @@ function openProfile(rec){
     '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+'<label>Next action</label><textarea id="e_na" rows="3" style="width:100%">'+esc(rec.nextAction||'')+'</textarea>':
   isA?
     fld('e_firm','Firm name',rec.firm)+fld('e_contact','Primary contact',rec.contact)+fld('e_email','Email',rec.email)+fld('e_domain','Domain',rec.domain)+
-    '<div class="pgrid">'+selFld('e_cat','Category',['M&A sourcing intermediaries','Financing partners','DD advisors','Investors & family office','HR, universities & interns','Admin & infrastructure','Personal network','Other'],rec.category)+selFld('e_market','Market',['DE','UK'],rec.market||(/uk|united kingdom/i.test(rec.geo||'')?'UK':'DE'))+selFld('e_geo2','Geo (country)',['Germany','United Kingdom','Switzerland','France','Netherlands','Luxembourg','Sweden','Denmark','Austria','United States','Other'],rec.geo)+'</div>'+
+    '<div class="pgrid">'+selFld('e_cat','Category',['M&A sourcing intermediaries','Financing partners','DD advisors','Investors & family office','Executive search','HR, universities & interns','Admin & infrastructure','Personal network','Other'],rec.category)+selFld('e_market','Market',['DE','UK'],rec.market||(/uk|united kingdom/i.test(rec.geo||'')?'UK':'DE'))+selFld('e_geo2','Geo (country)',['Germany','United Kingdom','Switzerland','France','Netherlands','Luxembourg','Sweden','Denmark','Austria','United States','Other'],rec.geo)+'</div>'+
     selFld('e_status','Status',['To call','Emailed','Contact known','In dialogue','Active relationship','Dormant'],rec.status)+
     '<div class="pgrid">'+fld('e_city','City',rec.city)+fld('e_addr','Address',rec.address)+'</div>'+
     fld('e_intro','Intro path',rec.introPath)+
