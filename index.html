@@ -876,7 +876,7 @@ function suggestions(){
   const out=[];const t=today();
   allRecs().filter(r=>r.nextDate&&r.nextDate<=t).forEach(r=>{const k='due_'+r.id;if(!isDismissed(k))out.push({rec:r,why:'Action due: '+(r.nextAction||'follow up'),tag:'Due',color:'var(--red)',key:k})});
   S.companies.filter(c=>LIVE.includes(c.stage)&&c.stage!=='Identified'&&isStale(c)).forEach(c=>{const k='stale_'+c.id;if(!isDismissed(k))out.push({rec:c,why:c.stage+' for '+daysAgo(lastTouch(c)||(c.stageLog?.slice(-1)[0]?.date)||null)+'d with no activity',tag:'Stale',color:'#C6943E',key:k})});
-  S.advisors.filter(a=>{const lt=lastTouch(a);return lt&&daysAgo(lt)>(a.cadence||30)}).forEach(a=>{const k='cad_'+a.id;if(!isDismissed(k))out.push({rec:a,why:'Last contact '+fmtAgo(lastTouch(a))+' (cadence: '+(a.cadence||30)+'d)',tag:'Check-in',color:'var(--navy)',key:k})});
+  liveOnly(S.advisors||[]).filter(a=>{const lt=lastTouch(a);return lt&&daysAgo(lt)>(a.cadence||30)}).forEach(a=>{const k='cad_'+a.id;if(!isDismissed(k))out.push({rec:a,why:'Last contact '+fmtAgo(lastTouch(a))+' (cadence: '+(a.cadence||30)+'d)',tag:'Check-in',color:'var(--navy)',key:k})});
   S.companies.filter(c=>c.stage==='Dead'&&c.revisitDate&&c.revisitDate<=t).forEach(c=>{const k='rev_'+c.id;if(!isDismissed(k))out.push({rec:c,why:'Revisit date reached — consider re-engaging',tag:'Revisit',color:'var(--green)',key:k})});
   allRecs().filter(r=>r.nextAction&&r.nextSet&&lastTouch(r)&&lastTouch(r).slice(0,10)>r.nextSet).forEach(r=>{const k='ovt_'+r.id+'_'+lastTouch(r).slice(0,10);if(!isDismissed(k))out.push({rec:r,why:'Next action may be outdated — new activity since it was set ("'+r.nextAction.slice(0,60)+'"). Review and update.',tag:'Overtaken',color:'#7030A0',key:k})});
   const byRec=new Map();
@@ -930,7 +930,8 @@ function shareIndex(){
   if(_shareIdx)return _shareIdx;
   const idx={};                       // companyId -> [{recId,date,subject,auto}]
   const cos=(S.companies||[]).map(c=>({c,tok:shareTokens(c)})).filter(x=>x.tok.length);
-  [...(S.advisors||[]),...(S.people||[])].forEach(r=>{
+  // archived records are internal or parked; they are not a third party holding the name
+  liveOnly([...(S.advisors||[]),...(S.people||[])]).forEach(r=>{
     touchList(r).filter(t=>!isSysNote(t)&&t.dir==='out').forEach(t=>{
       const hay=foldSearch((t.subject||'')+' '+(t.prev||'')+' '+(t.note||''));
       if(!hay)return;
@@ -1055,7 +1056,7 @@ function partnerStats(a){
 function renderYield(){
   const el=document.getElementById('yieldBody');if(!el)return;
   const D=90;
-  const stats=(S.advisors||[]).map(partnerStats);
+  const stats=liveOnly(S.advisors||[]).map(partnerStats);
   const link=x=>'<b style="cursor:pointer" onclick="openProfile(findRec(\''+x.a.id+'\'))">'+esc(fixUml(dispName(x.a)))+'</b>';
   const hdr=cols=>'<tr>'+cols.map((c,i)=>'<th'+(i?' style="text-align:right"':'')+'>'+c+'</th>').join('')+'</tr>';
   const sub=t=>'<div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959;margin:10px 0 4px">'+t+'</div>';
@@ -1278,7 +1279,7 @@ function renderFollowups(){
   const stale=live.filter(c=>isStale(c)&&!c.nextDate&&!isDismissed('stale_'+c.id));
   const noAction=live.filter(c=>c.stage!=='Identified'&&!c.nextDate&&!isStale(c));
   const resurrect=(S.companies||[]).filter(c=>c.stage==='Dead'&&c.revisitDate&&c.revisitDate<=t&&!isDismissed('rev_'+c.id));
-  const advDue=(S.advisors||[]).filter(a=>{const lt=lastTouch(a);return lt&&daysAgo(lt)>(a.cadence||30)&&!a.nextDate&&!isDismissed('cad_'+a.id)});
+  const advDue=liveOnly(S.advisors||[]).filter(a=>{const lt=lastTouch(a);return lt&&daysAgo(lt)>(a.cadence||30)&&!a.nextDate&&!isDismissed('cad_'+a.id)});
   const n=overdue.length+dueToday.length;
   const badge=document.getElementById('fuBadge');badge.style.display=n?'inline-block':'none';badge.textContent=n;
   const pr={'Urgent':0,'High':1,'Medium':2,'':3,undefined:3};
