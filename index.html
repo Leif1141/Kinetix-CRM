@@ -350,7 +350,7 @@ const SEED = {"targets":[{"company":"Lang Group (incl. IWETEC)","revenue_eurm":"
 // ═══════════════════════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════
-const STAGES=['Identified','Contacted','Replied','Meeting','NDA','Info received','IOI/LOI','Diligence','Closed','Dead'];
+const STAGES=['Identified','Contacted','Replied','Meeting','NDA','Info received','IOI/LOI','Diligence','Closed','On hold','Dead'];
 const LIVE=STAGES.filter(s=>!['Closed','Dead'].includes(s));
 const CHANNELS=['','Cold email','Letter','Cold call','LinkedIn','Broker','Referral','Platform','Event','Inbound'];
 const DEADREASONS=['No response','Not for sale','Valuation gap','Too small','Too large','Bad fit','Lost to buyer','Other'];
@@ -491,6 +491,7 @@ function uid(){return 'r'+Math.random().toString(36).slice(2,10)}
 function today(){return new Date().toISOString().slice(0,10)}
 function daysAgo(d){if(!d)return 9999;return Math.floor((Date.now()-new Date(d).getTime())/864e5)}
 function esc(s){return (s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function fmtM(v){return (v===''||v===null||v===undefined||isNaN(v))?'-':Number(v).toFixed(1)}
 function fmtD(d){if(!d)return '—';return new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}
 function fmtAgo(d){if(!d)return '—';const n=daysAgo(d);return n===0?'today':n===1?'1 day ago':n<31?n+' days ago':n<365?Math.floor(n/30)+'mo ago':Math.floor(n/365)+'y ago'}
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2800)}
@@ -928,7 +929,7 @@ function suggestions(){
   S.companies.filter(c=>LIVE.includes(c.stage)&&c.stage!=='Identified'&&isStale(c)).forEach(c=>{const k='stale_'+c.id;if(!isDismissed(k))out.push({rec:c,why:c.stage+' for '+daysAgo(lastTouch(c)||(c.stageLog?.slice(-1)[0]?.date)||null)+'d with no activity',tag:'Stale',color:'#C6943E',key:k})});
   liveOnly(S.advisors||[]).filter(a=>{const lt=lastTouch(a);return lt&&daysAgo(lt)>(a.cadence||30)}).forEach(a=>{const k='cad_'+a.id;if(!isDismissed(k))out.push({rec:a,why:'Last contact '+fmtAgo(lastTouch(a))+' (cadence: '+(a.cadence||30)+'d)',tag:'Check-in',color:'var(--navy)',key:k})});
   S.companies.filter(c=>c.stage==='Dead'&&c.revisitDate&&c.revisitDate<=t).forEach(c=>{const k='rev_'+c.id;if(!isDismissed(k))out.push({rec:c,why:'Revisit date reached — consider re-engaging',tag:'Revisit',color:'var(--green)',key:k})});
-  allRecs().filter(r=>r.nextAction&&r.nextSet&&lastTouch(r)&&lastTouch(r).slice(0,10)>r.nextSet).forEach(r=>{const k='ovt_'+r.id+'_'+lastTouch(r).slice(0,10);if(!isDismissed(k))out.push({rec:r,why:'Next action may be outdated — new activity since it was set ("'+r.nextAction.slice(0,60)+'"). Review and update.',tag:'Overtaken',color:'#7030A0',key:k})});
+  allRecs().filter(r=>r.nextAction&&r.nextSet&&lastTouch(r)&&lastTouch(r).slice(0,10)>r.nextSet).forEach(r=>{const k='ovt_'+r.id+'_'+lastTouch(r).slice(0,10);if(!isDismissed(k))out.push({rec:r,why:'Next action may be outdated, there has been new activity since it was set. Current action: "'+r.nextAction+'"',tag:'Overtaken',color:'#7030A0',key:k})});
   const byRec=new Map();
   out.forEach(s=>{const g=byRec.get(s.rec.id);if(!g){s.also=[];byRec.set(s.rec.id,s)}else{g.also.push(s)}});
   return [...byRec.values()];
@@ -956,7 +957,7 @@ function renderOverview(){
   document.getElementById('recentBody').innerHTML=recent.length?'<table><tr><th style="width:64px">Date</th><th style="width:20%">Name</th><th style="width:30%">Subject</th><th>Summary</th></tr>'+recent.map(x=>{
     const _ai=x.r.lastSummary&&x.r.lastSummaryDate&&x.r.lastSummaryDate>=(x.t.date||'').slice(0,10);
     const _base=cleanPrev(x.t.prev)||x.t.note||'';
-    const sum=_ai?('★ '+x.r.lastSummary):((_base?(x.t.dir==='out'?'You: ':'They: ')+_base:'')+(x.r.nextAction?' → Next: '+x.r.nextAction.slice(0,90):''));
+    const sum=_ai?(x.r.lastSummary):((_base?(x.t.dir==='out'?'You: ':'They: ')+_base:'')+(x.r.nextAction?' → Next: '+x.r.nextAction.slice(0,90):''));
     let sec='';
     if(x.r.kind==='person')sec=x.r.firm||'';
     else{const pp=orgPeople(x.r);sec=(pp[0]&&pp[0].name)||x.r.contact||''}
@@ -1081,8 +1082,8 @@ function renderQueue(){
     .sort((a,b)=>((b.score??-1)-(a.score??-1))||dispName(a).localeCompare(dispName(b)));
   const vChip=v=>v?'<span class="chip">'+esc(v)+'</span>':'';
   el.innerHTML=q.length
-    ? '<table><tr><th style="width:52px">Score</th><th style="width:24%">Company</th><th style="width:92px">Verdict</th><th style="width:120px">Location</th><th style="width:130px">Rev / EBIT (€m)</th><th>Business</th><th style="width:70px"></th></tr>'+q.map(c=>
-        '<tr class="rowlink" onclick="openProfile(findRec(\''+c.id+'\'))"><td><b>'+(c.score!=null?c.score:'<span class="muted">-</span>')+'</b></td><td><b>'+esc(fixUml(dispName(c)))+'</b></td><td>'+vChip(c.verdict)+'</td><td class="muted">'+esc(c.location||'')+'</td><td class="muted">'+(c.revenue!=null?Math.round(c.revenue):'-')+' / '+(c.ebit!=null?c.ebit:'-')+'</td><td class="muted" style="max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.description||'')+'</td><td><button class="sm" onclick="event.stopPropagation();quickSetAction(\''+c.id+'\',event)">Work it</button></td></tr>'
+    ? '<table><tr><th style="width:56px;text-align:center">Score</th><th style="width:24%">Company</th><th style="width:92px">Verdict</th><th style="width:120px">Location</th><th style="width:130px;text-align:right">Rev / EBIT (€m)</th><th>Business</th><th style="width:70px"></th></tr>'+q.map(c=>
+        '<tr class="rowlink" onclick="openProfile(findRec(\''+c.id+'\'))"><td style="text-align:center"><b>'+(c.score!=null?Math.round(c.score):'<span class="muted">-</span>')+'</b></td><td><b>'+esc(fixUml(dispName(c)))+'</b></td><td>'+vChip(c.verdict)+'</td><td class="muted">'+esc(c.location||'')+'</td><td class="muted" style="text-align:right">'+fmtM(c.revenue)+' / '+fmtM(c.ebit)+'</td><td class="muted" style="max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.description||'')+'</td><td><button class="sm" onclick="event.stopPropagation();quickSetAction(\''+c.id+'\',event)">Work it</button></td></tr>'
       ).join('')+'</table>'
     : '<p class="muted" style="padding:12px">No researched targets waiting.</p>';
 }
@@ -1193,14 +1194,14 @@ function renderOrgs(){
   const typeShort=o=>o.kind==='target'?'Target':({'M&A sourcing intermediaries':'M&A / Sourcing','Financing partners':'Financing','DD advisors':'DD advisor','Investors & family office':'Investor / FO','HR, universities & interns':'HR / Talent','Admin & infrastructure':'Admin / Infra','Personal network':'Network'}[o.category]||o.category||'Advisor');
   const detailCell=o=>{
     if(o.kind==='advisor')return [o.city,(o.notes||o.detail||o.introPath||'').slice(0,110)].filter(Boolean).join(' · ');
-    return [o.location,(o.revenue?'€'+o.revenue+'m rev':''),(o.description||o.ownership||'').slice(0,110)].filter(Boolean).join(' · ');
+    return [o.location,(o.revenue?fmtM(o.revenue)+' rev / '+fmtM(o.ebit)+' EBIT (€m)':''),(o.description||o.ownership||'').slice(0,110)].filter(Boolean).join(' · ');
   };
   const statusSel=o=>{
-    const opts=o.kind==='target'?STAGES:['To call','Emailed','Contact known','In dialogue','Active relationship','Dormant'];
+    const opts=o.kind==='target'?STAGES:['To call','Emailed','Contact known','In dialogue','Active relationship','On hold','Dormant'];
     const cur=statusOf(o)||'';
     return '<select class="stagesel" onclick="event.stopPropagation()" onchange="setStatusInline(\''+o.id+'\',this.value)">'+opts.map(s=>'<option'+(s===cur?' selected':'')+'>'+esc(s)+'</option>').join('')+(opts.includes(cur)?'':'<option selected>'+esc(cur||'—')+'</option>')+'</select>';
   };
-  document.getElementById('orgTable').innerHTML='<table>'+hdr('name','Organization')+hdr('status','Stage / Status')+'<th>Type</th><th>Contact</th>'+hdr('lastc','Last contact')+'<th>Address</th><th>Detail</th><th></th>'+rows.map(o=>'<tr class="rowlink" onclick="openProfile(findRec(\''+o.id+'\'))"><td>'+starHtml(o)+' <b>'+esc(dispName(o))+'</b>'+(o.flag?' <span class="flag">'+esc(o.flag)+'</span>':'')+'</td><td>'+statusSel(o)+'</td><td class="muted">'+esc(typeShort(o))+'</td><td class="muted">'+esc(o.contact||orgPeople(o).map(p=>p.name).join(', ')||'—')+'</td><td class="muted">'+fmtAgo(lastTouch(o))+'</td><td class="muted" style="max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc([o.address,o.city].filter(Boolean).join(', ')||o.location||'')+'</td><td class="muted" style="max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(detailCell(o))+'</td><td>'+prioChip(o)+'</td></tr>').join('')+'</table>';
+  document.getElementById('orgTable').innerHTML='<table>'+hdr('name','Organization')+hdr('status','Stage / Status')+'<th>Type</th><th>Contact</th>'+hdr('lastc','Last contact')+'<th>Address</th><th>Detail</th><th style="text-align:right">Priority</th>'+rows.map(o=>'<tr class="rowlink" onclick="openProfile(findRec(\''+o.id+'\'))"><td>'+starHtml(o)+' <b>'+esc(dispName(o))+'</b>'+(o.flag?' <span class="flag">'+esc(o.flag)+'</span>':'')+'</td><td>'+statusSel(o)+'</td><td class="muted">'+esc(typeShort(o))+'</td><td class="muted">'+esc(o.contact||orgPeople(o).map(p=>p.name).join(', ')||'—')+'</td><td class="muted">'+fmtAgo(lastTouch(o))+'</td><td class="muted" style="max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc([o.address,o.city].filter(Boolean).join(', ')||o.location||'')+'</td><td class="muted" style="max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(detailCell(o))+'</td><td style="text-align:right">'+prioChip(o)+'</td></tr>').join('')+'</table>';
 }
 function sortOrgs(k){if(sortK===k)sortD*=-1;else{sortK=k;sortD=k==='name'?1:-1}renderOrgs()}
 function setStatusInline(id,val){
@@ -1271,7 +1272,8 @@ function renderPipeline(){
   const stale=live.filter(isStale).length;
   const noAction=live.filter(c=>c.stage!=='Identified'&&!c.nextDate).length;
   const k=[['Targets',cs.length],['Live deals',live.filter(c=>c.stage!=='Identified').length],['Replied+',live.filter(c=>STAGES.indexOf(c.stage)>=2&&STAGES.indexOf(c.stage)<=7).length],['Stale',stale],['No action',noAction]];
-  document.getElementById('pipeKpis').innerHTML=k.map(x=>'<div class="kpi'+(x[0]==='Stale'&&x[1]?' warn':'')+'" ><div class="v">'+x[1]+'</div><div class="l">'+x[0]+'</div></div>').join('');
+  document.getElementById('pipeKpis').innerHTML=k.map(x=>'<div class="kpi'+(x[0]==='Stale'&&x[1]?' warn':'')+'" ><div class="v">'+x[1]+'</div><div class="l">'+x[0]+'</div></div>').join('')
+    +'<div style="flex-basis:100%;font-size:11px;color:#595959;padding:4px 2px 0">The bar on the left of each card: <span style="border-left:3px solid var(--navy2);padding-left:5px">navy, on track</span> &nbsp; <span style="border-left:3px solid var(--red);padding-left:5px">red, no activity for longer than the stage allows</span></div>';
   const q=(document.getElementById('fSearch').value||'').toLowerCase();
   const geo=document.getElementById('fGeo').value;
   const list=cs.filter(c=>(!q||c.name.toLowerCase().includes(q))&&(!geo||c.geo===geo));
@@ -1541,13 +1543,12 @@ async function weeklyDigest(){
 function renderData(){
   const el=document.getElementById('dataInfo');
   const arch=rawRecs().filter(isArch);
-  if(el)el.textContent=(S.companies||[]).length+' companies · '+(S.advisors||[]).length+' advisors · '+(S.people||[]).length+' people · '+(S.unmatched||[]).length+' unmatched · '+arch.length+' archived · last sync: '+(S.lastSync?new Date(S.lastSync).toLocaleString('en-GB'):'never')+' · Firebase: '+(stateRef?'connected':'not configured');
+  if(el)el.textContent=allOrgs().filter(o=>o.kind==='target').length+' companies · '+allOrgs().filter(o=>o.kind==='advisor').length+' advisors · '+liveOnly(S.people||[]).length+' people · '+(S.unmatched||[]).length+' unmatched · last sync: '+(S.lastSync?new Date(S.lastSync).toLocaleString('en-GB'):'never')+' · Firebase: '+(stateRef?'connected':'not configured');
   const ael=document.getElementById('archInfo');
-  if(ael)ael.innerHTML=arch.length
-    ? '<label style="font-size:11px;display:inline-flex;align-items:center;gap:5px;text-transform:none"><input type="checkbox" '+(S.showArchived?'checked':'')+' onchange="toggleArchived(this.checked)"> Show archived records in every view</label> <button class="sm" onclick="if(confirm(\'Restore all '+arch.length+' archived records?\'))unarchiveAll()">Restore all</button>'
-      +'<div class="muted" style="font-size:11px;margin-top:5px">'+arch.length+' records are archived: hidden from every view, count, suggestion and search, but nothing is deleted. '
-      +Object.entries(arch.reduce((m,r)=>{const k=r.archivedReason||'no reason recorded';m[k]=(m[k]||0)+1;return m},{})).map(([k,n])=>esc(k)+' ('+n+')').join(', ')+'</div>'
-    : '<div class="muted" style="font-size:11px">Nothing archived.</div>';
+  // Deliberately says nothing about what is archived or why: this screen is visible to everyone with access.
+  if(ael)ael.innerHTML=S.showArchived
+    ? '<label style="font-size:11px;display:inline-flex;align-items:center;gap:5px;text-transform:none"><input type="checkbox" checked onchange="toggleArchived(this.checked)"> Archive visible</label> <button class="sm" onclick="if(confirm(\'Restore everything currently archived?\'))unarchiveAll()">Restore all</button>'
+    : '<label style="font-size:11px;display:inline-flex;align-items:center;gap:5px;text-transform:none"><input type="checkbox" onchange="toggleArchived(this.checked)"> Archive visible</label>';
 }
 function resetData(){if(!confirm('Reset CRM to seed data? This cannot be undone.'))return;S=buildInitialState();save();renderAll();toast('Reset to seed data')}
 function exportJSON(){
@@ -1924,7 +1925,7 @@ function openProfile(rec){
   isA?
     fld('e_firm','Firm name',rec.firm)+fld('e_contact','Primary contact',rec.contact)+fld('e_email','Email',rec.email)+fld('e_domain','Domain',rec.domain)+
     '<div class="pgrid">'+selFld('e_cat','Category',['M&A sourcing intermediaries','Financing partners','DD advisors','Investors & family office','Executive search','HR, universities & interns','Admin & infrastructure','Personal network','Other'],rec.category)+selFld('e_market','Market',['DE','UK'],rec.market||(/uk|united kingdom/i.test(rec.geo||'')?'UK':'DE'))+selFld('e_geo2','Geo (country)',['Germany','United Kingdom','Switzerland','France','Netherlands','Luxembourg','Sweden','Denmark','Austria','United States','Other'],rec.geo)+'</div>'+
-    selFld('e_status','Status',['To call','Emailed','Contact known','In dialogue','Active relationship','Dormant'],rec.status)+
+    selFld('e_status','Status',['To call','Emailed','Contact known','In dialogue','Active relationship','On hold','Dormant'],rec.status)+
     '<div class="pgrid">'+fld('e_city','City',rec.city)+fld('e_addr','Address',rec.address)+'</div>'+
     fld('e_intro','Intro path',rec.introPath)+
     '<label>Notes</label><textarea id="e_notes" rows="3">'+esc(rec.notes||'')+'</textarea>'+
@@ -1939,7 +1940,7 @@ function openProfile(rec){
   '<div class="mbody"><div class="mcol-l">'+
     '<div class="pbox"><h4>Details</h4>'+detailL+'</div>'+
     '<div class="pbox"><h4>Lists</h4>'+listChips(rec)+'</div>'+
-    (isP?'':'<div class="pbox"><h4>People'+(isP?'':' <button class="sm" onclick="addPersonToOrg()">+ Add</button>')+'</h4>'+(ppl.length?ppl.map(p=>'<div style="margin-bottom:4px;cursor:pointer" onclick="openProfile(findRec(\''+p.id+'\'))"><b>'+esc(p.name)+'</b> <span class="muted">'+esc(p.title||'')+'</span>'+(p.email?' · '+esc(p.email):'')+'</div>').join(''):(rec.contact?'<div><b>'+esc(rec.contact)+'</b> <span class="muted">'+esc(rec.email||'')+' \u00B7 primary contact (record field)</span></div>':'<span class="muted">No people linked</span>'))+'</div>')+
+    (isP?'':'<div class="pbox"><h4>People <button class="sm" onclick="addPersonToOrg()">+ Add</button></h4>'+peopleBoxHtml(rec,ppl)+'</div>')+
     '<div class="pbox"><h4>Files <button class="sm" onclick="addLink()">+ Link</button></h4>'+filesHtml(rec)+'</div>'+
     (isT?'<div class="pbox"><h4>Deal maths</h4><div class="pgrid">'+fld('dm_e','EBITDA (€m)',rec.ebitda,'number')+fld('dm_m','Multiple',6,'number')+fld('dm_d','Debt %',60,'number')+fld('dm_r','Interest rate %',5,'number')+fld('dm_t','Tenor (yrs)',7,'number')+'</div><button class="sm primary" onclick="calcMaths()" style="margin-top:6px">Calculate</button><div id="dm_out" style="margin-top:8px"></div></div>':'')+
   '</div><div class="mcol-r">'+
@@ -1994,6 +1995,29 @@ function deleteRec(){
   S.advisors=(S.advisors||[]).filter(a=>a.id!==r.id);
   S.people=(S.people||[]).filter(p=>p.id!==r.id);
   save();closeProfile();renderAll();
+}
+function peopleBoxHtml(rec,ppl){
+  // Primary contact in full, everyone else on one line each. Keeps a company with eight
+  // contacts readable instead of eight equally loud blocks.
+  const prim=ppl.find(p=>rec.contact&&normName(p.name)===normName(rec.contact));
+  const rest=ppl.filter(p=>p!==prim);
+  let out='';
+  if(prim){
+    out+='<div style="margin-bottom:6px;cursor:pointer" onclick="openProfile(findRec(\''+prim.id+'\'))"><b>'+esc(fixUml(prim.name))+'</b> <span class="chip">primary</span>'
+      +(prim.title?'<div class="muted" style="font-size:11px">'+esc(prim.title)+'</div>':'')
+      +(prim.email?'<div style="font-size:11px"><a href="mailto:'+esc(prim.email)+'" onclick="event.stopPropagation()">'+esc(prim.email)+'</a></div>':'')
+      +(prim.phone?'<div class="muted" style="font-size:11px">'+esc(prim.phone)+'</div>':'')+'</div>';
+  } else if(rec.contact){
+    out+='<div style="margin-bottom:6px"><b>'+esc(fixUml(rec.contact))+'</b> <span class="chip">primary</span>'
+      +(rec.email?'<div style="font-size:11px"><a href="mailto:'+esc(rec.email)+'">'+esc(rec.email)+'</a></div>':'')
+      +'<div class="muted" style="font-size:10px">from the company record, no separate person record yet</div></div>';
+  }
+  if(rest.length){
+    out+=(out?'<div style="border-top:1px solid #E8E8EC;margin:6px 0 5px"></div>':'')
+      +'<div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959;margin-bottom:3px">Also here ('+rest.length+')</div>'
+      +rest.map(p=>'<div style="font-size:11px;margin-bottom:2px;cursor:pointer" onclick="openProfile(findRec(\''+p.id+'\'))"><b>'+esc(fixUml(p.name))+'</b>'+(p.email?' <span class="muted">'+esc(p.email)+'</span>':'')+(p.title?' <span class="muted">'+esc(p.title.slice(0,40))+'</span>':'')+'</div>').join('');
+  }
+  return out||'<span class="muted">No people linked</span>';
 }
 function addPersonToOrg(){const p=newPerson();p.orgId=profRec.id;p.firm=dispName(profRec);openProfile(p)}
 function logActivity(){
@@ -2109,13 +2133,43 @@ function renderClusters(){
   ).join(''):'<p class="muted" style="padding:12px">Noch keine Region mit drei oder mehr Zielunternehmen im Umkreis von '+km+' km.</p>';
 }
 let locMap=null,locLayer=null;
+// One label for every record: the person and the organisation they belong to.
+function recLabel(r){
+  if(r.kind==='person'){const o=r.orgId?findRec(r.orgId):null;const firm=(o?dispName(o):r.firm)||'';return firm?fixUml(dispName(r))+' / '+fixUml(firm):fixUml(dispName(r))}
+  const p=orgPeople(r)[0];
+  const who=r.contact||(p&&p.name)||'';
+  return who?fixUml(who)+' / '+fixUml(dispName(r)):fixUml(dispName(r));
+}
+// Cluster cities that sit within roughly `km` of each other so the list is regions, not 200 single entries.
+function clusterCities(byCity,km){
+  const cache=S.geoCache||{};
+  const pts=Object.keys(byCity).map(c=>({c,g:cache[c]}));
+  const R=6371,rad=x=>x*Math.PI/180;
+  const dist=(a,b)=>{const dLat=rad(b.lat-a.lat),dLon=rad(b.lon-a.lon);const h=Math.sin(dLat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(h))};
+  const clusters=[];
+  pts.sort((a,b)=>byCity[b.c].length-byCity[a.c].length).forEach(p=>{
+    if(!p.g||p.g.lat==null){clusters.push({head:p.c,cities:[p.c],geo:null});return}
+    const hit=clusters.find(cl=>cl.geo&&dist(cl.geo,p.g)<=km);
+    if(hit)hit.cities.push(p.c); else clusters.push({head:p.c,cities:[p.c],geo:p.g});
+  });
+  return clusters.map(cl=>({
+    head:cl.head,
+    cities:cl.cities,
+    recs:cl.cities.reduce((a,c)=>a.concat(byCity[c]),[])
+  })).sort((a,b)=>b.recs.length-a.recs.length);
+}
+function setLocRadius(v){S.locRadius=+v;save();renderLocations()}
 function renderLocations(){
   const kind=document.getElementById('locKind').value;
   const recs=allRecs().filter(r=>!(!recCity(r)||(kind&&r.kind!==kind)));
   document.getElementById('locCount').textContent=recs.length+' records with a city';
   const byCity={};recs.forEach(r=>{const c=recCity(r);(byCity[c]=byCity[c]||[]).push(r)});
-  const cities=Object.keys(byCity).sort((a,b)=>byCity[b].length-byCity[a].length);
-  document.getElementById('locList').innerHTML=cities.map(c=>'<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b>'+esc(c)+'</b> <span class="muted">('+byCity[c].length+')</span><br>'+byCity[c].map(r=>'<span class="chip" style="cursor:pointer" onclick="openProfile(findRec(\''+r.id+'\'))">'+esc(dispName(r))+'</span>').join(' ')+'</div>').join('')||'<p class="muted" style="padding:12px">No records with city yet — add cities on profiles or apply the latest Claude patch.</p>';
+  const km=S.locRadius||75;
+  const groups=clusterCities(byCity,km);
+  const ctl='<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC;font-size:11px">Group places within '
+    +'<select onchange="setLocRadius(this.value)">'+[0,25,50,75,100,150].map(v=>'<option value="'+v+'"'+(km===v?' selected':'')+'>'+(v?v+' km':'no grouping')+'</option>').join('')+'</select>'
+    +' <span class="muted">'+groups.length+' areas from '+Object.keys(byCity).length+' places</span></div>';
+  document.getElementById('locList').innerHTML=ctl+(groups.map(g=>'<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b>'+esc(g.head)+'</b> <span class="muted">('+g.recs.length+')</span>'+(g.cities.length>1?' <span class="muted" style="font-size:10px">incl. '+esc(g.cities.filter(c=>c!==g.head).join(', '))+'</span>':'')+'<br>'+g.recs.map(r=>'<span class="chip" style="cursor:pointer" onclick="openProfile(findRec(\''+r.id+'\'))">'+esc(recLabel(r))+'</span>').join(' ')+'</div>').join('')||'<p class="muted" style="padding:12px">No records with a city yet.</p>');
   if(typeof L==='undefined')return;
   if(!locMap){locMap=L.map('locMap').setView([51.3,7.5],6);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(locMap)}
   if(locLayer)locLayer.remove();locLayer=L.layerGroup().addTo(locMap);
