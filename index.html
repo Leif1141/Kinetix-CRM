@@ -1320,6 +1320,13 @@ function quickSetAction(id,ev){
   r.nextSet=today();
   save();renderAll();
 }
+function snoozeAction(id,ev){
+  if(ev)ev.stopPropagation();
+  const r=findRec(id);if(!r)return;
+  const d=new Date((r.nextDate&&r.nextDate>=today())?r.nextDate:today());d.setDate(d.getDate()+7);
+  r.nextDate=d.toISOString().slice(0,10);
+  save();renderAll();toast('Pushed to '+r.nextDate);
+}
 function snoozeSugg(k,ev){if(ev)ev.stopPropagation();dismissSugg(k)}
 function renderFollowups(){
   const t=today();
@@ -1337,7 +1344,7 @@ function renderFollowups(){
   const pr={'Urgent':0,'High':1,'Medium':2,'':3,undefined:3};
   const psort=(a,b)=>pr[a.priority]-pr[b.priority]||((a.nextDate||'9').localeCompare(b.nextDate||'9'));
   const sec=(title,items,color,render)=>items.length?'<div class="section"><div class="section-hdr" style="background:'+color+'">'+title+' ('+items.length+')</div><table>'+items.map(render).join('')+'</table></div>':'';
-  const row=r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))"><td style="width:24px"><input type="checkbox" onclick="completeAction(\''+r.id+'\',event)" title="Mark done"></td><td style="width:30%"><b>'+esc(dispName(r))+'</b></td><td>'+esc(r.nextAction||'')+'</td><td>'+dueChip(r.nextDate)+'</td><td>'+prioChip(r)+'</td><td class="muted">'+fmtAgo(lastTouch(r))+'</td></tr>';
+  const row=r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))"><td style="width:118px;white-space:nowrap"><button class="sm primary" onclick="event.stopPropagation();completeAction(\''+r.id+'\',event)" title="Log as done and clear it">Done</button> <button class="sm" onclick="event.stopPropagation();snoozeAction(\''+r.id+'\',event)" title="Push the date out by a week">+1w</button></td><td style="width:30%"><b>'+esc(dispName(r))+'</b></td><td>'+esc(r.nextAction||'')+'</td><td>'+dueChip(r.nextDate)+'</td><td>'+prioChip(r)+'</td><td class="muted">'+fmtAgo(lastTouch(r))+'</td></tr>';
   const acts=(id,key)=>'<td style="width:180px;text-align:right;white-space:nowrap"><button class="sm" onclick="quickSetAction(\''+id+'\',event)">Set action</button> <button class="sm" onclick="snoozeSugg(\''+key+'\',event)">Dismiss</button></td>';
   const rowS=c=>'<tr class="rowlink" onclick="openProfile(findRec(\''+c.id+'\'))"><td style="width:30%"><b>'+esc(c.name)+'</b></td><td>'+stagePill(c.stage)+'</td><td class="muted">Last: '+fmtAgo(lastTouch(c))+'</td>'+acts(c.id,'stale_'+c.id)+'</tr>';
   const rowR=c=>'<tr class="rowlink" onclick="openProfile(findRec(\''+c.id+'\'))"><td style="width:30%"><b>'+esc(c.name)+'</b></td><td class="muted">Revisit date: '+fmtD(c.revisitDate)+'</td>'+acts(c.id,'rev_'+c.id)+'</tr>';
@@ -1915,7 +1922,7 @@ function openProfile(rec){
   const detailL=isT?
     fld('e_name','Company name',rec.name)+
     '<div class="pgrid">'+fld('e_tcontact','Primary contact (owner / MD)',rec.contact)+fld('e_temail','Email',rec.email)+fld('e_tphone','Phone',rec.phone)+fld('e_tdomain','Website',rec.domain)+'</div>'+
-    '<div class="pgrid">'+selFld('e_stage','Stage',STAGES,rec.stage)+selFld('e_geo','Geo',['DE','UK','Other'],rec.geo)+fld('e_rev','Revenue (€m)',rec.revenue,'number')+fld('e_ebitda','EBITDA (€m)',rec.ebitda,'number')+fld('e_ebit','EBIT (€m)',rec.ebit,'number')+fld('e_gm','Gross margin %',rec.gm?rec.gm*100:null,'number')+selFld('e_chan','Channel',CHANNELS,rec.channel)+fld('e_loc','Location',rec.location)+'</div>'+
+    '<div class="pgrid">'+selFld('e_stage','Stage',STAGES,rec.stage)+fld('e_rev','Revenue (€m)',rec.revenue,'number')+fld('e_ebitda','EBITDA (€m)',rec.ebitda,'number')+fld('e_ebit','EBIT (€m)',rec.ebit,'number')+fld('e_gm','Gross margin %',rec.gm?rec.gm*100:null,'number')+selFld('e_chan','Channel',CHANNELS,rec.channel)+fld('e_loc','Location',rec.location)+'</div>'+
     '<label>Description</label><textarea id="e_desc" rows="2">'+esc(rec.description||'')+'</textarea>'+
     '<label>Ownership</label><input id="e_own" value="'+esc(rec.ownership||'')+'">'+
     '<label>Flag</label><input id="e_flag" value="'+esc(rec.flag||'')+'">'+
@@ -1966,7 +1973,7 @@ function saveProfile(){
   if(r.kind==='target'){
     r.name=gv('e_name')||r.name;
     const ns=gv('e_stage');if(ns!==r.stage){r.stage=ns;r.stageLog=r.stageLog||[];r.stageLog.push({stage:ns,date:today()})}
-    r.geo=gv('e_geo');r.revenue=+gv('e_rev')||null;r.ebitda=+gv('e_ebitda')||null;r.ebit=+gv('e_ebit')||null;
+    r.geo=r.geo||'DE';r.revenue=+gv('e_rev')||null;r.ebitda=+gv('e_ebitda')||null;r.ebit=+gv('e_ebit')||null;
     const gm=+gv('e_gm');r.gm=gm?gm/100:null;
     r.channel=gv('e_chan');r.location=gv('e_loc');r.description=gv('e_desc');r.ownership=gv('e_own');r.flag=gv('e_flag');
     r.contact=gv('e_tcontact');r.email=gv('e_temail');r.phone=gv('e_tphone');r.domain=gv('e_tdomain');
