@@ -202,7 +202,7 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
   <div class="section"><div class="section-hdr">Recent activity</div><div id="recentBody"></div></div>
   <div class="ov-grid">
     <div>
-      <div class="section"><div class="section-hdr">Favorites</div><div id="favBody"></div></div>
+      <div class="section" style="display:none"><div class="section-hdr">Favorites</div><div id="favBody"></div></div>
     </div>
     <div class="section"><div class="section-hdr">Custom lists <button class="sm" style="background:#fff" onclick="newList()">+ New list</button></div><div id="listsBody"></div></div>
   </div>
@@ -245,14 +245,14 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
 <div class="panel" id="p-threads">
   <div class="kpis" id="thKpis"></div>
   <div class="filterbar">
-    <button class="sm th-f on" data-f="open" onclick="thGo('open')">Alles Offene</button>
-    <button class="sm th-f" data-f="leif" onclick="thGo('leif')">Ich bin dran</button>
-    <button class="sm th-f" data-f="them" onclick="thGo('them')">Andere sind dran</button>
-    <button class="sm th-f" data-f="hoch" onclick="thGo('hoch')">Nur hohe Priorität</button>
-    <button class="sm th-f" data-f="all" onclick="thGo('all')">Alle</button>
-    <input id="thSearch" placeholder="Suchen..." oninput="renderThreads()" style="flex:1;min-width:160px">
+    <button class="sm th-f on" data-f="open" onclick="thGo('open')">All open</button>
+    <button class="sm th-f" data-f="leif" onclick="thGo('leif')">My move</button>
+    <button class="sm th-f" data-f="them" onclick="thGo('them')">Their move</button>
+    <button class="sm th-f" data-f="hoch" onclick="thGo('hoch')">High priority only</button>
+    <button class="sm th-f" data-f="all" onclick="thGo('all')">All</button>
+    <input id="thSearch" placeholder="Search..." oninput="renderThreads()" style="flex:1;min-width:160px">
     <select id="thCat" onchange="renderThreads()"><option value="">Alle Kategorien</option></select>
-    <label style="font-size:12px"><input type="checkbox" id="thHideDone" onchange="renderThreads()"> Abgehakte ausblenden</label>
+    <label style="font-size:12px"><input type="checkbox" id="thHideDone" onchange="renderThreads()"> Hide ticked</label>
     <button class="sm" onclick="thToggleAll()" id="thAllBtn">Alle Details</button>
     <span class="muted" id="thCount"></span>
   </div>
@@ -286,7 +286,7 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
   <div id="locMap" style="height:440px;border:1px solid var(--lgray);border-radius:5px;margin-bottom:14px"></div>
   <div class="section" style="margin-bottom:14px"><div class="section-hdr">Nearby: who sits within reach</div>
     <div style="padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <span>Ort</span><input id="locNear" placeholder="z.B. Bonn" style="width:170px" onkeydown="if(event.key==='Enter')nearbyBriefing()">
+      <span>Place</span><input id="locNear" placeholder="e.g. Bonn" style="width:170px" onkeydown="if(event.key==='Enter')nearbyBriefing()">
       <span>Radius</span><input id="locKm" type="number" value="75" style="width:64px"> <span>km</span>
       <button class="sm" onclick="nearbyBriefing()">Show</button>
       <button class="sm" onclick="copyBriefing()">Copy as text</button>
@@ -364,7 +364,7 @@ function parseFlag(c){
   return c;
 }
 function backfillScores(){let n=0;(S.companies||[]).forEach(c=>{const b=[c.score,c.verdict].join('|');parseFlag(c);if([c.score,c.verdict].join('|')!==b)n++});return n}
-const STALE_DAYS={'Identified':null,'Contacted':7,'Replied':5,'Meeting':7,'NDA':10,'Info received':10,'IOI/LOI':7,'Diligence':14};
+const STALE_DAYS={'Identified':null,'Contacted':7,'Replied':5,'Meeting':7,'NDA':10,'LOI':7,'Diligence':14};
 const MY_ADDR=['leif@kinetixcap.com','leif.berger26@gmail.com','leif@kinetix-industries.de','leif@kinetix-industries.com','tommy@kinetix-industries.com'];
 const ACT_TYPES=['Call','Meeting','Note','Letter','LinkedIn'];
 const PRIORITIES=['','Urgent','High','Medium','Low'];
@@ -544,7 +544,15 @@ function findRec(id){return rawRecs().find(r=>r.id===id)}
 function dispName(r){return r.name||r.firm}
 function touchList(r){return Object.values(r.touches||{}).sort((a,b)=>(b.date||'').localeCompare(a.date||''))}
 function isSysNote(t){return !!(t&&t.src==='Note'&&/^✔/.test(t.subject||''))}
-function lastTouch(r){const t=touchList(r).find(x=>!isSysNote(x));return t?t.date:null}
+function orgTouches(o){
+  // own touches plus the touches of every linked person, de-duplicated, newest first
+  const seen=new Set();const out=[];
+  const add=t=>{if(isSysNote(t))return;const k=(t.date||'')+'|'+(t.subject||'');if(seen.has(k))return;seen.add(k);out.push(t)};
+  touchList(o).forEach(add);
+  if(o.kind!=='person')orgPeople(o).forEach(p=>touchList(p).forEach(add));
+  return out.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+}
+function lastTouch(r){const t=(r.kind==='person'?touchList(r).filter(x=>!isSysNote(x)):orgTouches(r))[0];return t?t.date:null}
 function tType(t){if(t.src==='Granola'||t.src==='Meeting')return 'Meeting';if(t.src==='Call')return 'Call';if(t.src==='Kinetix'||t.src==='Gmail')return 'Email';if(t.src==='Note'||t.src==='Letter'||t.src==='LinkedIn')return t.src;return 'Email'}
 function lastOfType(r,ty){const t=touchList(r).find(x=>tType(x)===ty);return t?t.date:null}
 function isStale(c){const th=STALE_DAYS[c.stage];if(th==null)return false;const lt=lastTouch(c);return daysAgo(lt||(c.stageLog?.slice(-1)[0]?.date)||null)>th}
@@ -910,7 +918,7 @@ async function syncEmails(){
 // ═══════════════════════════════════════════════════════════════
 // UI HELPERS
 // ═══════════════════════════════════════════════════════════════
-function stagePill(s){const col={'Identified':'#8C97B8','Contacted':'#434F80','Replied':'#C6943E','Meeting':'#C6943E','NDA':'#2E7D32','Info received':'#2E7D32','IOI/LOI':'#1565C0','Diligence':'#1565C0','Closed':'#2E7D32','Dead':'#999'};return '<span class="pill" style="background:'+(col[s]||'#888')+';color:#fff">'+esc(s)+'</span>'}
+function stagePill(s){const col={'Identified':'#8C97B8','Contacted':'#434F80','Replied':'#C6943E','Meeting':'#C6943E','NDA':'#2E7D32','LOI':'#1565C0','Diligence':'#1565C0','Closed':'#2E7D32','Dead':'#999'};return '<span class="pill" style="background:'+(col[s]||'#888')+';color:#fff">'+esc(s)+'</span>'}
 function prioChip(r){return r.priority?'<span class="pill" style="background:'+(PRIO_COL[r.priority]||'#8C97B8')+';color:#fff" title="'+(PRIO_DEF[r.priority]||'')+'">'+r.priority+'</span>':''}
 function dueChip(d){if(!d)return '';const n=-daysAgo(d);const t=n<0?Math.abs(n)+'d overdue':n===0?'due today':'due in '+n+'d';const c=n<0?'var(--red)':n===0?'#C6943E':'#2E7D32';return '<span class="duechip" style="background:'+c+'22;color:'+c+'">'+t+'</span>'}
 function starHtml(r){return '<span class="star'+(r.fav?' on':'')+'" onclick="toggleFav(event,\''+r.id+'\')" title="Favorite">★</span>'}
@@ -946,8 +954,8 @@ function renderOverview(){
   const orgs=allOrgs(),live=S.companies.filter(c=>LIVE.includes(c.stage)&&c.stage!=='Identified');
   const due=[...allRecs()].filter(r=>r.nextDate&&r.nextDate<=today()).length;
   const sug=suggestions();
-  const k=[['Organizations',orgs.length,'orgs'],['People',(S.people||[]).length,'people'],['Live deals',live.length,'pipeline'],['Due today',due,'followups']];
-  document.getElementById('ovKpis').innerHTML=k.map(x=>'<div class="kpi'+(x[0]==='Due today'&&x[1]?' warn':'')+'" onclick="goTab(\''+x[2]+'\')"><div class="v">'+x[1]+'</div><div class="l">'+x[0]+'</div></div>').join('');
+  const k=[['Organizations',orgs.length,'orgs'],['People',(S.people||[]).length,'people'],['Live deals',live.length,'pipeline'],['Due or overdue',due,'followups']];
+  document.getElementById('ovKpis').innerHTML=k.map(x=>'<div class="kpi'+(x[0]==='Due or overdue'&&x[1]?' warn':'')+'" onclick="goTab(\''+x[2]+'\')"><div class="v">'+x[1]+'</div><div class="l">'+x[0]+'</div></div>').join('');
   const b=document.getElementById('sugBadge');b.style.display=sug.length?'inline-block':'none';b.textContent=sug.length;
   document.getElementById('suggBody').innerHTML=sug.length?sug.map(s=>'<div class="sugg"><span class="tag" style="background:'+s.color+'">'+s.tag+'</span><div><b style="cursor:pointer" onclick="openProfile(findRec(\''+s.rec.id+'\'))">'+esc(sugHead(s.rec))+'</b><div class="why">'+esc(s.why)+(s.also&&s.also.length?'<div style="margin-top:3px">'+s.also.map(a=>'<span class="chip" style="background:'+a.color+';color:#fff">'+a.tag+'</span> '+esc(a.why)).join('<br>')+'</div>':'')+'</div></div><button class="sm" onclick="dismissSugg(\''+s.key+'\')">Dismiss</button></div>').join(''):'<p class="muted" style="padding:12px">No suggested actions right now.</p>';
   const favs=allRecs().filter(r=>r.fav);
@@ -1053,7 +1061,7 @@ function foldSearch(s){
     .replace(/[^a-z0-9@. ]+/g,' ').replace(/\s+/g,' ').trim();
 }
 function searchHay(r){
-  return foldSearch([dispName(r),r.name,r.firm,r.contact,r.email,r.domain,r.city,r.location,r.title,r.category,r.ptype,r.stage,r.status,(r.lists||[]).join(' ')].filter(Boolean).join(' '));
+  return foldSearch([dispName(r),r.name,r.firm,r.contact,r.email,r.domain,r.city,r.location,r.title,r.category,r.ptype,r.stage,r.status,(r.lists||[]).join(' '),r.description,(r.notes||'').slice(0,600)].filter(Boolean).join(' '));
 }
 function renderGlobalSearch(){
   const q=foldSearch((document.getElementById('gSearch')||{}).value||'');
@@ -1096,7 +1104,7 @@ function renderQueue(){
 // YIELD  -  where the effort actually pays
 // ═══════════════════════════════════════════════════════════════
 function realTouches(r,days){
-  return touchList(r).filter(t=>!isSysNote(t)&&(!days||daysAgo(t.date)<days));
+  return orgTouches(r).filter(t=>(!days||daysAgo(t.date)<days));
 }
 function partnerStats(a){
   const ts=realTouches(a);
@@ -1448,13 +1456,13 @@ function renderThreads(){
       +'<div class="th-bd"><div class="th-head"><span class="th-nm" onclick="thOpen(\''+t.id+'\',event)">'+esc(t.name)+'</span>'
       +(t.contact&&t.contact!==t.name?'<span class="muted">'+esc(t.contact)+'</span>':'')
       +pill(TH_CLS[v],TH_V[v])+(t.p&&t.p!=='Niedrig'?pill(t.p.toLowerCase(),t.p):'')
-      +(still!=null&&still<9999?pill('lite',still+' Tage still'):'')
+      +(still!=null&&still<9999?pill('lite',still+' days quiet'):'')
       +(fresh?pill('fresh','Kontakt nach 15.09.'):'')
       +(st.v?pill('lite','Status changed'):'')
       +(t.dup?pill('lite',t.dup+'x doppelt'):'')+(!r?pill('lite','not in CRM'):(r.archived?pill('lite','archiviert'):''))
       +'</div>';
     if(t.a)h+='<div class="th-a"><b>Next action:</b> '+esc(t.a)+(t.due?' <span class="muted">(bis '+esc(t.due)+')</span>':'')+'</div>';
-    if(t.r)h+='<div class="th-r"><b>Empfehlung:</b> '+esc(t.r)+'</div>';
+    if(t.r)h+='<div class="th-r"><b>Recommendation:</b> '+esc(t.r)+'</div>';
     if(st.note)h+='<div class="th-note"><b>Notiz'+(st.noteDate?' '+fmtD(st.noteDate):'')+':</b> '+esc(st.note)+'</div>';
     if(r&&(r.nextAction||r.nextDate))h+='<div class="th-live"><b>CRM action:</b> '+esc(r.nextAction||'')+' '+dueChip(r.nextDate)+' '+prioChip(r)+'</div>';
     if(more){h+='<div class="th-more">'
@@ -1541,7 +1549,7 @@ function renderReports(){
   mk('chFunnel',{type:'bar',data:{labels:STAGES.filter(s=>s!=='Closed'&&s!=='Dead'),datasets:[{data:fc,backgroundColor:'#434F80'}]}});
   const weeks=[...Array(8)].map((_,i)=>{const d=new Date(Date.now()-(7-i)*7*864e5);return d.toISOString().slice(0,10)});
   // A target counts in the week of its FIRST outbound touch. That is the number Leif wants to hold at 10 a week.
-  const firstOut={};(S.companies||[]).forEach(c=>{const o=touchList(c).filter(t=>t.dir==='out'&&!isSysNote(t)).map(t=>t.date).sort();if(o.length)firstOut[c.id]=o[0]});
+  const firstOut={};liveOnly(S.companies||[]).forEach(c=>{const o=orgTouches(c).filter(t=>t.dir==='out').map(t=>t.date).sort();if(o.length)firstOut[c.id]=o[0]});
   const wkNew=weeks.map((w,i)=>Object.values(firstOut).filter(d=>{const dd=daysAgo(d);return dd<(8-i)*7&&dd>=(7-i)*7}).length);
   const TARGET_PER_WEEK=S.outreachTarget||10;
   mk('chActivity',{type:'bar',data:{labels:weeks.map(w=>w.slice(5)),datasets:[{type:'line',label:'Target',data:weeks.map(()=>TARGET_PER_WEEK),borderColor:'#C00000',borderDash:[5,4],pointRadius:0,borderWidth:1.5},{label:'Targets approached',data:wkNew,backgroundColor:'#2E3C65'}]}});
@@ -1825,7 +1833,7 @@ async function checkDriveUpdates(auto){
 // PROFILE / MODAL
 // ═══════════════════════════════════════════════════════════════
 function fld(id,label,valu,type){return '<div><label>'+label+'</label><input id="'+id+'" type="'+(type||'text')+'" value="'+esc(valu||'')+'"></div>'}
-function selFld(id,label,opts,cur){return '<div><label>'+label+'</label><select id="'+id+'">'+opts.map(o=>'<option'+(o===cur?' selected':'')+'>'+esc(o)+'</option>').join('')+'</select></div>'}
+function selFld(id,label,opts,cur){const has=cur==null||cur===''||opts.includes(cur);return '<div><label>'+label+'</label><select id="'+id+'">'+opts.map(o=>'<option'+(o===cur?' selected':'')+'>'+esc(o)+'</option>').join('')+(has?'':'<option selected>'+esc(cur)+'</option>')+'</select></div>'}
 function gv(id){const e=document.getElementById(id);return e?e.value.trim():undefined}
 
 function tlHtml(r){
@@ -1939,6 +1947,7 @@ function openProfile(rec){
     '<label>Ownership</label><input id="e_own" value="'+esc(rec.ownership||'')+'">'+
     '<label>Flag</label><input id="e_flag" value="'+esc(rec.flag||'')+'">'+
     '<div class="pgrid">'+fld('e_score','Score /100',rec.score,'number')+selFld('e_verdict','Verdict',VERDICTS,rec.verdict)+'</div>'+
+    '<label>Research notes</label><textarea id="e_tnotes" rows="6" style="width:100%;font-size:11px">'+esc(rec.notes||'')+'</textarea>'+
     (rec.stage==='Dead'?selFld('e_dr','Dead reason',DEADREASONS,rec.deadReason)+fld('e_revd','Revisit date',rec.revisitDate,'date'):'')+
     '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+'<label>Next action</label><textarea id="e_na" rows="3" style="width:100%">'+esc(rec.nextAction||'')+'</textarea>':
   isA?
@@ -1988,7 +1997,7 @@ function saveProfile(){
     r.geo=r.geo||'DE';r.revenue=+gv('e_rev')||null;r.ebitda=+gv('e_ebitda')||null;r.ebit=+gv('e_ebit')||null;
     const gm=+gv('e_gm');r.gm=gm?gm/100:null;
     r.channel=gv('e_chan');r.outreachChannel=gv('e_outreach');r.location=gv('e_loc');r.description=gv('e_desc');r.ownership=gv('e_own');r.flag=gv('e_flag');
-    r.contact=gv('e_tcontact');r.email=gv('e_temail');r.phone=gv('e_tphone');r.domain=gv('e_tdomain');
+    r.contact=gv('e_tcontact');r.email=gv('e_temail');r.phone=gv('e_tphone');r.domain=gv('e_tdomain');r.notes=gv('e_tnotes');
     r.score=gv('e_score')!==''?+gv('e_score'):(r.score??null);r.verdict=gv('e_verdict')||'';
     if(r.stage==='Dead'){r.deadReason=gv('e_dr');r.revisitDate=gv('e_revd')}
   } else if(r.kind==='advisor'){
