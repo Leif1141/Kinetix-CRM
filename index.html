@@ -1682,10 +1682,14 @@ function applyPatchOps(ops){
         if(o.email){S.ignoredSenders[o.email.toLowerCase().replace(/\./g,'_')]=today();made++}
         else if(o.domain){S.ignoredDomains[o.domain.toLowerCase().replace(/\./g,'_')]=today();made++}
         else skipped++;
+      }else if(o.op==='setThread'){
+        seedThreads();let t=S.threads.find(x=>x.id===o.id||(x.alias||[]).includes(o.id));
+        if(!t){const r=findRec(o.id);if(r){t=autoThread(r);delete t.auto;S.threads.push(t)}}
+        if(t&&o.fields){['r','a','o','e','due','p','cat'].forEach(k=>{if(o.fields[k]!==undefined)t[k]=o.fields[k]});_threadsCache=null;made++}else skipped++;
       }else if(o.op==='setField'){
         const r=patchFind(o.match);
-        const _ok=['notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict'];
-        if(r&&o.field&&_ok.includes(o.field)){r[o.field]=o.value;made++}else if(o.op==='addList'){
+        const _ok=['notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict','outreachChannel','stage'];
+        if(r&&o.field&&_ok.includes(o.field)){if(o.field==='stage'&&r.stage!==o.value){r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.value,date:o.date||today()})}r[o.field]=o.value;made++}else if(o.op==='addList'){
         if(o.name){S.customLists=S.customLists||[];if(!S.customLists.includes(o.name))S.customLists.push(o.name);made++}else skipped++;
       }else if(o.op==='renameList'){
         if(o.from&&o.to&&(S.customLists||[]).includes(o.from)){S.customLists=S.customLists.map(x=>x===o.from?o.to:x);allRecs().forEach(r=>{if(r.lists)r.lists=r.lists.map(x=>x===o.from?o.to:x)});made++}else skipped++;
