@@ -2234,7 +2234,8 @@ function renderLocations(){
   const missing=cities.filter(c=>!S.geoCache[c.toLowerCase()]).length;
   if(missing)toast(missing+' places not geocoded yet, click "Geocode new cities"');
   try{renderClusters()}catch(e){}
-  if(pts.length&&!locMap._fitted){try{const de=pts.filter(p=>p[0]>=45&&p[0]<=56&&p[1]>=4&&p[1]<=17);locMap.fitBounds(de.length?de:pts,{padding:[30,30],maxZoom:8});locMap._fitted=1}catch(e){}}
+  // Always frame Germany. Foreign records are listed under Abroad, they do not widen the map.
+  if(!locMap._fitted){try{locMap.fitBounds([[47.3,5.9],[55.1,15.0]],{padding:[10,10]});locMap._fitted=1}catch(e){}}
   setTimeout(()=>locMap.invalidateSize(),120);
 }
 async function geocodeMissing(){
