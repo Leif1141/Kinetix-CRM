@@ -467,6 +467,7 @@ function startListening(){
       S.unmatched=S.unmatched||[];
       S.customLists=S.customLists||[];
       S.dismissed=S.dismissed||{};
+      S.dismissedUnmatched=S.dismissedUnmatched||{};
       S.senderMap=S.senderMap||{};
       S.threadsDone=S.threadsDone||{};
       S.threadsState=S.threadsState||{};
@@ -661,7 +662,7 @@ async function syncOutlookEmails(){
       cand.forEach(a=>{matchRecords(text,a,true).forEach(x=>{if(!recs.includes(x))recs.push(x)})});
       const t={date:msg.receivedDateTime,dir,subject:msg.subject||'(no subject)',link:msg.webLink||'',src:'Kinetix',who:dir==='out'?recipients.join(', '):sAddr,prev:cleanPrev(msg.bodyPreview)};
       if(recs.length){recs.forEach(r=>{addTouch(r,key,t)});added++;if(msg.hasAttachments)attQueue.push({key,id:msg.id,holders:recs})}
-      else{if(!(S.unmatched||[]).some(u=>u.key===key)){S.unmatched=S.unmatched||[];S.unmatched.push({...t,key,sender:sAddr})}}
+      else{if(!isDismissedUnmatched(key)&&!(S.unmatched||[]).some(u=>u.key===key)){S.unmatched=S.unmatched||[];S.unmatched.push({...t,key,sender:sAddr})}}
     });
     for(const q of attQueue.slice(0,25)){
       try{
@@ -763,7 +764,7 @@ async function syncGmailEmails(){
           const date=new Date(parseInt(m.internalDate)).toISOString();
           const t={date,dir,subject:headers.subject||'(no subject)',link:'https://mail.google.com/mail/u/0/#all/'+th.id,src:'Gmail',who:dir==='out'?to:sAddr};
           if(recs.length){recs.forEach(r=>{addTouch(r,key,t)});added++}
-          else{if(!(S.unmatched||[]).some(u=>u.key===key)){S.unmatched=S.unmatched||[];S.unmatched.push({...t,key,sender:sAddr})}}
+          else{if(!isDismissedUnmatched(key)&&!(S.unmatched||[]).some(u=>u.key===key)){S.unmatched=S.unmatched||[];S.unmatched.push({...t,key,sender:sAddr})}}
         });
       });
     }
@@ -824,6 +825,7 @@ function retriageUnmatched(){
   let assigned=0,dropped=0;
   S.unmatched=(S.unmatched||[]).filter(u=>{
     if(allRecs().some(r=>r.touches&&r.touches[u.key])){dropped++;return false}
+    if(isDismissedUnmatched(u.key)){dropped++;return false}
     const addrs=u.dir==='out'?(((u.who||'').toLowerCase().match(/[\w.+-]+@[\w.-]+/g))||[]):[((u.sender||'').toLowerCase())];
     const real=addrs.filter(a=>a&&a.includes('@')&&!MY_ADDR.some(m=>a.includes(m)));
     if(u.src!=='Granola'&&!real.length){dropped++;return false}
@@ -876,6 +878,7 @@ async function syncGranolaCalls(){
       const key='gr_'+f.id;
       if(allRecs().some(r=>r.touches&&r.touches[key]))continue;
       if((S.unmatched||[]).some(u=>u.key===key))continue;
+      if(isDismissedUnmatched(key))continue;
       const m=(f.name||'').match(/^(\d{4})(\d{2})(\d{2})\s+(.+?)(\s*\[[0-9a-f-]+\])?\.docx$/i);
       const date=m?(m[1]+'-'+m[2]+'-'+m[3]+'T12:00:00Z'):(f.createdTime||new Date().toISOString());
       const title=m?m[4]:(f.name||'Call');
@@ -1528,7 +1531,7 @@ function renderInbox(){
   const b=document.getElementById('inbBadge');
   b.style.display=(S.unmatched||[]).length?'inline-block':'none';b.textContent=(S.unmatched||[]).length;
   const opts='<option value="">Assign to…</option><optgroup label="Targets">'+(S.companies||[]).map(c=>'<option value="'+c.id+'">'+esc(c.name)+'</option>').join('')+'</optgroup><optgroup label="Advisors">'+(S.advisors||[]).map(a=>'<option value="'+a.id+'">'+esc(a.firm)+'</option>').join('')+'</optgroup>';
-  document.getElementById('inboxBody').innerHTML=(S.unmatched||[]).length?(S.unmatched||[]).map((u,i)=>'<div class="inbox-item"><div class="body" style="cursor:pointer" onclick="toggleInboxBody('+i+')"><b>'+esc(u.subject)+'</b>'+(u.link?' <a href="'+esc(u.link)+'" target="_blank" onclick="event.stopPropagation()" title="Open original">&#8599;</a>':'')+'<div id="inb_body_'+i+'" style="display:none;margin-top:6px;padding:8px;background:#F4F5F9;border:1px solid var(--lgray);border-radius:4px;font-size:11px;white-space:pre-wrap">'+esc(cleanPrev(u.prev||u.note||'',2000)||'No content captured for this message. Use the link to open the original.')+'</div><div class="snip">'+esc(u.dir==='out'?('to: '+(u.who||u.sender)):u.sender)+' · '+fmtD(u.date)+' · '+u.src+'</div></div><select class="assign" onchange="assignEmail('+i+',this.value)">'+opts+'</select><button class="sm" onclick="ignoreUnmatched('+i+',false)" title="Ignore this sender">Ignore</button><button class="sm" onclick="ignoreUnmatched('+i+',true)" title="Ignore the whole domain">Ignore domain</button></div>').join(''):'<p class="muted" style="padding:14px">No unmatched emails. Sync to pull new ones.</p>';
+  document.getElementById('inboxBody').innerHTML=(S.unmatched||[]).length?(S.unmatched||[]).map((u,i)=>'<div class="inbox-item"><div class="body" style="cursor:pointer" onclick="toggleInboxBody('+i+')"><b>'+esc(u.subject)+'</b>'+(u.link?' <a href="'+esc(u.link)+'" target="_blank" onclick="event.stopPropagation()" title="Open original">&#8599;</a>':'')+'<div id="inb_body_'+i+'" style="display:none;margin-top:6px;padding:8px;background:#F4F5F9;border:1px solid var(--lgray);border-radius:4px;font-size:11px;white-space:pre-wrap">'+esc(cleanPrev(u.prev||u.note||'',2000)||'No content captured for this message. Use the link to open the original.')+'</div><div class="snip">'+esc(u.dir==='out'?('to: '+(u.who||u.sender)):u.sender)+' · '+fmtD(u.date)+' · '+u.src+'</div></div><select class="assign" onchange="assignEmail('+i+',this.value)">'+opts+'</select><button class="sm" onclick="ignoreUnmatched('+i+',false)" title="Ignore this sender">Ignore</button><button class="sm" onclick="ignoreUnmatched('+i+',true)" title="Ignore the whole domain">Ignore domain</button><button class="sm" onclick="dismissUnmatched('+i+')" title="Remove this item only">Dismiss</button></div>').join(''):'<p class="muted" style="padding:14px">No unmatched emails. Sync to pull new ones.</p>';
 }
 function toggleInboxBody(i){const el=document.getElementById('inb_body_'+i);if(el)el.style.display=el.style.display==='none'?'':'none'}
 function ignoreUnmatched(i,dom){
@@ -1543,6 +1546,13 @@ function ignoreUnmatched(i,dom){
   save();renderAll();
   toast('Ignored '+(dom&&a.includes('@')?'@'+a.split('@')[1]:a)+' — '+r.dropped+' item'+(r.dropped===1?'':'s')+' cleared');
 }
+function dismissUnmatched(i){
+  const u=(S.unmatched||[])[i];if(!u||!u.key)return;
+  S.dismissedUnmatched=S.dismissedUnmatched||{};S.dismissedUnmatched[u.key.replace(/\./g,'_')]=today();
+  S.unmatched=(S.unmatched||[]).filter((_,j)=>j!==i);
+  save();renderAll();toast('Dismissed');
+}
+function isDismissedUnmatched(k){return !!(k&&S.dismissedUnmatched&&S.dismissedUnmatched[k.replace(/\./g,'_')])}
 function assignEmail(i,val){
   const u=(S.unmatched||[])[i];if(!u||!val)return;
   const _base=u.dir==='out'?(u.who||''):(u.sender||'');
@@ -1682,6 +1692,8 @@ function applyPatchOps(ops){
         if(o.email){S.ignoredSenders[o.email.toLowerCase().replace(/\./g,'_')]=today();made++}
         else if(o.domain){S.ignoredDomains[o.domain.toLowerCase().replace(/\./g,'_')]=today();made++}
         else skipped++;
+      }else if(o.op==='dismissUnmatched'){
+        if(o.key){S.dismissedUnmatched=S.dismissedUnmatched||{};S.dismissedUnmatched[o.key.replace(/\./g,'_')]=today();S.unmatched=(S.unmatched||[]).filter(u=>u.key!==o.key);made++}else skipped++;
       }else if(o.op==='setThread'){
         seedThreads();let t=S.threads.find(x=>x.id===o.id||(x.alias||[]).includes(o.id));
         if(!t){const r=findRec(o.id);if(r){t=autoThread(r);delete t.auto;S.threads.push(t)}}
