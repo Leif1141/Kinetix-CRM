@@ -494,6 +494,7 @@ function saveDebounced(){
 // ═══════════════════════════════════════════════════════════════
 function uid(){return 'r'+Math.random().toString(36).slice(2,10)}
 function today(){return new Date().toISOString().slice(0,10)}
+function addDays(d,n){const x=new Date((d||today())+'T12:00:00Z');x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)}
 function daysAgo(d){if(!d)return 9999;return Math.floor((Date.now()-new Date(d).getTime())/864e5)}
 function esc(s){return (s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 function fmtM(v){return (v===''||v===null||v===undefined||isNaN(v))?'-':Number(v).toFixed(1)}
@@ -1692,6 +1693,10 @@ function applyPatchOps(ops){
         if(o.email){S.ignoredSenders[o.email.toLowerCase().replace(/\./g,'_')]=today();made++}
         else if(o.domain){S.ignoredDomains[o.domain.toLowerCase().replace(/\./g,'_')]=today();made++}
         else skipped++;
+      }else if(o.op==='setTouchLink'){
+        const r=patchFind(o.match);let hit=0;
+        if(r&&o.link){const tl=r.touches||{};Object.keys(tl).forEach(k=>{const t=tl[k];if(t&&!t.link&&(!o.key||k===o.key)&&(!o.date||String(t.date||'').slice(0,10)===o.date)&&(!o.subject||String(t.subject||'').toLowerCase().indexOf(String(o.subject).toLowerCase())>=0)){t.link=o.link;hit++}})}
+        if(hit)made++;else skipped++;
       }else if(o.op==='dismissUnmatched'){
         if(o.key){S.dismissedUnmatched=S.dismissedUnmatched||{};S.dismissedUnmatched[o.key.replace(/\./g,'_')]=today();S.unmatched=(S.unmatched||[]).filter(u=>u.key!==o.key);made++}else skipped++;
       }else if(o.op==='setThread'){
@@ -1948,7 +1953,8 @@ function umlMap(){
 }
 function fixUml(s){if(!s)return s;let t=String(s);umlMap().forEach(p=>{if(t.indexOf(p[0])>=0)t=t.split(p[0]).join(p[1])});return t}
 function srcLabel(t){const s=t.src||'';if(s==='Granola'||s==='Meeting')return 'Call';if(s==='Kinetix'||s==='Gmail'||s==='Email')return 'Email';return s}
-function linkWrap(t,inner){return t.link?'<a href="'+esc(t.link)+'" target="_blank" title="Open original">'+inner+'</a>':inner}
+function mailUrl(u){if(!u)return u;const m=String(u).match(/outlook\.office(?:365)?\.com\/owa\/\?ItemID=([^&]+)/i);if(m){const id=m[1];return 'https://outlook.office.com/mail/deeplink/read/'+id+'?ItemID='+id+'&exvsurl=1'}return u}
+function linkWrap(t,inner){if(!t.link)return inner;const u=mailUrl(t.link),isMail=u!==t.link||/outlook\.office/.test(u);return '<a href="'+esc(u)+'" target="'+(isMail?'kinetixmail':'_blank')+'" title="Open original">'+inner+'</a>'}
 function convTouches(r){
   let ts=touchList(r).filter(t=>!isSysNote(t));
   if(r.kind==='person'){const o=personOrg(r);if(o){const seen=new Set(ts.map(t=>(t.date||'')+'|'+(t.subject||'')));touchList(o).forEach(t=>{if(isSysNote(t))return;const k=(t.date||'')+'|'+(t.subject||'');if(!seen.has(k)){seen.add(k);ts.push(t)}});ts.sort((a,b)=>(b.date||'').localeCompare(a.date||''))}}
@@ -2018,7 +2024,7 @@ function openProfile(rec){
   '</div><div class="mcol-r">'+
     wrapUpHtml(rec)+
     '<div class="pbox"><h4>'+(isT?'Shared with':'Names you gave them')+(isT?' <button class="sm" onclick="addShare()">+ Add</button>':'')+'</h4>'+shareHtml(rec)+'</div>'+
-    '<div class="pbox"><h4>Log activity</h4><div class="inline">'+selFld('la_type','Type',ACT_TYPES,'Call')+fld('la_date','Date',today(),'date')+fld('la_txt','Subject','')+'</div><label>Note</label><textarea id="la_note" rows="2"></textarea><button class="sm primary" onclick="logActivity()" style="margin-top:4px">Log</button></div>'+
+    '<div class="pbox"><h4>Log activity</h4><div class="inline">'+selFld('la_type','Type',ACT_TYPES,'Call')+fld('la_date','Date',today(),'date')+fld('la_txt','Subject','')+'</div><label>Note</label><textarea id="la_note" rows="2"></textarea><div class="inline" style="margin-top:4px">'+fld('la_owe','I promised (becomes the open item)','')+fld('la_owe_by','By',addDays(today(),3),'date')+'</div><button class="sm primary" onclick="logActivity()" style="margin-top:4px">Log</button></div>'+
     '<div class="pbox"><h4>Activity timeline <span class="muted" style="font-weight:400">'+Object.keys(rec.touches||{}).length+' activities</span></h4>'+
       '<div class="tl-ctl">Period: <select onchange="setTlPeriod(+this.value)"><option value="13"'+(tlPeriod===13?' selected':'')+'>13 weeks</option><option value="26"'+(tlPeriod===26?' selected':'')+'>26 weeks</option><option value="52"'+(tlPeriod===52?' selected':'')+'>52 weeks</option></select> '+
       Object.keys(tlTypes).map(ty=>'<label><input type="checkbox" '+(tlTypes[ty]?'checked':'')+' onchange="toggleTlType(\''+ty+'\',this.checked)"> '+ty+'</label>').join(' ')+
@@ -2099,10 +2105,13 @@ function logActivity(){
   if(!txt){toast('Enter a subject');return}
   const key='man_'+uid();
   const t={date:date+'T12:00:00Z',dir:'out',subject:type+': '+txt,link:'',src:type,who:'',note:note||''};
+  const owe=(gv('la_owe')||'').trim(),oweBy=gv('la_owe_by')||addDays(today(),3);
+  if(owe){t.note=(t.note?t.note+' | ':'')+'Promised: '+owe}
   addTouch(r,key,t);
   // also log to linked org
   if(r.orgId){const org=findRec(r.orgId);if(org)addTouch(org,key,t)}
-  save();openProfile(r);toast('Activity logged');
+  if(owe){const line='Promised ('+type+' '+fmtD(date)+'): '+owe;r.nextAction=r.nextAction&&r.nextAction.trim()?r.nextAction.trim()+' | '+line:line;if(!r.nextDate||oweBy<r.nextDate)r.nextDate=oweBy;r.nextSet=today();_threadsCache=null}
+  save();openProfile(r);toast(owe?'Logged, promise added to open item':'Activity logged');
 }
 function calcMaths(){
   const r=profRec;if(!r)return;const el=document.getElementById('dm_out');if(!el)return;
