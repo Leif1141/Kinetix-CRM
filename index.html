@@ -279,7 +279,7 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
 
 <div class="panel" id="p-locations">
   <div class="filterbar">
-    <select id="locKind" onchange="renderLocations()"><option value="">Everyone</option><option value="advisor">Advisors</option><option value="person">People</option><option value="target">Targets</option></select>
+    <select id="locKind" onchange="renderLocations()"><option value="">Everyone</option><option value="advisor">Advisors</option><option value="person">Contacts without firm record</option><option value="target">Targets</option></select>
     <button class="sm" onclick="geocodeMissing()">Geocode new cities</button>
     <span class="muted" id="locCount"></span>
   </div>
@@ -2147,11 +2147,17 @@ function meetSignal(r){return MEET_RE.test(((r.nextAction||'')+' '+(r.notes||'')
 function nearRecords(city,km){
   const ll=cityLL(city); if(!ll)return null;
   const out=[];
-  allRecs().forEach(r=>{
-    const c=recCity(r); if(!c)return;
-    const g=cityLL(c); if(!g)return;
-    const d=distKm(ll,g); if(d>km)return;
-    out.push({r,city:c,km:Math.round(d),open:!!(r.nextAction&&r.nextAction.trim()),meet:meetSignal(r),lt:lastTouch(r)});
+  locGroups('').forEach(g=>{
+    // distance = nearest of the org city and its people's cities
+    const cities=[g.city].concat(g.people.map(recCity)).filter(Boolean);
+    let best=null,bc='';
+    cities.forEach(c=>{const ge=cityLL(c);if(!ge)return;const d=distKm(ll,ge);if(best===null||d<best){best=d;bc=c}});
+    if(best===null||best>km)return;
+    const r=g.rec;
+    const open=!!((r.nextAction&&r.nextAction.trim())||g.people.some(p=>p.nextAction&&p.nextAction.trim()));
+    const meet=meetSignal(r)||g.people.some(meetSignal);
+    const lts=[lastTouch(r)].concat(g.people.map(lastTouch)).filter(Boolean).sort().reverse();
+    out.push({r,g,city:bc,km:Math.round(best),open,meet,lt:lts[0]||null});
   });
   out.sort((a,b)=>(b.meet-a.meet)||(b.open-a.open)||(a.km-b.km));
   return out;
@@ -2166,25 +2172,30 @@ function nearbyBriefing(){
   if(rows===null){box.innerHTML='<p class="muted" style="padding:12px">'+esc(city)+' ist noch nicht geocodiert. Erst auf "Geocode new cities" klicken.</p>';return}
   if(onlyOpen)rows=rows.filter(x=>x.open);
   if(!rows.length){box.innerHTML='<p class="muted" style="padding:12px">Nobody within '+km+' km.</p>';return}
-  const GRP=x=>x.r.kind==='target'?'Zielunternehmen':x.r.kind==='person'?'Personen':'Berater und Partner';
+  const GRP=x=>x.r.kind==='target'?'Zielunternehmen':x.r.kind==='advisor'?'Berater und Partner':'Kontakte';
   const g={};rows.forEach(x=>{(g[GRP(x)]=g[GRP(x)]||[]).push(x)});
   let html='',txt='Within '+km+' km of '+city+':\n';
-  ['Zielunternehmen','Berater und Partner','Personen'].forEach(k=>{
+  ['Zielunternehmen','Berater und Partner','Kontakte'].forEach(k=>{
     if(!g[k])return;
     html+='<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b>'+k+' ('+g[k].length+')</b></div>';
     txt+='\n'+k+':\n';
     g[k].forEach(x=>{
       const age=x.lt?daysAgo(x.lt)+' Tage her':'kein Kontakt';
-      html+='<div style="padding:7px 12px;border-bottom:1px solid #F2F2F5">'
-        +'<span style="cursor:pointer;font-weight:600" onclick="openProfile(findRec(\''+x.r.id+'\'))">'+esc(dispName(x.r))+'</span>'
-        +(x.r.contact?' <span class="muted">'+esc(x.r.contact)+'</span>':'')
+      const na=(x.r.nextAction&&x.r.nextAction.trim())||(x.g.people.map(p=>p.nextAction||'').find(s=>s.trim()))||'';
+      const ppl=x.g.people.map(p=>'<span style="cursor:pointer" onclick="openProfile(findRec(\''+p.id+'\'))">'+esc(fixUml(p.name))+(p.title?' <span class="muted">('+esc(fixUml(p.title))+')</span>':'')+'</span>').join(', ');
+      const who=ppl||(x.g.contact?'<span class="muted">'+esc(fixUml(x.g.contact))+'</span>':'');
+      html+='<div style="padding:7px 12px;border-bottom:1px solid #F2F2F5;border-left:4px solid '+x.g.cat[1]+'">'
+        +'<span style="cursor:pointer;font-weight:600" onclick="openProfile(findRec(\''+x.r.id+'\'))">'+esc(x.g.name)+'</span>'
+        +' <span class="chip" style="background:'+x.g.cat[1]+';color:#fff">'+esc(x.g.cat[0])+'</span>'
+        +(who?' '+who:'')
         +' <span class="chip">'+esc(x.city)+' · '+x.km+' km</span>'
         +(x.meet?' <span class="chip" style="background:#C00000;color:#fff">Treffen offen</span>':'')
         +' <span class="muted" style="font-size:11px">'+age+'</span>'
-        +(x.open?'<div class="muted" style="font-size:12px;margin-top:2px">'+esc(x.r.nextAction.slice(0,170))+'</div>':'')
+        +(na?'<div class="muted" style="font-size:12px;margin-top:2px">'+esc(na.slice(0,170))+'</div>':'')
         +'</div>';
-      txt+='- '+dispName(x.r)+(x.r.contact?' ('+x.r.contact+')':'')+', '+x.city+', '+x.km+' km, '+age
-        +(x.meet?' [Treffen offen]':'')+(x.open?'\n  offen: '+x.r.nextAction.slice(0,170):'')+'\n';
+      const names=x.g.people.map(p=>fixUml(p.name)).join(', ')||fixUml(x.g.contact||'');
+      txt+='- '+x.g.name+(names?' ('+names+')':'')+', '+x.city+', '+x.km+' km, '+age
+        +(x.meet?' [Treffen offen]':'')+(na?'\n  offen: '+na.slice(0,170):'')+'\n';
     });
   });
   window.__brief=txt;
@@ -2215,6 +2226,61 @@ function renderClusters(){
   ).join(''):'<p class="muted" style="padding:12px">No region with three or more targets within '+km+' km yet.</p>';
 }
 let locMap=null,locLayer=null;
+// Colour and label per record category. Used by the map markers, the region list and the nearby briefing.
+function locParty(r){
+  if(!r)return ['Contact','#434F80'];
+  return r.kind==='target'?['Target','#C00000']:
+    r.kind==='person'?['Contact','#434F80']:
+    r.category==='M&A sourcing intermediaries'?['M&A advisor','#2E3C65']:
+    r.category==='Financing partners'?['Financing','#2E7D32']:
+    r.category==='Investors & family office'?['Investor / FO','#7030A0']:
+    r.category==='DD advisors'?['DD / industry advisor','#C6943E']:
+    r.category==='HR, universities & interns'?['HR / interns','#FFC000']:
+    r.category==='Admin & infrastructure'?['Admin','#595959']:
+    r.category==='Personal network'?['Personal','#A9A4C6']:['Other','#8C97B8'];
+}
+// The organisation a person belongs to: linked record, else a record whose name matches the firm text, else null.
+function personOrg(p){
+  if(p.orgId){const o=findRec(p.orgId);if(o)return o}
+  const fn=normName(p.firm||'');if(!fn)return null;
+  return allOrgs().find(o=>normName(o.firm||o.name||'')===fn)||null;
+}
+// Where an organisation sits: its own city, else the city of the first linked person who has one.
+function effCity(r){
+  const c=recCity(r);if(c||r.kind==='person')return c;
+  const p=orgPeople(r).find(x=>recCity(x));return p?recCity(p):'';
+}
+// One group per firm: a real org record with its people folded in, or the people who share a firm text, or a lone person.
+// Each group: {key, rec (org or lead person), org, name, city, cat:[label,colour], contact, people:[person records]}
+function locGroups(kindFilter){
+  const groups={},order=[];
+  const add=(key,g)=>{if(!groups[key]){groups[key]=g;order.push(key)}return groups[key]};
+  const wantOrg=!kindFilter||kindFilter!=='person';
+  const wantPerson=!kindFilter||kindFilter==='person';
+  if(wantOrg)allOrgs().forEach(o=>{
+    if(kindFilter&&o.kind!==kindFilter)return;
+    const c=effCity(o);if(!c)return;
+    add('o:'+o.id,{key:'o:'+o.id,rec:o,org:o,name:dispName(o),city:c,cat:locParty(o),contact:o.contact||'',people:[]});
+  });
+  liveOnly(S.people||[]).forEach(p=>{
+    const pc=recCity(p);if(!pc)return;
+    const o=personOrg(p);
+    if(o&&wantOrg&&(!kindFilter||o.kind===kindFilter)){
+      const g=add('o:'+o.id,{key:'o:'+o.id,rec:o,org:o,name:dispName(o),city:effCity(o)||pc,cat:locParty(o),contact:o.contact||'',people:[]});
+      g.people.push(p);if(!g.contact)g.contact=p.name;return;
+    }
+    if(!wantPerson)return;
+    if(o)return; // belongs to an org of another kind than the filter
+    const fn=normName(p.firm||'');
+    const key=fn?'f:'+fn+'|'+pc.toLowerCase():'p:'+p.id;
+    const g=add(key,{key,rec:p,org:null,name:p.firm?fixUml(p.firm):dispName(p),city:pc,cat:locParty(p),contact:'',people:[]});
+    g.people.push(p);if(!g.contact)g.contact=p.name;
+  });
+  return order.map(k=>groups[k]);
+}
+function groupLabel(g){const who=g.contact?fixUml(g.contact):'';return who&&who!==g.name?fixUml(g.name)+' · '+who:fixUml(g.name)}
+function groupChip(g){return '<span class="chip" title="'+esc(g.cat[0])+'" style="cursor:pointer;background:'+g.cat[1]+';color:#fff" onclick="openProfile(findRec(\''+g.rec.id+'\'))">'+esc(groupLabel(g))+'</span>'}
+
 // One label for every record: the person and the organisation they belong to.
 function recLabel(r){
   if(r.kind==='person'){const o=r.orgId?findRec(r.orgId):null;const firm=(o?dispName(o):r.firm)||'';return firm?fixUml(dispName(r))+' / '+fixUml(firm):fixUml(dispName(r))}
@@ -2247,41 +2313,35 @@ function clusterCities(byCity,km){
 function setLocRadius(v){S.locRadius=+v;save();renderLocations()}
 function renderLocations(){
   const kind=document.getElementById('locKind').value;
-  const recs=allRecs().filter(r=>!(!recCity(r)||(kind&&r.kind!==kind)));
-  document.getElementById('locCount').textContent=recs.length+' records with a city';
-  const byCity={};recs.forEach(r=>{const c=recCity(r);(byCity[c]=byCity[c]||[]).push(r)});
+  const groups0=locGroups(kind);
+  const nPeople=groups0.reduce((a,g)=>a+g.people.length,0);
+  document.getElementById('locCount').textContent=groups0.length+' firms and contacts with a city ('+nPeople+' people folded into their firms)';
+  const byCity={};groups0.forEach(g=>{(byCity[g.city]=byCity[g.city]||[]).push(g)});
   const cities=Object.keys(byCity).sort((a,b)=>byCity[b].length-byCity[a].length);
   const km=S.locRadius||100;
   const groups=clusterCities(byCity,km);
   const ctl='<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC;font-size:11px">Region size '
     +'<select onchange="setLocRadius(this.value)">'+[50,75,100,150,200].map(v=>'<option value="'+v+'"'+(km===v?' selected':'')+'>'+v+' km</option>').join('')+'</select>'
     +' <span class="muted">'+groups.length+' regions from '+Object.keys(byCity).length+' places</span></div>';
-  document.getElementById('locList').innerHTML=ctl+(groups.map(g=>'<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b>'+esc(g.head)+'</b> <span class="muted">('+g.recs.length+')</span>'+(g.cities.length>1?' <span class="muted" style="font-size:10px">incl. '+esc(g.cities.filter(c=>c!==g.head).join(', '))+'</span>':'')+'<br>'+g.recs.map(r=>'<span class="chip" style="cursor:pointer" onclick="openProfile(findRec(\''+r.id+'\'))">'+esc(recLabel(r))+'</span>').join(' ')+'</div>').join('')||'<p class="muted" style="padding:12px">No records with a city yet.</p>');
+  const catOrder=g=>g.cat[0]==='Target'?0:g.cat[0]==='Contact'?9:1;
+  document.getElementById('locList').innerHTML=ctl+(groups.map(g=>'<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b>'+esc(g.head)+'</b> <span class="muted">('+g.recs.length+')</span>'+(g.cities.length>1?' <span class="muted" style="font-size:10px">incl. '+esc(g.cities.filter(c=>c!==g.head).join(', '))+'</span>':'')+'<br>'+g.recs.slice().sort((a,b)=>catOrder(a)-catOrder(b)||a.name.localeCompare(b.name)).map(groupChip).join(' ')+'</div>').join('')||'<p class="muted" style="padding:12px">No records with a city yet.</p>');
   if(typeof L==='undefined')return;
   if(!locMap){locMap=L.map('locMap').setView([51.1,10.3],6);locMap.setMaxBounds([[46.5,4.5],[55.5,16.5]]);locMap.setMinZoom(5);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(locMap)}
   if(locLayer)locLayer.remove();locLayer=L.layerGroup().addTo(locMap);
   S.geoCache=S.geoCache||{};
-  const PARTY=r=>r.kind==='target'?['Target','#C00000']:
-    r.kind==='person'?['Person','#434F80']:
-    r.category==='M&A sourcing intermediaries'?['M&A advisor','#2E3C65']:
-    r.category==='Financing partners'?['Financing','#2E7D32']:
-    r.category==='Investors & family office'?['Investor / FO','#7030A0']:
-    r.category==='DD advisors'?['DD / industry advisor','#C6943E']:
-    r.category==='HR, universities & interns'?['HR / interns','#FFC000']:
-    r.category==='Admin & infrastructure'?['Admin','#595959']:
-    r.category==='Personal network'?['Personal','#A9A4C6']:['Other','#8C97B8'];
   let plotted=0;const pts=[];
   cities.forEach(c=>{
     const g=S.geoCache[c.toLowerCase()];if(!g)return;
     if(!(g[0]>=47&&g[0]<=55.2&&g[1]>=5.5&&g[1]<=15.2))return;
     plotted++;pts.push(g);
-    byCity[c].forEach((r,i)=>{
+    byCity[c].forEach((gr,i)=>{
       const n=byCity[c].length;
       const ang=2*Math.PI*i/Math.max(n,1);
       const off=n>1?0.012:0;
-      const [lbl,col]=PARTY(r);
+      const [lbl,col]=gr.cat;
       const m=L.circleMarker([g[0]+off*Math.sin(ang),g[1]+off*Math.cos(ang)],{radius:8,color:'#fff',weight:1.5,fillColor:col,fillOpacity:0.92}).addTo(locLayer);
-      m.bindPopup('<b>'+esc(dispName(r))+'</b><br><span style="color:'+col+';font-weight:700">'+lbl+'</span> · '+esc(c)+(r.contact?'<br>'+esc(r.contact):'')+'<br><a href="#" onclick="openProfile(findRec(\''+r.id+'\'));return false">Open profile →</a>');
+      const ppl=gr.people.map(p=>fixUml(p.name)).join(', ')||fixUml(gr.contact||'');
+      m.bindPopup('<b>'+esc(gr.name)+'</b><br><span style="color:'+col+';font-weight:700">'+lbl+'</span> · '+esc(c)+(ppl?'<br>'+esc(ppl):'')+'<br><a href="#" onclick="openProfile(findRec(\''+gr.rec.id+'\'));return false">Open profile →</a>');
     });
   });
   if(!locMap._legend){
@@ -2289,7 +2349,7 @@ function renderLocations(){
     lg.onAdd=function(){
       const d=L.DomUtil.create('div');
       d.style.cssText='background:#fff;padding:8px 12px;border:1px solid #D3D3D2;border-radius:4px;font:11px Arial;line-height:1.7';
-      d.innerHTML=[['Target','#C00000'],['M&A advisor','#2E3C65'],['Financing','#2E7D32'],['Investor / FO','#7030A0'],['DD / industry advisor','#C6943E'],['HR / interns','#FFC000'],['Admin','#595959'],['Personal','#A9A4C6'],['Person','#434F80']].map(x=>'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+x[1]+';margin-right:6px"></span>'+x[0]).join('<br>');
+      d.innerHTML=[['Target','#C00000'],['M&A advisor','#2E3C65'],['Financing','#2E7D32'],['Investor / FO','#7030A0'],['DD / industry advisor','#C6943E'],['HR / interns','#FFC000'],['Admin','#595959'],['Personal','#A9A4C6'],['Contact (no firm record)','#434F80']].map(x=>'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+x[1]+';margin-right:6px"></span>'+x[0]).join('<br>');
       return d;
     };
     lg.addTo(locMap);locMap._legend=lg;
