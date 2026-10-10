@@ -1712,7 +1712,7 @@ function applyPatchOps(ops){
         else skipped++;
       }else if(o.op==='setTouchLink'){
         const r=patchFind(o.match);let hit=0;
-        if(r&&o.link){const tl=r.touches||{};Object.keys(tl).forEach(k=>{const t=tl[k];if(t&&!t.link&&(!o.key||k===o.key)&&(!o.date||String(t.date||'').slice(0,10)===o.date)&&(!o.subject||String(t.subject||'').toLowerCase().indexOf(String(o.subject).toLowerCase())>=0)){t.link=o.link;hit++}})}
+        if(r&&o.link){const tl=r.touches||{};Object.keys(tl).forEach(k=>{const t=tl[k];if(t&&(!t.link||o.force)&&(!o.key||k===o.key)&&(!o.date||String(t.date||'').slice(0,10)===o.date)&&(!o.subject||String(t.subject||'').toLowerCase().indexOf(String(o.subject).toLowerCase())>=0)){t.link=o.link;hit++}})}
         if(hit)made++;else skipped++;
       }else if(o.op==='dismissUnmatched'){
         if(o.key){S.dismissedUnmatched=S.dismissedUnmatched||{};S.dismissedUnmatched[o.key.replace(/\./g,'_')]=today();S.unmatched=(S.unmatched||[]).filter(u=>u.key!==o.key);made++}else skipped++;
