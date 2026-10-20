@@ -19,6 +19,20 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:Arial,sans-serif;background:var(--bg);color:#000;font-size:13px;line-height:1.45}
 .wrap{max-width:1340px;margin:0 auto;padding:14px}
+body.wide .wrap{max-width:none;padding:10px 18px}
+.board{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.bcol{background:#F2F3F7;border-radius:6px;padding:6px;min-width:0}
+.bcol h5{margin:2px 2px 6px;font-size:12px;color:var(--deep)}
+.bcard{background:#fff;border:1px solid #E3E5EC;border-radius:5px;padding:6px 7px;margin-bottom:6px;cursor:pointer;font-size:11.5px;line-height:1.35}
+.bcard:hover{border-color:#2E3C65}
+.bcard .nm{font-weight:bold;font-size:12px}
+.bcard .na{color:#333;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin-top:3px}
+.chch{display:inline-block;font-size:10px;padding:0 5px;border-radius:3px;background:#E6E8F2;color:#2E3C65;margin-top:3px}
+.vbtn.on{background:#2E3C65;color:#fff}
+table.ps th{cursor:pointer;white-space:nowrap}
+table.ps td{vertical-align:top}
+details.psec{background:#fff;border:1px solid #E3E5EC;border-radius:6px;margin-bottom:8px}
+details.psec>summary{padding:7px 10px;cursor:pointer;font-weight:bold;color:var(--deep)}
 header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px}
 h1{font-size:20px;color:var(--deep)}
 .hdr-right{display:flex;gap:8px;align-items:center;font-size:11px;color:var(--gray)}
@@ -234,8 +248,11 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
 <div class="panel" id="p-pipeline">
   <div class="kpis" id="pipeKpis"></div>
   <div class="filterbar">
+    <button class="sm vbtn" data-v="board" onclick="setPipeView('board')">Funnel board</button><button class="sm vbtn" data-v="focus" onclick="setPipeView('focus')">Focus list</button><button class="sm vbtn" data-v="channel" onclick="setPipeView('channel')">By channel</button>
     <input id="fSearch" placeholder="Search company..." oninput="renderPipeline()">
-
+    <select id="fChan" onchange="renderPipeline()"><option value="">All channels</option></select>
+    <select id="fPrio" onchange="renderPipeline()"><option value="">All priorities</option><option>High</option><option>Medium</option><option>Low</option><option value="*">Starred only</option></select>
+    <button class="sm" onclick="toggleWide()" id="wideBtn">Wide view</button>
   </div>
   <div id="pipeBody"></div>
 </div>
@@ -355,7 +372,10 @@ const STAGE_ALIAS={'Info received':'NDA','IOI/LOI':'LOI'};
 function migrateStages(){let n=0;(S.companies||[]).forEach(c=>{if(STAGE_ALIAS[c.stage]){c.stage=STAGE_ALIAS[c.stage];n++}(c.stageLog||[]).forEach(l=>{if(STAGE_ALIAS[l.stage])l.stage=STAGE_ALIAS[l.stage]})});return n}
 const OUTREACH=['','Email','LinkedIn','Letter','Phone call','Trade conference','Advisor outreach','Referral','nexxt-change','Other'];
 const LIVE=STAGES.filter(s=>!['Closed','Dead'].includes(s));
-const CHANNELS=['','Cold email','Letter','Cold call','LinkedIn','Broker','Referral','Platform','Event','Inbound'];
+const CHANNELS=['','Own letter','Partner letter','M&A house / advisor','Trade fair','Own email','LinkedIn','Phone','Network / referral','Platform','Bank','Inbound','Other'];
+const CH_MAP={'Cold email':'Own email','Email':'Own email','Letter':'Own letter','Cold call':'Phone','Phone call':'Phone','Broker':'M&A house / advisor','Advisor outreach':'M&A house / advisor','Referral':'Network / referral','Personal network':'Network / referral','Event':'Trade fair','Trade conference':'Trade fair','nexxt-change':'Platform','Platform':'Platform','Inbound':'Inbound','LinkedIn':'LinkedIn','Other':'Other'};
+function migrateChannels(){if(S.chanMigV1)return;let n=0;(S.companies||[]).forEach(c=>{const old=c.channel||'';if(CHANNELS.includes(old)&&old)return;let ch='',via='';if(old){if(/rettig/i.test(old)){ch='Partner letter';via=old}else if(/fakuma|messe|fair/i.test(old)){ch='Trade fair';via=old}else if(/network/i.test(old)){ch='Network / referral'}else if(CH_MAP[old]){ch=CH_MAP[old]}else{ch='M&A house / advisor';via=old}}else if(c.outreachChannel){ch=CH_MAP[c.outreachChannel]||'Other'}if(ch){c.channel=ch;if(via&&!c.channelVia)c.channelVia=via;n++}});S.chanMigV1=today();if(n)save();return n}
+function chanOf(c){return c.channel||CH_MAP[c.outreachChannel]||''}
 const DEADREASONS=['No response','Not for sale','Valuation gap','Too small','Too large','Bad fit','Lost to buyer','Other'];
 const VERDICTS=['','pursue','keep looking','watch','passed'];
 function parseFlag(c){
@@ -633,11 +653,11 @@ async function silentOutlook(){
 async function syncOutlookEmails(){
   if(!outlookToken)return 0;
   const afterDate=new Date(Date.now()-45*864e5).toISOString();
-  let url='https://graph.microsoft.com/v1.0/me/messages?$filter=receivedDateTime ge '+afterDate+'&$top=100&$orderby=receivedDateTime desc&$select=id,internetMessageId,subject,receivedDateTime,sender,toRecipients,bodyPreview,webLink,hasAttachments,isDraft';
+  let url='https://graph.microsoft.com/v1.0/me/messages?$filter=receivedDateTime ge '+afterDate+'&$top=100&$orderby=receivedDateTime desc&$select=id,internetMessageId,subject,receivedDateTime,sender,toRecipients,bodyPreview,uniqueBody,webLink,hasAttachments,isDraft';
   let added=0,allMsgs=[];const attQueue=[];
   try{
     while(url&&allMsgs.length<500){
-      const res=await fetch(url,{headers:{Authorization:'Bearer '+outlookToken}});
+      const res=await fetch(url,{headers:{Authorization:'Bearer '+outlookToken,Prefer:'outlook.body-content-type="text"'}});
       if(!res.ok){if(res.status===401){outlookToken=null;document.getElementById('outlookConn').className='conn-status off';document.getElementById('outlookConn').textContent='Outlook: session expired'}throw new Error('Outlook API '+res.status)}
       const data=await res.json();
       if(data.value)allMsgs.push(...data.value);
@@ -649,7 +669,7 @@ async function syncOutlookEmails(){
       const sAddr=(msg.sender?.emailAddress?.address||'').toLowerCase();
       const _holders=[...S.companies,...S.advisors,...(S.people||[])].filter(r=>r.touches&&r.touches[key]);
       if(_holders.length){
-        if(!_holders[0].touches[key].prev&&msg.bodyPreview)_holders.forEach(r=>{r.touches[key].prev=cleanPrev(msg.bodyPreview)});
+        const _full=cleanPrev((msg.uniqueBody&&msg.uniqueBody.content)||msg.bodyPreview,1500);if(_full&&(_holders[0].touches[key].prev||'').length<_full.length)_holders.forEach(r=>{r.touches[key].prev=_full});
         if(msg.hasAttachments&&!_holders[0].touches[key].att)attQueue.push({key,id:msg.id,holders:_holders});
         return;
       }
@@ -661,7 +681,7 @@ async function syncOutlookEmails(){
       if(cand.every(isIgnoredAddr))return;
       let recs=[];
       cand.forEach(a=>{matchRecords(text,a,true).forEach(x=>{if(!recs.includes(x))recs.push(x)})});
-      const t={date:msg.receivedDateTime,dir,subject:msg.subject||'(no subject)',link:msg.webLink||'',src:'Kinetix',who:dir==='out'?recipients.join(', '):sAddr,prev:cleanPrev(msg.bodyPreview)};
+      const t={date:msg.receivedDateTime,dir,subject:msg.subject||'(no subject)',link:msg.webLink||'',src:'Kinetix',who:dir==='out'?recipients.join(', '):sAddr,prev:cleanPrev((msg.uniqueBody&&msg.uniqueBody.content)||msg.bodyPreview,1500)};
       if(recs.length){recs.forEach(r=>{addTouch(r,key,t)});added++;if(msg.hasAttachments)attQueue.push({key,id:msg.id,holders:recs})}
       else{if(!isDismissedUnmatched(key)&&!(S.unmatched||[]).some(u=>u.key===key)){S.unmatched=S.unmatched||[];S.unmatched.push({...t,key,sender:sAddr})}}
     });
@@ -940,15 +960,19 @@ function sugHead(r){
   return bits ? n+' ('+bits+')' : n;
 }
 function suggestions(){
-  const out=[];const t=today();
+  const byRec=new Map();
+  suggestionsRaw().filter(s=>!isDismissed(s.key)&&!isIgnoredRec(s.rec)).forEach(s=>{const g=byRec.get(s.rec.id);if(!g){s.also=[];byRec.set(s.rec.id,s)}else{g.also.push(s)}});
+  return [...byRec.values()];
+}
+function suggestionsRaw(){
+  const out=[];const t=today();const isDismissed=()=>false;
+  (S.companies||[]).forEach(c=>{const cd=cadenceOf(c);if(cd&&cd.next&&cd.next.due<=t)out.push({rec:c,why:'Letter sent '+fmtD(cd.sent)+': time for '+cd.next.label+(cd.via?' (via '+cd.via+')':''),tag:'Cadence',color:'#B86E1B',key:'cdz_'+c.id+'_'+cd.next.k})});
   allRecs().filter(r=>r.nextDate&&r.nextDate<=t).forEach(r=>{const k='due_'+r.id;if(!isDismissed(k))out.push({rec:r,why:'Action due: '+(r.nextAction||'follow up'),tag:'Due',color:'var(--red)',key:k})});
   S.companies.filter(c=>LIVE.includes(c.stage)&&c.stage!=='Identified'&&isStale(c)).forEach(c=>{const k='stale_'+c.id;if(!isDismissed(k))out.push({rec:c,why:c.stage+' for '+daysAgo(lastTouch(c)||(c.stageLog?.slice(-1)[0]?.date)||null)+'d with no activity',tag:'Stale',color:'#C6943E',key:k})});
   liveOnly(S.advisors||[]).filter(a=>{const lt=lastTouch(a);return lt&&daysAgo(lt)>(a.cadence||30)}).forEach(a=>{const k='cad_'+a.id;if(!isDismissed(k))out.push({rec:a,why:'Last contact '+fmtAgo(lastTouch(a))+' (cadence: '+(a.cadence||30)+'d)',tag:'Check-in',color:'var(--navy)',key:k})});
   S.companies.filter(c=>c.stage==='Dead'&&c.revisitDate&&c.revisitDate<=t).forEach(c=>{const k='rev_'+c.id;if(!isDismissed(k))out.push({rec:c,why:'Revisit date reached — consider re-engaging',tag:'Revisit',color:'var(--green)',key:k})});
   allRecs().filter(r=>r.nextAction&&r.nextSet&&lastTouch(r)&&lastTouch(r).slice(0,10)>r.nextSet).forEach(r=>{const k='ovt_'+r.id+'_'+lastTouch(r).slice(0,10);if(!isDismissed(k))out.push({rec:r,why:'Next action may be outdated, there has been new activity since it was set. Current action: "'+r.nextAction+'"',tag:'Overtaken',color:'#7030A0',key:k})});
-  const byRec=new Map();
-  out.forEach(s=>{const g=byRec.get(s.rec.id);if(!g){s.also=[];byRec.set(s.rec.id,s)}else{g.also.push(s)}});
-  return [...byRec.values()];
+  return out;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -961,7 +985,7 @@ function renderOverview(){
   const k=[['Organizations',orgs.length,'orgs'],['People',(S.people||[]).length,'people'],['Live deals',live.length,'pipeline'],['Due or overdue',due,'followups']];
   document.getElementById('ovKpis').innerHTML=k.map(x=>'<div class="kpi'+(x[0]==='Due or overdue'&&x[1]?' warn':'')+'" onclick="goTab(\''+x[2]+'\')"><div class="v">'+x[1]+'</div><div class="l">'+x[0]+'</div></div>').join('');
   const b=document.getElementById('sugBadge');b.style.display=sug.length?'inline-block':'none';b.textContent=sug.length;
-  document.getElementById('suggBody').innerHTML=sug.length?sug.map(s=>'<div class="sugg"><span class="tag" style="background:'+s.color+'">'+s.tag+'</span><div><b style="cursor:pointer" onclick="openProfile(findRec(\''+s.rec.id+'\'))">'+esc(sugHead(s.rec))+'</b><div class="why">'+esc(s.why)+(s.also&&s.also.length?'<div style="margin-top:3px">'+s.also.map(a=>'<span class="chip" style="background:'+a.color+';color:#fff">'+a.tag+'</span> '+esc(a.why)).join('<br>')+'</div>':'')+'</div></div><button class="sm" onclick="dismissSugg(\''+s.key+'\')">Dismiss</button></div>').join(''):'<p class="muted" style="padding:12px">No suggested actions right now.</p>';
+  document.getElementById('suggBody').innerHTML=sug.length?sug.map(s=>'<div class="sugg"><span class="tag" style="background:'+s.color+'">'+s.tag+'</span><div><b style="cursor:pointer" onclick="openProfile(findRec(\''+s.rec.id+'\'))">'+esc(sugHead(s.rec))+'</b><div class="why">'+esc(s.why)+(s.also&&s.also.length?'<div style="margin-top:3px">'+s.also.map(a=>'<span class="chip" style="background:'+a.color+';color:#fff">'+a.tag+'</span> '+esc(a.why)).join('<br>')+'</div>':'')+'</div></div>'+actBtns(s.rec.id,s.key)+'</div>').join(''):'<p class="muted" style="padding:12px">No suggested actions right now.</p>';
   const favs=allRecs().filter(r=>r.fav);
   document.getElementById('favBody').innerHTML=favs.length?'<table>'+favs.map(r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))"><td>'+starHtml(r)+' <b>'+esc(dispName(r))+'</b></td><td class="muted">'+fmtAgo(lastTouch(r))+'</td></tr>').join('')+'</table>':'<p class="muted" style="padding:12px">Star records to pin them here.</p>';
   document.getElementById('listsBody').innerHTML='<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959;margin-bottom:5px">Categories</div>'+autoCats().map(c=>{const n=allOrgs().filter(o=>catOf(o)===c).length;return '<button class="sm" style="margin:0 4px 4px 0" onclick="goCat(\''+esc(c).replace(/'/g,"\\'")+'\')">'+esc(c)+' ('+n+')</button>'}).join('')+'</div>'+(((S.customLists||[]).length?'':'<p class="muted" style="padding:12px 12px 0">No custom lists yet.</p>')+(S.customLists||[]).map(l=>{const items=allRecs().filter(r=>(r.lists||[]).includes(l));const open=(S._openLists||[]).includes(l);return '<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC">'+'<b style="cursor:pointer" onclick="toggleListOpen(\''+esc(l)+'\')">'+(open?'&#9662; ':'&#9656; ')+esc(l)+'</b> <span class="muted">('+items.length+')</span>'+'<button class="sm" onclick="delList(\''+esc(l)+'\')" style="float:right">&times;</button>'+'<button class="sm" onclick="goList(\''+esc(l)+'\')" style="float:right;margin-right:4px">Orgs tab</button>'+(open?'<table style="margin-top:6px">'+items.map(r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))"><td><b>'+esc(dispName(r))+'</b></td><td class="muted">'+esc(r.kind==='person'?(r.firm||''):(r.contact||''))+'</td><td class="muted">'+esc(r.kind==='person'?(r.title||''):(r.category||''))+'</td></tr>').join('')+'</table>':'')+'</div>'}).join(''));
@@ -1189,7 +1213,7 @@ function dismissSugg(k){
   S.dismissed[k]=today();
   save();renderAll();toast('Snoozed for 30 days');
 }
-function isDismissed(k){return !!(S.dismissed&&S.dismissed[k]&&daysAgo(S.dismissed[k])<30)}
+function isDismissed(k){if(S.snoozeUntil&&S.snoozeUntil[k]&&S.snoozeUntil[k]>today())return true;return !!(S.dismissed&&S.dismissed[k]&&daysAgo(S.dismissed[k])<30)}
 function newList(){const n=prompt('List name:');if(n&&!(S.customLists||[]).includes(n)){S.customLists=S.customLists||[];S.customLists.push(n);save();renderOverview()}}
 function delList(n){if(!confirm('Delete list "'+n+'"? Records stay.'))return;S.customLists=(S.customLists||[]).filter(x=>x!==n);allRecs().forEach(r=>{if(r.lists)r.lists=r.lists.filter(x=>x!==n)});save();renderAll()}
 function goTab(t){if(t==='followups')t='overview';document.querySelector('.tab[data-t="'+t+'"]')?.click()}
@@ -1299,27 +1323,109 @@ function newCompany(){return {id:uid(),kind:'target',name:'',geo:'DE',revenue:nu
 function newAdvisor(){return {id:uid(),kind:'advisor',firm:'',contact:'',email:'',domain:'',category:'M&A sourcing intermediary',geo:'',market:'',status:'Active',ptype:'',introPath:'',notes:'',detail:'',cadence:30,fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:'',links:[]}}
 function newPerson(){return {id:uid(),kind:'person',name:'',title:'',firm:'',orgId:'',email:'',phone:'',linkedin:'',city:'',market:'',ptype:'',angle:'',networkPath:'',fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:''}}
 
-function renderPipeline(){
-  const cs=S.companies||[];
-  const live=cs.filter(c=>LIVE.includes(c.stage));
-  const stale=live.filter(isStale).length;
-  const noAction=live.filter(c=>c.stage!=='Identified'&&!c.nextDate).length;
-  const k=[['Targets',cs.length],['Live deals',live.filter(c=>c.stage!=='Identified').length],['Replied+',live.filter(c=>STAGES.indexOf(c.stage)>=2&&STAGES.indexOf(c.stage)<=7).length],['Stale',stale],['No action',noAction]];
-  document.getElementById('pipeKpis').innerHTML=k.map(x=>'<div class="kpi'+(x[0]==='Stale'&&x[1]?' warn':'')+'" ><div class="v">'+x[1]+'</div><div class="l">'+x[0]+'</div></div>').join('')
-    +'<div style="flex-basis:100%;font-size:11px;color:#595959;padding:4px 2px 0">Priority: '+Object.entries(PRIO_DEF).map(([k,v])=>'<span class="pill" style="background:'+PRIO_COL[k]+';color:#fff">'+k+'</span> '+v).join(' &nbsp; ')+'</div>';
-  const q=(document.getElementById('fSearch').value||'').toLowerCase();
-  const list=cs.filter(c=>(!q||c.name.toLowerCase().includes(q)));
-  const daysIn=c=>{const l=(c.stageLog||[]).slice(-1)[0];return l&&l.date?daysAgo(l.date):null};
-  const stageSel=c=>'<select class="stagesel" onclick="event.stopPropagation()" onchange="setStatusInline(\''+c.id+'\',this.value)">'+STAGES.map(s=>'<option'+(s===c.stage?' selected':'')+'>'+s+'</option>').join('')+'</select>';
-  // One section per stage, full width, so every company is on screen without a horizontal slider.
-  document.getElementById('pipeBody').innerHTML=STAGES.filter(s=>s!=='Dead'||list.some(c=>c.stage===s)).map(s=>{
-    const items=list.filter(c=>c.stage===s).sort((a,b)=>(PRIORITIES.indexOf(a.priority||'')||9)-(PRIORITIES.indexOf(b.priority||'')||9)||dispName(a).localeCompare(dispName(b)));
-    return '<div class="section" style="margin-bottom:10px"><div class="section-hdr">'+s+' <span style="font-weight:400">('+items.length+')</span></div>'
-      +(items.length?'<table><tr><th style="width:30%">Company</th><th style="width:120px">Location</th><th style="width:110px;text-align:right">Rev / EBIT (€m)</th><th style="width:70px;text-align:right">Score</th><th style="width:90px">Priority</th><th style="width:120px">Stage</th><th style="width:80px;text-align:right">Days here</th><th style="width:90px">Last contact</th><th>Next action</th></tr>'
-        +items.map(c=>'<tr class="rowlink" onclick="openProfile(findRec(\''+c.id+'\'))"><td><b>'+esc(fixUml(dispName(c)))+'</b></td><td class="muted">'+esc(c.location||'')+'</td><td class="muted" style="text-align:right">'+fmtM(c.revenue)+' / '+fmtM(c.ebit)+'</td><td class="muted" style="text-align:right">'+(c.score!=null?Math.round(c.score):'-')+'</td><td>'+prioChip(c)+'</td><td>'+stageSel(c)+'</td><td class="muted" style="text-align:right">'+(daysIn(c)!=null?daysIn(c):'-')+'</td><td class="muted">'+fmtAgo(lastTouch(c))+'</td><td class="muted" style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.nextAction||'')+dueChip(c.nextDate)+'</td></tr>').join('')+'</table>'
-        :'<p class="muted" style="padding:8px 12px">Nothing here.</p>')+'</div>';
-  }).join('');
+// ═══ PIPELINE v2 (20.10.2026): funnel board, focus list, channel view ═══
+const CAD_STEPS=[{k:'email',d:10,label:'follow-up email'},{k:'call',d:20,label:'follow-up call'},{k:'l6',d:182,label:'second letter (6 months)'},{k:'l12',d:365,label:'third letter (12 months)'}];
+const CAD_LABEL={email:'follow-up email',call:'follow-up call',l6:'second letter (6 months)',l12:'third letter (12 months)'};
+const BOARD_COLS=[{k:'ready',t:'To approach'},{k:'Contacted',t:'Contacted'},{k:'Replied',t:'Replied'},{k:'Meeting',t:'Meeting'},{k:'NDA',t:'NDA / info'},{k:'LOI',t:'LOI'},{k:'Diligence',t:'Diligence'}];
+let pipeView=null,pipeSort={},pipeExpand={},pipeMore={};
+function cadenceOf(c){
+  if(!c||!c.letterSent)return null;
+  const sent=c.letterSent.slice(0,10),done=c.cadDone||{};
+  const ts=touchList(c).filter(t=>!isSysNote(t)&&(t.date||'').slice(0,10)>sent);
+  const replied=ts.some(t=>t.dir==='in'&&tType(t)!=='Note')||['Replied','Meeting','NDA','LOI','Diligence','Closed','Dead','On hold'].includes(c.stage);
+  const auto={email:ts.some(t=>t.dir==='out'&&tType(t)==='Email'),call:ts.some(t=>tType(t)==='Call'),l6:ts.some(t=>tType(t)==='Letter'&&daysBetween(sent,t.date)>150),l12:ts.some(t=>tType(t)==='Letter'&&daysBetween(sent,t.date)>330)};
+  const steps=CAD_STEPS.map(s=>({k:s.k,label:s.label,due:addDays(sent,s.d),done:!!(done[s.k]||auto[s.k])}));
+  const next=replied?null:steps.find(s=>!s.done)||null;
+  return {sent,via:c.channel==='Partner letter'?(c.channelVia||''):'',replied,steps,next};
 }
+function daysBetween(a,b){return Math.round((new Date((b||'').slice(0,10)+'T12:00:00Z')-new Date((a||'').slice(0,10)+'T12:00:00Z'))/864e5)}
+function cadChip(c){const cd=cadenceOf(c);if(!cd)return '';if(cd.replied)return '<span class="chch" style="background:#E3F1E4;color:#2E7D32">replied</span>';if(!cd.next)return '';const od=cd.next.due<=today();return '<span class="chch" style="'+(od?'background:#FBE3D6;color:#9A3B12':'')+'">'+cd.next.label+' '+fmtD(cd.next.due)+'</span>'}
+function letterBox(rec){
+  const cd=cadenceOf(rec);
+  const st=cd?('Letter sent '+fmtD(cd.sent)+(cd.via?' via '+esc(cd.via):'')+' &middot; '+(cd.replied?'reply received, cadence stopped':cd.next?'next: '+cd.next.label+' on '+fmtD(cd.next.due):'cadence complete')):(rec.letterStatus==='ready'?'Letter ready, not yet sent':'No letter yet');
+  const steps=cd?'<div style="font-size:11px;margin-top:4px">'+cd.steps.map(s=>(s.done?'&#10003; ':'&#9675; ')+s.label+' '+fmtD(s.due)).join(' &nbsp; ')+'</div>':'';
+  return '<div style="margin-top:8px;padding:8px;border:1px solid #E3E5EC;border-radius:5px"><label style="margin:0">Letter cadence</label><div style="font-size:12px">'+st+'</div>'+steps+
+    '<div style="margin-top:6px"><button class="sm" onclick="markLetterSent(\''+rec.id+'\')">Letter sent...</button> <button class="sm" onclick="toggleLetterReady(\''+rec.id+'\')">'+(rec.letterStatus==='ready'?'Unmark ready':'Mark letter ready')+'</button></div></div>';
+}
+function markLetterSent(id){
+  const r=findRec(id);if(!r)return;
+  const d=prompt('Date the letter went out (YYYY-MM-DD):',today());if(d===null)return;
+  const dt=/^\d{4}-\d{2}-\d{2}$/.test(d.trim())?d.trim():today();
+  const via=prompt('Sent by (leave empty if your own letter, e.g. Rettig Family Capital):',r.channel==='Partner letter'?(r.channelVia||''):'');if(via===null)return;
+  const first=!r.letterSent;
+  addTouch(r,'letter_'+dt+'_'+uid(),{date:dt+'T12:00:00Z',dir:'out',src:'Letter',subject:'Letter: '+(first?'first letter':'follow-up letter')+(via?' (via '+via+')':''),who:r.contact||'',note:''});
+  if(first){r.letterSent=dt;if(!r.channel||!CHANNELS.includes(r.channel))r.channel=via?'Partner letter':'Own letter';if(via)r.channelVia=via}
+  else{const ds=daysBetween(r.letterSent,dt);r.cadDone=r.cadDone||{};if(ds>330)r.cadDone.l12=dt;else if(ds>150)r.cadDone.l6=dt}
+  r.letterStatus='sent';
+  if(r.stage==='Identified'){r.stage='Contacted';r.stageLog=r.stageLog||[];r.stageLog.push({stage:'Contacted',date:dt})}
+  save();openProfile(r);renderAll();toast('Letter logged, cadence running');
+}
+function toggleLetterReady(id){const r=findRec(id);if(!r)return;r.letterStatus=r.letterStatus==='ready'?'':'ready';save();openProfile(r);renderAll()}
+function setPipeView(v){pipeView=v;try{localStorage.setItem('kxPipeView',v)}catch(e){}renderPipeline()}
+function toggleWide(){const on=!document.body.classList.contains('wide');document.body.classList.toggle('wide',on);try{localStorage.setItem('kxWide',on?'1':'')}catch(e){}const b=document.getElementById('wideBtn');if(b)b.textContent=on?'Normal width':'Wide view'}
+function pipeSortClick(tid,k){const p=pipeSort[tid]||{};pipeSort[tid]={k,d:p.k===k?-(p.d||1):1};renderPipeline()}
+function pTable(tid,cols,items,limit){
+  const st=pipeSort[tid];
+  if(st){const col=cols.find(c=>c.k===st.k);if(col)items=[...items].sort((a,b)=>{const x=col.v(a),y=col.v(b);return (x==null||x==='')-(y==null||y==='')||(typeof x==='number'&&typeof y==='number'?x-y:String(x).localeCompare(String(y)))*st.d})}
+  const shown=limit&&!pipeMore[tid]?items.slice(0,limit):items;
+  return '<table class="ps"><tr>'+cols.map(c=>'<th style="'+(c.w?'width:'+c.w+';':'')+(c.num?'text-align:right':'')+'" onclick="pipeSortClick(\''+tid+'\',\''+c.k+'\')">'+c.t+(st&&st.k===c.k?(st.d>0?' &#9650;':' &#9660;'):'')+'</th>').join('')+'</tr>'+
+    shown.map(r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))">'+cols.map(c=>'<td'+(c.num?' style="text-align:right"':'')+(c.muted?' class="muted"':'')+'>'+c.h(r)+'</td>').join('')+'</tr>').join('')+'</table>'+
+    (limit&&items.length>limit?'<div style="padding:6px 10px"><button class="sm" onclick="pipeMore[\''+tid+'\']=!pipeMore[\''+tid+'\'];renderPipeline()">'+(pipeMore[tid]?'Show fewer':'Show all '+items.length)+'</button></div>':'');
+}
+function cardSort(a,b){const od=x=>x.nextDate&&x.nextDate<=today()?0:1;const pr=x=>{const i=PRIORITIES.indexOf(x.priority||'');return i<=0?9:i};return od(a)-od(b)||(b.fav?1:0)-(a.fav?1:0)||pr(a)-pr(b)||(a.nextDate||'9').localeCompare(b.nextDate||'9')||dispName(a).localeCompare(dispName(b))}
+function bCard(c){const ch=chanOf(c);return '<div class="bcard" onclick="openProfile(findRec(\''+c.id+'\'))"><div class="nm">'+(c.fav?'&#9733; ':'')+esc(fixUml(dispName(c)))+'</div><div class="muted">'+(c.ebit!=null&&c.ebit!==''?'EBIT '+fmtM(c.ebit):'')+(c.revenue?' &middot; Rev '+fmtM(c.revenue):'')+(c.location?' &middot; '+esc(c.location):'')+'</div>'+(ch?'<span class="chch">'+esc(ch)+(c.channelVia&&ch==='Partner letter'?': '+esc(c.channelVia.split(' ')[0]):'')+'</span> ':'')+cadChip(c)+(c.nextAction?'<div class="na">'+esc(c.nextAction)+'</div>':'')+(c.nextDate?dueChip(c.nextDate):'')+'</div>'}
+function renderPipeline(){
+  if(!pipeView){try{pipeView=localStorage.getItem('kxPipeView')||'board'}catch(e){pipeView='board'}try{if(localStorage.getItem('kxWide')==='1'&&!document.body.classList.contains('wide'))toggleWide()}catch(e){}}
+  document.querySelectorAll('#p-pipeline .vbtn').forEach(b=>b.classList.toggle('on',b.dataset.v===pipeView));
+  const cs=(S.companies||[]).filter(c=>c.kind!=='advisor'&&!c.archived);
+  const fc=document.getElementById('fChan');if(fc&&fc.options.length<2)fc.innerHTML='<option value="">All channels</option>'+CHANNELS.filter(Boolean).map(c=>'<option>'+c+'</option>').join('');
+  const q=(document.getElementById('fSearch').value||'').toLowerCase(),fch=fc?fc.value:'',fpr=(document.getElementById('fPrio')||{}).value||'';
+  const list=cs.filter(c=>(!q||(c.name||'').toLowerCase().includes(q)||(c.location||'').toLowerCase().includes(q))&&(!fch||chanOf(c)===fch)&&(!fpr||(fpr==='*'?c.fav:c.priority===fpr)));
+  const active=list.filter(c=>['Contacted','Replied','Meeting','NDA','LOI','Diligence'].includes(c.stage));
+  const ready=list.filter(c=>c.stage==='Identified'&&(c.letterStatus==='ready'||c.fav));
+  const t=today(),d30=addDays(t,-30);
+  const appr30=cs.filter(c=>(c.stageLog||[]).some(l=>l.stage==='Contacted'&&l.date>=d30)||(c.letterSent&&c.letterSent>=d30)).length;
+  const k=[['Live deals',active.length],['Approached (30d)',appr30],['Replied or further',active.filter(c=>c.stage!=='Contacted').length],['Overdue',active.filter(c=>c.nextDate&&c.nextDate<t).length+list.filter(c=>{const cd=cadenceOf(c);return cd&&cd.next&&cd.next.due<=t}).length],['To approach',ready.length]];
+  document.getElementById('pipeKpis').innerHTML=k.map(x=>'<div class="kpi'+(x[0]==='Overdue'&&x[1]?' warn':'')+'"><div class="v">'+x[1]+'</div><div class="l">'+x[0]+'</div></div>').join('')+
+    '<div style="flex-basis:100%;font-size:11px;color:#595959;padding:4px 2px 0">Priority comes from the score (60+ High, 40-60 Medium, below 40 Low). Star a company to pin it to "To approach" and the focus list.</div>';
+  const stageSel=c=>'<select class="stagesel" onclick="event.stopPropagation()" onchange="setStatusInline(\''+c.id+'\',this.value)">'+STAGES.map(s=>'<option'+(s===c.stage?' selected':'')+'>'+s+'</option>').join('')+'</select>';
+  const C={
+    name:{k:'name',t:'Company',w:'22%',v:c=>dispName(c),h:c=>(c.fav?'&#9733; ':'')+'<b>'+esc(fixUml(dispName(c)))+'</b>'},
+    loc:{k:'loc',t:'Location',v:c=>c.location||'',h:c=>esc(c.location||''),muted:1},
+    ebit:{k:'ebit',t:'EBIT',num:1,v:c=>c.ebit==null||c.ebit===''?null:+c.ebit,h:c=>fmtM(c.ebit),muted:1},
+    rev:{k:'rev',t:'Rev',num:1,v:c=>c.revenue==null||c.revenue===''?null:+c.revenue,h:c=>fmtM(c.revenue),muted:1},
+    score:{k:'score',t:'Score',num:1,v:c=>c.score==null||c.score===''?null:+c.score,h:c=>c.score!=null&&c.score!==''?Math.round(c.score):'-',muted:1},
+    prio:{k:'prio',t:'Priority',v:c=>{const i=PRIORITIES.indexOf(c.priority||'');return i<=0?9:i},h:c=>prioChip(c)},
+    stage:{k:'stage',t:'Stage',v:c=>STAGES.indexOf(c.stage),h:c=>stageSel(c)},
+    chan:{k:'chan',t:'Channel',v:c=>chanOf(c),h:c=>esc(chanOf(c))+(c.channelVia?'<div class="muted" style="font-size:10px">'+esc(c.channelVia.slice(0,40))+'</div>':''),muted:1},
+    next:{k:'next',t:'Next step',w:'34%',v:c=>c.nextAction||'',h:c=>esc(c.nextAction||'')+' '+cadChip(c)},
+    due:{k:'due',t:'Due',v:c=>c.nextDate||'9999',h:c=>dueChip(c.nextDate)},
+    last:{k:'last',t:'Last contact',v:c=>lastTouch(c)||'',h:c=>fmtAgo(lastTouch(c)),muted:1},
+    days:{k:'days',t:'Days in stage',num:1,v:c=>{const l=(c.stageLog||[]).slice(-1)[0];return l&&l.date?daysAgo(l.date):null},h:c=>{const l=(c.stageLog||[]).slice(-1)[0];return l&&l.date?daysAgo(l.date):'-'},muted:1},
+    reason:{k:'reason',t:'Reason',w:'36%',v:c=>c.deadReason||c.flag||'',h:c=>esc(c.deadReason||c.lastSummary||c.flag||'')},
+    when:{k:'when',t:'Since',v:c=>{const l=(c.stageLog||[]).slice(-1)[0];return l?l.date:''},h:c=>{const l=(c.stageLog||[]).slice(-1)[0];return l?fmtD(l.date):'-'},muted:1}
+  };
+  const sec=(id,title,items,cols,limit,open)=>'<details class="psec"'+(open||pipeExpand[id]?' open':'')+' ontoggle="pipeExpand[\''+id+'\']=this.open"><summary>'+title+' <span style="font-weight:400">('+items.length+')</span></summary>'+(items.length?pTable(id,cols,items,limit):'<p class="muted" style="padding:6px 10px">None.</p>')+'</details>';
+  const idl=list.filter(c=>c.stage==='Identified'),hold=list.filter(c=>c.stage==='On hold'),dead=list.filter(c=>c.stage==='Dead'),closed=list.filter(c=>c.stage==='Closed');
+  const lower=sec('idl','Identified, not yet approached',idl,[C.name,C.loc,C.rev,C.ebit,C.score,C.prio,C.chan,C.next],50)+
+    sec('hold','On hold',hold,[C.name,C.loc,C.ebit,C.score,C.reason,C.when,C.next],50)+
+    sec('dead','Passed',dead,[C.name,C.loc,C.ebit,C.chan,C.reason,C.when],50)+(closed.length?sec('closed','Closed',closed,[C.name,C.ebit,C.when],0):'');
+  let body='';
+  if(pipeView==='focus'){
+    const fl=[...new Map([...active,...ready,...list.filter(c=>c.fav&&c.stage!=='Dead')].map(c=>[c.id,c])).values()];
+    if(!pipeSort.focus)fl.sort(cardSort);
+    body='<div class="section">'+pTable('focus',[C.name,C.stage,C.chan,C.ebit,C.next,C.due,C.last],fl,0)+'</div>'+lower;
+  }else if(pipeView==='channel'){
+    const reached=c=>['Contacted','Replied','Meeting','NDA','LOI','Diligence','Closed','On hold','Dead'].includes(c.stage)&&(c.stageLog||[]).some(l=>l.stage==='Contacted')||c.letterSent||!['Identified'].includes(c.stage);
+    const rows=CHANNELS.filter(Boolean).concat(['(none)']).map(ch=>{const g=list.filter(c=>(chanOf(c)||'(none)')===ch&&c.stage!=='Identified');return {ch,g,appr:g.length,rep:g.filter(c=>STAGES.indexOf(c.stage)>=2&&STAGES.indexOf(c.stage)<=7||(c.stageLog||[]).some(l=>['Replied','Meeting','NDA','LOI'].includes(l.stage))).length,meet:g.filter(c=>(c.stageLog||[]).some(l=>['Meeting','NDA','LOI','Diligence','Closed'].includes(l.stage))).length,pass:g.filter(c=>c.stage==='Dead').length}}).filter(x=>x.appr);
+    body='<div class="section"><table class="ps"><tr><th>Channel</th><th style="text-align:right">Approached</th><th style="text-align:right">Replied</th><th style="text-align:right">Meeting+</th><th style="text-align:right">Passed</th><th>Companies</th></tr>'+rows.map(x=>'<tr><td><b>'+esc(x.ch)+'</b></td><td style="text-align:right">'+x.appr+'</td><td style="text-align:right">'+x.rep+'</td><td style="text-align:right">'+x.meet+'</td><td style="text-align:right">'+x.pass+'</td><td style="font-size:11px">'+x.g.slice(0,60).map(c=>'<a href="#" onclick="openProfile(findRec(\''+c.id+'\'));return false">'+esc(fixUml(dispName(c)))+'</a> <span class="muted">('+c.stage+')</span>').join(', ')+'</td></tr>').join('')+'</table></div>'+lower;
+  }else{
+    const colItems=k=>k==='ready'?ready:list.filter(c=>c.stage===k);
+    body='<div class="board">'+BOARD_COLS.map(col=>{const its=colItems(col.k).sort(cardSort);const lim=pipeExpand['b_'+col.k]?its.length:8;return '<div class="bcol"><h5>'+col.t+' <span style="font-weight:400;color:#595959">'+its.length+'</span></h5>'+its.slice(0,lim).map(bCard).join('')+(its.length>8?'<button class="sm" style="width:100%" onclick="pipeExpand[\'b_'+col.k+'\']=!pipeExpand[\'b_'+col.k+'\'];renderPipeline()">'+(pipeExpand['b_'+col.k]?'Show fewer':'+'+(its.length-8)+' more')+'</button>':'')+'</div>'}).join('')+'</div>'+lower;
+  }
+  document.getElementById('pipeBody').innerHTML=body;
+}
+
 function dropCard(ev,colEl){
   ev.preventDefault();colEl.classList.remove('dragover');
   const id=ev.dataTransfer.getData('text');const c=findRec(id);if(!c)return;
@@ -1341,7 +1447,7 @@ function completeAction(id,ev){
   if(ev)ev.stopPropagation();
   const r=findRec(id);if(!r)return;
   logDone(r,r.nextAction);
-  r.nextDate='';r.nextAction='';r.priority='';r.nextSet='';
+  r.nextDate='';r.nextAction='';r.nextSet='';
   if(S.dismissed)delete S.dismissed['due_'+r.id];
   save();renderAll();toast('Logged as done');
 }
@@ -1358,18 +1464,34 @@ function quickSetAction(id,ev){
   r.nextSet=today();
   save();renderAll();
 }
-function snoozeAction(id,ev){
+function snoozeAction(id,ev,days){
   if(ev)ev.stopPropagation();
-  const r=findRec(id);if(!r)return;
-  const d=new Date((r.nextDate&&r.nextDate>=today())?r.nextDate:today());d.setDate(d.getDate()+7);
+  const r=findRec(id);if(!r)return;days=days||7;
+  const d=new Date((r.nextDate&&r.nextDate>=today())?r.nextDate:today());d.setDate(d.getDate()+days);
   r.nextDate=d.toISOString().slice(0,10);
   save();renderAll();toast('Pushed to '+r.nextDate);
 }
+function isIgnoredRec(r){if(!r||!r.ignored)return false;const lt=lastTouch(r);return !(lt&&lt.slice(0,10)>r.ignored)}
+function ignoreRec(id,ev){if(ev)ev.stopPropagation();const r=findRec(id);if(!r)return;r.ignored=today();save();renderAll();toast('Ignored until new activity')}
+function unignoreRec(id,ev){if(ev)ev.stopPropagation();const r=findRec(id);if(!r)return;delete r.ignored;save();renderAll()}
+function sugKeysOf(id){return suggestionsRaw().filter(s=>s.rec.id===id).map(s=>s.key)}
+function sugAct(kind,id,key,ev){if(ev)ev.stopPropagation();const r=findRec(id);if(!r)return;
+  if(kind==='done'){
+    if(key.startsWith('cdz_')){const step=key.split('_').pop();r.cadDone=r.cadDone||{};r.cadDone[step]=today();logDone(r,'Cadence: '+(CAD_LABEL[step]||step));save();renderAll();toast('Cadence step done');return}
+    if(r.nextAction){completeAction(id);return}
+    S.dismissed=S.dismissed||{};sugKeysOf(id).forEach(k=>S.dismissed[k]=today());save();renderAll();toast('Done');return}
+  if(kind==='ignore'){ignoreRec(id);return}
+  const days=kind==='1m'?30:7;
+  if(r.nextDate&&r.nextDate<=addDays(today(),days)){const d=new Date((r.nextDate>=today())?r.nextDate:today());d.setDate(d.getDate()+days);r.nextDate=d.toISOString().slice(0,10)}
+  S.snoozeUntil=S.snoozeUntil||{};const until=addDays(today(),days);sugKeysOf(id).forEach(k=>S.snoozeUntil[k]=until);
+  save();renderAll();toast('Snoozed until '+fmtD(until));
+}
+function actBtns(id,key){key=key||('due_'+id);return '<span style="white-space:nowrap"><button class="sm primary" onclick="sugAct(\'done\',\''+id+'\',\''+key+'\',event)" title="Log as done">Done</button> <button class="sm" onclick="sugAct(\'1w\',\''+id+'\',\''+key+'\',event)">+1w</button> <button class="sm" onclick="sugAct(\'1m\',\''+id+'\',\''+key+'\',event)">+1m</button> <button class="sm" onclick="sugAct(\'ignore\',\''+id+'\',\''+key+'\',event)" title="Hide until there is new activity">Ignore</button></span>'}
 function snoozeSugg(k,ev){if(ev)ev.stopPropagation();dismissSugg(k)}
 function renderFollowups(){
   const t=today();
   const live=(S.companies||[]).filter(c=>LIVE.includes(c.stage));
-  const withDates=allRecs().filter(r=>r.nextDate);
+  const withDates=allRecs().filter(r=>r.nextDate&&!isIgnoredRec(r));
   const overdue=withDates.filter(r=>r.nextDate<t);
   const dueToday=withDates.filter(r=>r.nextDate===t);
   const week=withDates.filter(r=>r.nextDate>t&&daysAgo(r.nextDate)>-8);
@@ -1382,7 +1504,7 @@ function renderFollowups(){
   const pr={'Urgent':0,'High':1,'Medium':2,'':3,undefined:3};
   const psort=(a,b)=>pr[a.priority]-pr[b.priority]||((a.nextDate||'9').localeCompare(b.nextDate||'9'));
   const sec=(title,items,color,render)=>items.length?'<div class="section"><div class="section-hdr" style="background:'+color+'">'+title+' ('+items.length+')</div><table>'+items.map(render).join('')+'</table></div>':'';
-  const row=r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))"><td style="width:118px;white-space:nowrap"><button class="sm primary" onclick="event.stopPropagation();completeAction(\''+r.id+'\',event)" title="Log as done and clear it">Done</button> <button class="sm" onclick="event.stopPropagation();snoozeAction(\''+r.id+'\',event)" title="Push the date out by a week">+1w</button></td><td style="width:30%"><b>'+esc(dispName(r))+'</b></td><td>'+esc(r.nextAction||'')+'</td><td>'+dueChip(r.nextDate)+'</td><td>'+prioChip(r)+'</td><td class="muted">'+fmtAgo(lastTouch(r))+'</td></tr>';
+  const row=r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))"><td style="width:230px">'+actBtns(r.id)+'</td><td style="width:30%"><b>'+esc(dispName(r))+'</b></td><td>'+esc(r.nextAction||'')+'</td><td>'+dueChip(r.nextDate)+'</td><td>'+prioChip(r)+'</td><td class="muted">'+fmtAgo(lastTouch(r))+'</td></tr>';
   const acts=(id,key)=>'<td style="width:180px;text-align:right;white-space:nowrap"><button class="sm" onclick="quickSetAction(\''+id+'\',event)">Set action</button> <button class="sm" onclick="snoozeSugg(\''+key+'\',event)">Dismiss</button></td>';
   const rowS=c=>'<tr class="rowlink" onclick="openProfile(findRec(\''+c.id+'\'))"><td style="width:30%"><b>'+esc(c.name)+'</b></td><td>'+stagePill(c.stage)+'</td><td class="muted">Last: '+fmtAgo(lastTouch(c))+'</td>'+acts(c.id,'stale_'+c.id)+'</tr>';
   const rowR=c=>'<tr class="rowlink" onclick="openProfile(findRec(\''+c.id+'\'))"><td style="width:30%"><b>'+esc(c.name)+'</b></td><td class="muted">Revisit date: '+fmtD(c.revisitDate)+'</td>'+acts(c.id,'rev_'+c.id)+'</tr>';
@@ -1396,6 +1518,8 @@ function renderFollowups(){
     sec('No action scheduled',noAction,'#8C97B8',rowS)+
     sec('Resurrect (revisit date passed)',resurrect,'var(--green)',rowR)+
     sec('Advisor check-in due',advDue,'var(--navy2)',rowA)||'<p class="muted" style="padding:14px">All clear — no overdue actions or stale deals.</p>';
+  const ign=allRecs().filter(isIgnoredRec);
+  if(ign.length)document.getElementById('fuBody').innerHTML+='<p class="muted" style="font-size:11px;padding:4px 8px">Ignored until new activity: '+ign.map(r=>esc(dispName(r))+' <a href="#" onclick="unignoreRec(\''+r.id+'\',event);return false">restore</a>').join(' &middot; ')+'</p>';
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1722,7 +1846,7 @@ function applyPatchOps(ops){
         if(t&&o.fields){['r','a','o','e','due','p','cat'].forEach(k=>{if(o.fields[k]!==undefined)t[k]=o.fields[k]});_threadsCache=null;made++}else skipped++;
       }else if(o.op==='setField'){
         const r=patchFind(o.match);
-        const _ok=['notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict','outreachChannel','stage'];
+        const _ok=['notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict','outreachChannel','stage','channel','channelVia','letterSent','letterStatus','fav','ignored','cadDone'];
         if(r&&o.field&&_ok.includes(o.field)){if(o.field==='stage'&&r.stage!==o.value){r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.value,date:o.date||today()})}r[o.field]=o.value;made++}else if(o.op==='addList'){
         if(o.name){S.customLists=S.customLists||[];if(!S.customLists.includes(o.name))S.customLists.push(o.name);made++}else skipped++;
       }else if(o.op==='renameList'){
@@ -1898,7 +2022,8 @@ async function checkDriveUpdates(auto){
 // ═══════════════════════════════════════════════════════════════
 // PROFILE / MODAL
 // ═══════════════════════════════════════════════════════════════
-function fld(id,label,valu,type){return '<div><label>'+label+'</label><input id="'+id+'" type="'+(type||'text')+'" value="'+esc(valu||'')+'"></div>'}
+function fld(id,label,valu,type){return '<div><label>'+label+'</label><input id="'+id+'" type="'+(type||'text')+'"'+(type==='number'?' step="0.1"':'')+' value="'+esc(valu??'')+'"></div>'}
+function n1(v){return (v===''||v===null||v===undefined||isNaN(v))?'':(Math.round(+v*10)/10).toFixed(1)}
 function selFld(id,label,opts,cur){const has=cur==null||cur===''||opts.includes(cur);return '<div><label>'+label+'</label><select id="'+id+'">'+opts.map(o=>'<option'+(o===cur?' selected':'')+'>'+esc(o)+'</option>').join('')+(has?'':'<option selected>'+esc(cur)+'</option>')+'</select></div>'}
 function gv(id){const e=document.getElementById(id);return e?e.value.trim():undefined}
 
@@ -1931,7 +2056,7 @@ function addLink(){const t=prompt('Link title:');if(!t)return;const u=prompt('UR
 function listChips(r){return '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px;align-items:start">'+(S.customLists||[]).map(l=>'<label style="font-size:11px;display:flex;align-items:flex-start;gap:5px;text-transform:none;margin:0;line-height:1.3"><input type="checkbox" style="margin:0" '+(((r.lists||[]).includes(l))?'checked':'')+' onchange="toggleList(\''+r.id+'\',\''+esc(l)+'\',this.checked)"> '+esc(l)+'</label>').join('')+'</div>'}
 function toggleList(id,l,on){const r=findRec(id);r.lists=r.lists||[];if(on&&!r.lists.includes(l))r.lists.push(l);if(!on)r.lists=r.lists.filter(x=>x!==l);save()}
 
-let tlPeriod=13,tlTypes={Email:true,Meeting:true,Call:true,Note:true};
+let tlPeriod=13,tlTypes={Email:true,Meeting:true,Call:true,Note:true,Letter:true};
 function drawTimeline(r){
   const el=document.getElementById('profTl');if(!el)return;
   if(profChart){try{profChart.destroy()}catch(e){}}
@@ -2009,14 +2134,14 @@ function openProfile(rec){
   const detailL=isT?
     fld('e_name','Company name',rec.name)+
     '<div class="pgrid">'+fld('e_tcontact','Primary contact (owner / MD)',rec.contact)+fld('e_temail','Email',rec.email)+fld('e_tphone','Phone',rec.phone)+fld('e_tdomain','Website',rec.domain)+'</div>'+
-    '<div class="pgrid">'+selFld('e_stage','Stage',STAGES,rec.stage)+fld('e_rev','Revenue (€m)',rec.revenue,'number')+fld('e_ebitda','EBITDA (€m)',rec.ebitda,'number')+fld('e_ebit','EBIT (€m)',rec.ebit,'number')+fld('e_gm','Gross margin %',rec.gm?rec.gm*100:null,'number')+selFld('e_chan','Sourcing route',CHANNELS,rec.channel)+selFld('e_outreach','First contact via',OUTREACH,rec.outreachChannel)+fld('e_loc','Location',rec.location)+'</div>'+
+    '<div class="pgrid">'+selFld('e_stage','Stage',STAGES,rec.stage)+fld('e_rev','Revenue (€m)',n1(rec.revenue),'number')+fld('e_ebitda','EBITDA (€m)',n1(rec.ebitda),'number')+fld('e_ebit','EBIT (€m)',n1(rec.ebit),'number')+fld('e_gm','Gross margin %',rec.gm?n1(rec.gm*100):null,'number')+selFld('e_chan','Channel',CHANNELS,chanOf(rec))+fld('e_chvia','Via (partner, fair, contact)',rec.channelVia)+fld('e_loc','Location',rec.location)+'</div>'+
     '<label>Description</label><textarea id="e_desc" rows="2">'+esc(rec.description||'')+'</textarea>'+
     '<label>Ownership</label><input id="e_own" value="'+esc(rec.ownership||'')+'">'+
     '<label>Flag</label><input id="e_flag" value="'+esc(rec.flag||'')+'">'+
     '<div class="pgrid">'+fld('e_score','Score /100',rec.score,'number')+selFld('e_verdict','Verdict',VERDICTS,rec.verdict)+'</div>'+
     '<label>Research notes</label><textarea id="e_tnotes" rows="6" style="width:100%;font-size:11px">'+esc(rec.notes||'')+'</textarea>'+
     (rec.stage==='Dead'?selFld('e_dr','Dead reason',DEADREASONS,rec.deadReason)+fld('e_revd','Revisit date',rec.revisitDate,'date'):'')+
-    '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+'<label>Next action</label><textarea id="e_na" rows="3" style="width:100%">'+esc(rec.nextAction||'')+'</textarea>':
+    '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+'<label>Next action</label><textarea id="e_na" rows="3" style="width:100%">'+esc(rec.nextAction||'')+'</textarea>'+letterBox(rec):
   isA?
     fld('e_firm','Firm name',rec.firm)+fld('e_contact','Primary contact',rec.contact)+fld('e_email','Email',rec.email)+fld('e_domain','Domain',rec.domain)+
     '<div class="pgrid">'+selFld('e_cat','Category',['M&A sourcing intermediaries','Financing partners','DD advisors','Investors & family office','Executive search','HR, universities & interns','Admin & infrastructure','Personal network','Other'],rec.category)+selFld('e_market','Market',['DE','UK'],rec.market||(/uk|united kingdom/i.test(rec.geo||'')?'UK':'DE'))+selFld('e_geo2','Geo (country)',['Germany','United Kingdom','Switzerland','France','Netherlands','Luxembourg','Sweden','Denmark','Austria','United States','Other'],rec.geo)+'</div>'+
@@ -2064,7 +2189,7 @@ function saveProfile(){
     const ns=gv('e_stage');if(ns!==r.stage){r.stage=ns;r.stageLog=r.stageLog||[];r.stageLog.push({stage:ns,date:today()})}
     r.geo=r.geo||'DE';r.revenue=+gv('e_rev')||null;r.ebitda=+gv('e_ebitda')||null;r.ebit=+gv('e_ebit')||null;
     const gm=+gv('e_gm');r.gm=gm?gm/100:null;
-    r.channel=gv('e_chan');r.outreachChannel=gv('e_outreach');r.location=gv('e_loc');r.description=gv('e_desc');r.ownership=gv('e_own');r.flag=gv('e_flag');
+    r.channel=gv('e_chan');r.channelVia=gv('e_chvia');r.location=gv('e_loc');r.description=gv('e_desc');r.ownership=gv('e_own');r.flag=gv('e_flag');
     r.contact=gv('e_tcontact');r.email=gv('e_temail');r.phone=gv('e_tphone');r.domain=gv('e_tdomain');r.notes=gv('e_tnotes');
     r.score=gv('e_score')!==''?+gv('e_score'):(r.score??null);r.verdict=gv('e_verdict')||'';
     if(r.stage==='Dead'){r.deadReason=gv('e_dr');r.revisitDate=gv('e_revd')}
@@ -2393,7 +2518,7 @@ async function geocodeMissing(){
   }
   save();renderLocations();toast('Geocoding done');
 }
-function renderAll(){if(!S)return;_shareIdx=null;_threadsCache=null;try{migrateStages()}catch(e){}try{migratePrevClean()}catch(e){}renderOverview();renderYield();renderQueue();renderGlobalSearch();renderOrgs();renderPeople();renderPipeline();renderFollowups();renderThreads();renderInbox();renderReports();renderData();if(document.getElementById('p-locations').classList.contains('active'))renderLocations()}
+function renderAll(){if(!S)return;_shareIdx=null;_threadsCache=null;try{migrateStages()}catch(e){}try{migratePrevClean()}catch(e){}try{migrateChannels()}catch(e){}renderOverview();renderYield();renderQueue();renderGlobalSearch();renderOrgs();renderPeople();renderPipeline();renderFollowups();renderThreads();renderInbox();renderReports();renderData();if(document.getElementById('p-locations').classList.contains('active'))renderLocations()}
 
 document.getElementById('tabs').addEventListener('click',e=>{
   const t=e.target.closest('.tab');if(!t)return;
