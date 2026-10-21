@@ -2846,7 +2846,7 @@ async function geocodeMissing(){
   toast('Geocoding '+cities.length+' cities and '+addrs.length+' addresses…');
   for(const c of [...cities,...addrs]){
     try{
-      const isA=Array.isArray(c);const q=isA?c[1]+', Germany':c+', Europe';
+      const isA=Array.isArray(c);const q=isA?(c[1].split(/[;|]| weitere /)[0].replace(/\(.*?\)/g,'').trim()+', Germany'):c+', Europe';
       const res=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q));
       const j=await res.json();
       if(j[0])S.geoCache[isA?c[0]:c.toLowerCase()]=[+j[0].lat,+j[0].lon];
