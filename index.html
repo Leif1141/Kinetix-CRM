@@ -166,6 +166,163 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
 .th-acts{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px;align-items:center}
 .th-acts select{font:11px Arial;padding:2px 4px;border:1px solid var(--lgray);border-radius:4px}
 .th-acts .sp{flex:1}
+
+/* ---- Dynamo execution dashboard (merged 21 Oct 2026) ---- */
+#p-dash{--terra:#8B3A2A;--gold:#C6943E;--shaded:#A8B4C8;--white:#FFF;--black:#000;--goldbg:#F5EDDA;--blue:#0563C1;--amber:#D4A012;--red:#CC0000;line-height:1.5}
+#p-dash .dwrap{max-width:1200px;margin:0 auto;padding:16px}
+#p-dash .dtabs{display:flex;gap:2px;border-bottom:2px solid var(--navy);margin-bottom:16px;flex-wrap:wrap}
+#p-dash .dtab{padding:7px 14px;cursor:pointer;font-size:12px;font-weight:600;background:var(--sub);border-radius:4px 4px 0 0;color:var(--navy);position:relative;user-select:none;transition:background .15s}
+#p-dash .dtab.active{background:var(--navy);color:var(--white)}
+#p-dash .dtab:hover:not(.active){background:#B8BDD0}
+#p-dash .dtab[draggable="true"]{cursor:grab}
+#p-dash .dtab.dragging{opacity:.4}
+#p-dash .dtab.drag-over{border-left:3px solid var(--gold)}
+#p-dash .dtab-badge{display:inline-block;background:var(--terra);color:var(--white);font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;vertical-align:middle}
+#p-dash .dtab.active .dtab-badge{background:var(--gold)}
+#p-dash .dpanel{display:none}
+#p-dash .dpanel.active{display:block}
+#p-dash .dsec{margin-bottom:20px}
+#p-dash .dsec-hdr{background:var(--navy);color:var(--white);padding:6px 12px;font-weight:700;font-size:13px;border-radius:3px 3px 0 0;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none}
+#p-dash .dsec-hdr .chevron{transition:transform .2s;font-size:11px}
+#p-dash .dsec-hdr .chevron.collapsed{transform:rotate(-90deg)}
+#p-dash .dsec-body.collapsed{max-height:0 !important;overflow:hidden}
+#p-dash .sub-hdr{background:var(--sub);padding:4px 12px;font-weight:600;font-size:12px;display:grid;gap:4px}
+#p-dash table{width:100%;border-collapse:collapse;font-size:12px}
+#p-dash th{background:var(--sub);padding:5px 8px;text-align:left;font-weight:600;font-size:11px;position:sticky;top:0}
+#p-dash td{padding:4px 8px;border-bottom:1px solid #E8E8EC}
+#p-dash tr:hover td{background:#F0F0F5}
+#p-dash .r{text-align:right}
+#p-dash .c{text-align:center}
+#p-dash .gantt{margin-top:8px;position:relative}
+#p-dash .gantt-row{display:grid;grid-template-columns:minmax(200px,1.6fr) repeat(12,1fr);gap:1px;margin-bottom:1px;align-items:center;min-height:26px}
+#p-dash .gantt-task{padding:2px 8px;font-size:12px;white-space:normal;line-height:1.3;overflow-wrap:break-word}
+#p-dash .gantt-cell{height:22px;border-radius:2px;position:relative}
+#p-dash .gantt-fill{background:var(--navy)}
+#p-dash .gantt-fill-s{background:var(--shaded)}
+#p-dash .gantt-fill-t{background:var(--terra)}
+#p-dash .gantt-fill-done{background:var(--green)}
+#p-dash .gantt-fill-y{background:#D4A012}
+#p-dash .gantt-hdr{font-weight:700;color:var(--white);background:var(--navy);padding:4px 8px;font-size:12px;border-radius:2px}
+#p-dash .gantt-month{text-align:center;font-size:10px;color:var(--gray);padding:2px}
+#p-dash .legend{display:flex;gap:16px;margin:10px 0;font-size:11px;align-items:center;flex-wrap:wrap}
+#p-dash .legend-box{width:16px;height:12px;border-radius:2px;display:inline-block;vertical-align:middle;margin-right:4px}
+#p-dash .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+#p-dash .stat{background:var(--white);border-radius:6px;padding:12px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+#p-dash .stat-val{font-size:22px;font-weight:700;color:var(--navy)}
+#p-dash .stat-label{font-size:11px;color:var(--gray);margin-top:2px}
+#p-dash .funnel-tbl td.num{text-align:right;color:#0000FF;font-weight:500}
+#p-dash .funnel-tbl td.tot{text-align:right;font-weight:700}
+#p-dash .funnel-tbl td.note{color:var(--gray);font-size:11px}
+#p-dash .highlight-row{background:var(--goldbg) !important}
+#p-dash .highlight-row td{background:var(--goldbg) !important}
+#p-dash a.link{color:var(--blue);font-size:11px;text-decoration:underline}
+#p-dash .status-red{color:var(--red);font-weight:500}
+#p-dash .dd-gantt{margin-top:8px}
+#p-dash .dd-row{display:grid;grid-template-columns:320px repeat(12,1fr);gap:1px;margin-bottom:1px;align-items:center;min-height:24px}
+#p-dash .dd-task{padding:2px 8px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#p-dash .dd-cell{height:20px;border-radius:2px}
+#p-dash .cost-tbl td{padding:4px 8px}
+#p-dash .cost-tbl .tot-row td{border-top:1px solid var(--gray);font-weight:700}
+#p-dash .progress-entry{background:var(--white);border-radius:4px;padding:8px 12px;margin-bottom:4px;border-left:3px solid var(--navy);cursor:pointer;transition:box-shadow .15s}
+#p-dash .progress-entry:hover{box-shadow:0 2px 8px rgba(0,0,0,.1)}
+#p-dash .progress-entry .pe-detail{max-height:0;overflow:hidden;transition:max-height .25s ease}
+#p-dash .progress-entry.expanded .pe-detail{max-height:200px}
+#p-dash .milestone{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #E8E8EC;font-size:12px}
+#p-dash .milestone-date{min-width:80px;color:var(--gray);font-size:11px}
+#p-dash .milestone-text{flex:1}
+#p-dash .milestone-status{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--sub)}
+#p-dash .gantt-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
+#p-dash .gantt-dot-ip{background:var(--gold)}
+#p-dash .gantt-dot-done{background:var(--green)}
+#p-dash .gantt-dot-pending{background:var(--sub)}
+#p-dash .gantt-dot-flagged{background:#D4A012}
+#p-dash .exec-summary{display:flex;gap:16px;margin-bottom:12px;padding:8px 12px;background:var(--white);border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.06);font-size:12px;align-items:center;flex-wrap:wrap}
+#p-dash .exec-summary-item{display:flex;align-items:center;gap:4px}
+#p-dash .exec-summary-val{font-weight:700;font-size:14px;color:var(--navy)}
+#p-dash .loading{text-align:center;padding:40px;color:var(--gray)}
+#p-dash .funnel-visual{max-width:500px;margin:16px auto}
+#p-dash .funnel-bar-wrap{display:flex;align-items:center;margin-bottom:3px}
+#p-dash .funnel-bar-label{width:120px;font-size:11px;text-align:right;padding-right:10px;color:var(--gray);font-weight:600}
+#p-dash .funnel-bar-track{flex:1;display:flex;justify-content:center}
+#p-dash .funnel-bar{height:28px;border-radius:3px;display:flex;align-items:center;justify-content:center;color:var(--white);font-size:11px;font-weight:700;transition:width .3s}
+#p-dash .preloi-list{padding:8px 12px}
+#p-dash .preloi-item{padding:4px 0;font-size:12px;border-bottom:1px solid #E8E8EC;display:flex;gap:8px;align-items:baseline}
+#p-dash .preloi-bullet{color:var(--terra);font-weight:700;font-size:14px}
+#p-dash .dec-card{background:var(--white);border-radius:6px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);border-left:4px solid var(--shaded);transition:box-shadow .15s;position:relative}
+#p-dash .dec-card:hover{box-shadow:0 2px 8px rgba(0,0,0,.1)}
+#p-dash .dec-card-active{border-left-color:var(--gold)}
+#p-dash .dec-card-decided{border-left-color:var(--navy)}
+#p-dash .dec-card-pending{border-left-color:var(--shaded)}
+#p-dash .dec-card-parked{border-left-color:var(--gray)}
+#p-dash .dec-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px}
+#p-dash .dec-badge-active{background:var(--goldbg);color:var(--gold)}
+#p-dash .dec-badge-decided{background:var(--navy);color:var(--white)}
+#p-dash .dec-badge-pending{background:var(--sub);color:var(--gray)}
+#p-dash .dec-badge-parked{background:#E0E0E0;color:var(--gray)}
+#p-dash .dec-meta{font-size:11px;color:var(--gray);margin-bottom:4px}
+#p-dash .dec-title{font-weight:700;font-size:13px;margin-bottom:4px}
+#p-dash .dec-outcome{background:var(--navy);color:var(--white);padding:8px 12px;border-radius:4px;font-size:12px;line-height:1.5;margin:6px 0 4px}
+#p-dash .dec-rationale{font-size:12px;color:var(--gray);line-height:1.5;max-height:0;overflow:hidden;transition:max-height .25s ease}
+#p-dash .dec-card.expanded .dec-rationale{max-height:300px}
+#p-dash .dec-dismiss{position:absolute;top:10px;right:10px;background:none;border:1px solid #D0D0D8;color:var(--gray);cursor:pointer;font-size:12px;width:22px;height:22px;border-radius:3px;display:flex;align-items:center;justify-content:center;opacity:.4;transition:opacity .15s}
+#p-dash .dec-dismiss:hover{opacity:1;color:var(--red);border-color:var(--red)}
+#p-dash .dec-dismissed-bar{background:var(--white);border-radius:6px;padding:10px 16px;margin-top:12px;font-size:12px;color:var(--gray);display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+#p-dash .dec-dismissed-bar button{background:none;border:1px solid #D0D0D8;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--navy);font-family:Arial,sans-serif}
+#p-dash .dec-dismissed-bar button:hover{background:var(--sub)}
+#p-dash .search-bar{display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap}
+#p-dash .search-input{flex:1;min-width:180px;padding:6px 12px;border:1px solid #D0D0D8;border-radius:4px;font-size:12px;font-family:Arial,sans-serif;outline:none}
+#p-dash .search-input:focus{border-color:var(--navy);box-shadow:0 0 0 2px rgba(46,60,101,.15)}
+#p-dash .filter-btn{padding:5px 12px;border:1px solid #D0D0D8;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;background:var(--white);color:var(--gray);user-select:none}
+#p-dash .filter-btn.active{background:var(--navy);color:var(--white);border-color:var(--navy)}
+#p-dash .filter-btn-owner{padding:5px 12px;border:1px solid #D0D0D8;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;background:var(--white);color:var(--gray);user-select:none}
+#p-dash .filter-btn-owner.active{background:var(--gold);color:var(--white);border-color:var(--gold)}
+#p-dash .todo-filter-active{background:#FDF6E3;border:1px solid #E8D9A0;border-radius:6px;padding:8px 12px;margin-bottom:12px}
+#p-dash .todo-filter-indicator{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--gold);font-weight:600;margin-bottom:4px}
+#p-dash .todo-card{background:var(--white);border-radius:6px;padding:12px 16px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);border-left:4px solid var(--shaded);display:flex;gap:12px;align-items:flex-start;cursor:grab;transition:box-shadow .15s,opacity .15s}
+#p-dash .todo-card.dragging{opacity:.4;cursor:grabbing}
+#p-dash .todo-card.drag-over-todo{border-top:3px solid var(--gold)}
+#p-dash .todo-card-urgent{border-left-color:var(--terra)}
+#p-dash .todo-card-active{border-left-color:var(--gold)}
+#p-dash .todo-card-info{border-left-color:var(--navy)}
+#p-dash .todo-card-midterm{border-left-color:#7C3AED}
+#p-dash .todo-due-soon{background:#FDF6E3;border:1px solid #E8D9A0}
+#p-dash .todo-due-badge{background:var(--terra);color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:6px}
+#p-dash .todo-check{width:18px;height:18px;border:2px solid var(--shaded);border-radius:3px;cursor:pointer;flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+#p-dash .todo-check:hover{border-color:var(--navy)}
+#p-dash .todo-check.checked{background:var(--green);border-color:var(--green)}
+#p-dash .todo-check.checked::after{content:'';width:5px;height:9px;border:solid white;border-width:0 2px 2px 0;transform:rotate(45deg);margin-top:-2px}
+#p-dash .todo-card.done{opacity:.5;cursor:default}
+#p-dash .todo-card.done .todo-title{text-decoration:line-through}
+#p-dash .todo-content{flex:1;min-width:0}
+#p-dash .todo-title{font-weight:600;font-size:13px;margin-bottom:2px}
+#p-dash .todo-desc{font-size:12px;color:var(--gray);line-height:1.4}
+#p-dash .todo-meta{display:flex;gap:12px;margin-top:4px;font-size:11px;flex-wrap:wrap}
+#p-dash .todo-tag{padding:1px 8px;border-radius:10px;font-weight:600;font-size:10px}
+#p-dash .todo-tag-research{background:#E8F0FE;color:#1A56DB}
+#p-dash .todo-tag-setup{background:#E8F5E9;color:var(--green)}
+#p-dash .todo-tag-outreach{background:var(--goldbg);color:var(--gold)}
+#p-dash .todo-tag-strategy{background:#F3E8FF;color:#7C3AED}
+#p-dash .todo-tag-data{background:#FFF3E0;color:#E65100}
+#p-dash .todo-tag-financing{background:#FDE8E8;color:var(--terra)}
+#p-dash .todo-tag-equity{background:#EDE7F6;color:#4527A0}
+#p-dash .todo-tag-hiring{background:#E0F2F1;color:#00695C}
+#p-dash .todo-tag-legal{background:#F3E5F5;color:#7B1FA2}
+#p-dash .todo-owner{color:var(--gray)}
+#p-dash .todo-deadline{color:var(--terra);font-weight:600}
+#p-dash .todo-section-hdr{font-weight:700;font-size:13px;color:var(--navy);padding:8px 0 4px;border-bottom:1px solid var(--sub);margin-bottom:8px;margin-top:16px}
+#p-dash .todo-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:16px}
+#p-dash .todo-stat{background:var(--white);border-radius:6px;padding:10px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+#p-dash .todo-stat-val{font-size:20px;font-weight:700;color:var(--navy)}
+#p-dash .todo-stat-label{font-size:10px;color:var(--gray);margin-top:2px}
+#p-dash .add-todo-bar{display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
+#p-dash .add-todo-input{flex:1;min-width:200px;padding:8px 12px;border:2px dashed var(--sub);border-radius:6px;font-size:13px;font-family:Arial,sans-serif;outline:none;background:var(--white)}
+#p-dash .add-todo-input:focus{border-color:var(--navy);border-style:solid}
+#p-dash .add-todo-btn{padding:8px 16px;background:var(--navy);color:var(--white);border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:Arial,sans-serif}
+#p-dash .add-todo-btn:hover{background:#3D4F7A}
+#p-dash .today-line{position:absolute;width:2px;background:var(--terra);top:0;bottom:0;z-index:10;pointer-events:none}
+#p-dash .today-label{position:absolute;top:-16px;transform:translateX(-50%);font-size:9px;font-weight:700;color:var(--terra);white-space:nowrap;background:var(--bg);padding:0 3px;border-radius:2px}
+#p-dash .delete-btn{background:none;border:none;color:var(--gray);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:3px;opacity:.4;transition:opacity .15s}
+#p-dash .delete-btn:hover{opacity:1;color:var(--red)}
 </style>
 </head>
 <body>
@@ -211,6 +368,7 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
   <div class="tab" data-t="locations">Map</div>
   <div class="tab" data-t="reports">Reports</div>
   <div class="tab" data-t="data">Data</div>
+  <div class="tab" data-t="dash" id="dashTab" style="display:none">Dashboard <span class="tab-badge" id="dashBadge" style="display:none"></span></div>
 </div>
 
 <div class="panel active" id="p-overview">
@@ -325,6 +483,10 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
   </div>
   <div class="section" style="margin-bottom:14px"><div class="section-hdr">Worth a trip: regions with several targets</div><div id="locClusters"></div></div>
   <div class="section"><div class="section-hdr">By region</div><div id="locList"></div></div>
+</div>
+
+<div class="panel" id="p-dash">
+  <div class="dwrap"><div class="dtabs" id="dtabs"></div><div id="dpanels"></div></div>
 </div>
 
 <div class="panel" id="p-data">
@@ -1921,6 +2083,7 @@ function applyPatchOps(ops){
   let made=0,skipped=0;
   for(const o of (ops||[])){
     try{
+      if(o.op&&String(o.op).indexOf('dash')===0){if(dashApplyOp(o))made++;else skipped++;continue}
       if(o.op==='upsertAdvisor'){
         let r=patchFind(Object.assign({kind:'advisor'},o.match));
         if(!r){r=newAdvisor();r.firm=(o.match&&o.match.firm)||(o.set&&o.set.firm)||'';S.advisors.push(r)}
@@ -2633,7 +2796,145 @@ async function geocodeMissing(){
   }
   save();renderLocations();toast('Geocoding done');
 }
-function renderAll(){if(!S)return;_shareIdx=null;_threadsCache=null;try{migrateStages()}catch(e){}try{migratePrevClean()}catch(e){}try{migrateChannels()}catch(e){}renderOverview();renderYield();renderQueue();renderGlobalSearch();renderOrgs();renderPeople();renderPipeline();renderFollowups();renderThreads();renderInbox();renderReports();renderData();if(document.getElementById('p-locations').classList.contains('active'))renderLocations()}
+function renderAll(){if(!S)return;_shareIdx=null;_threadsCache=null;try{migrateStages()}catch(e){}try{migratePrevClean()}catch(e){}try{migrateChannels()}catch(e){}renderOverview();renderYield();renderQueue();renderGlobalSearch();renderOrgs();renderPeople();renderPipeline();renderFollowups();renderThreads();renderInbox();renderReports();renderData();try{dashRefresh()}catch(e){console.warn('dashboard',e)}if(document.getElementById('p-locations').classList.contains('active'))renderLocations()}
+
+
+// ═══════════════════════════════════════════════════════════════
+// DYNAMO EXECUTION DASHBOARD (merged 21 Oct 2026, data in S.dash)
+// ═══════════════════════════════════════════════════════════════
+const NAVY='#2E3C65',TERRA='#8B3A2A',GOLD='#C6943E',SHADED='#A8B4C8',SUB='#CFD1E2',GOLDBG='#F5EDDA',GREEN='#2E7D32',AMBER='#D4A012';
+const MONTHS=['Jun 26','Jul','Aug','Sep','Oct','Nov','Dec','Jan 27','Feb','Mar','Apr','May'];
+const MC=['M1','M2','M3','M4','M5','M6','M7','M8','M9','M10','M11','M12'];
+const MONTH_DATES=[new Date(2026,5,1),new Date(2026,6,1),new Date(2026,7,1),new Date(2026,8,1),new Date(2026,9,1),new Date(2026,10,1),new Date(2026,11,1),new Date(2027,0,1),new Date(2027,1,1),new Date(2027,2,1),new Date(2027,3,1),new Date(2027,4,1)];
+// status: 0=pending, 1=in-progress, 2=done, 3=yellow/amber flagged
+const PHASES=[
+['General',[['Register for trade fairs (DE + UK)',1,3,0,3]]],
+['Setup',[['Form acquisition SPV / GmbH',1,4,0,3],['Website and email addresses (staged)',1,2,0,2],['Office setup in London',3,5,1,0],['CRM build (custom Firebase)',1,3,0,1]]],
+['Sourcing',[['Build master list of targets',1,5,0,1],['Develop seller approach playbook',1,4,0,3],['First target outreach',3,3,0,0],['Target five companies per week',3,12,0,0]]],
+['Value creation',[['AI opportunity learning and operator conversations',1,12,1,0]]],
+['Talent',[['Intern recruiting (EBS/WHU Pflichtpraktikum)',2,3,0,1],['CTO search - identify and approach candidates',3,12,1,0],['Board member search',3,12,1,0]]],
+['Funding',[['Consider 2nd equity sponsor',1,6,1,0],['Initial outreach to debt providers',2,3,0,1]]],
+['Advisors',[['Initial outreach and selection of advisors',2,5,0,1]]]
+];
+const PRELOI_ITEMS=['Industry and market fit assessment (sector dynamics, growth drivers, competitive positioning)','Public financials review (Bundesanzeiger Jahresabschluesse / Companies House filings)','Owner motivation and succession readiness (retirement timeline, emotional attachment, family dynamics)','Basic commercial check (key customers, revenue concentration, contract structure)','Management meeting(s) - assess leadership quality, culture, operational depth','Indicative valuation and deal structure (enterprise value range, earn-out vs. clean break)','Preliminary legal check (corporate structure, liens, pending litigation, Betriebsrat / TUPE)','Supplier and vendor dependency scan (single-source risk, contract terms)','Site visit(s) - factory walkthrough, equipment condition, workforce impression'];
+const DD_SECTIONS=[['Kickoff + data room',[['Sign LOI, notify investors',[1]],['Engage QoE firm + buyer-side counsel',[1,2]],['Data room access + initial doc request',[1,2]],['Assemble DD team (legal DE + UK, tax)',[1,2]],['Define key investment thesis pillars',[1,2]]]],['1. Financial',[['Proof of cash (bank stmt vs GL reconciliation)',[2,3]],['QoE - 36-month historical reconciliation',[3,4,5]],['QoE - normalized EBITDA + add-back review',[3,4,5]],['QoE - working capital peg analysis',[4,5,6]],['Customer + revenue concentration analysis',[4,5]],['Financial projections + narrative deck',[5,6]],['QoE report finalized',[6,7]]]],['2. Legal',[['Corporate structure + ownership verification',[3,4]],['Key contracts (customers, vendors, leases)',[4,5,6]],['Change-of-control consent requirements',[4,5]],['License + regulatory (DE Handwerk, UK permits)',[4,5]],['Employment law (DE Betriebsrat, UK TUPE)',[5,6]],['Liens, encumbrances, outstanding claims',[5,6]],['Legal DD memo finalized',[7]]]],['3. Commercial (in-house)',[['Industry dynamics + market sizing',[3,4]],['Competitive landscape + positioning analysis',[3,4,5]],['Site visits (DE factory + UK operations)',[4,5]],['Sales pipeline + win/loss review',[5,6]],['Commercial memo finalized',[7]]]],['4. Customer (in-house)',[['Customer data request (anonymized rev share)',[3,4]],['Customer interviews (top 10-15, 30-60% of rev)',[4,5,6]],['Logo + revenue attrition analysis',[4,5]],['Switching cost + stickiness assessment',[5,6]],['Customer report finalized',[6,7]]]],['5. Technology',[['Tech stack audit + ERP/accounting review',[5,6]],['IT security + cybersecurity assessment',[5,6]],['Tech debt evaluation + upgrade roadmap',[6,7]]]],['6. Human capital (in-house)',[['Owner motivation + commitment to transition',[3,4,5,6]],['Employee roster, comp, demographics review',[4,5]],['Key-employee interviews (ops managers)',[5,6]],['Culture assessment + retention plan',[5,6,7]]]],['7. Operational',[['Operations cycle documentation (order-to-cash)',[4,5,6]],['Quality + safety controls review',[5,6]],['Supplier concentration + procurement review',[5,6]]]],['8. Other (env / insurance)',[['Phase I environmental (if manufacturing site)',[4,5,6]],['Insurance coverage review + gap analysis',[5,6]],['Regulatory compliance check (DE + UK)',[5,6]]]],['Tax + structure',[['Asset vs share deal analysis (DE/UK)',[3,4]],['Cross-border holding structure (Luxco?)',[4,5]],['VAT + transfer pricing review',[5,6]],['Tax structure memo finalized',[7]]]],['Investor approval + SPA',[['Investor approval memo (10-15 pages)',[7,8]],['Investor committee review + approval',[8,9]],['SPA negotiation',[8,9,10]],['Financing definitive docs',[9,10]]]],['Close',[['Customer + lease consents collected',[10,11]],['Conditions precedent satisfied',[10,11]],['Wire transfers + signing',[11,12]],['Day 1 - employee meeting, customer notifications',[12]],['100-day post-close plan kicks off',[12]]]]];
+const FAIRS=[
+{n:'Fakuma',a:1,d:'12-16 Oct 2026',att:'12-14 Oct',dys:3,l:'Friedrichshafen',co:'DE',t:'A',fq:'3yr',e:'1,900',f:'Plastics processing; highest turnout of family-owned plastic-parts firms',tr:'Fly LHR/LGW to Zurich (~1h40), then car or rail ~1h. No direct in October',st:'4-star Friedrichshafen, book early',u:'https://www.fakuma-messe.de/'},
+{n:'SPS Nuremberg',a:1,d:'24-26 Nov 2026',att:'24-25 Nov',dys:2,l:'Nuremberg',co:'DE',t:'A',fq:'1yr',e:'1,000+',f:'Smart production; German fluid-power and motion control, high owner density',tr:'Fly LHR to Munich (~1h55) plus train ~1h, or via Frankfurt',st:'4-star Nuremberg',u:'https://sps.mesago.com/'},
+{n:'Valve World Expo',a:1,d:'1-3 Dec 2026',att:'1-2 Dec',dys:2,l:'Duesseldorf',co:'DE',t:'A',fq:'2yr',e:'700',f:'Most concentrated valve event globally; many owners present',tr:'Direct LHR/LCY/LGW to Duesseldorf (~1h20)',st:'Family, Rheinland',u:'https://www.valveworldexpo.com/'},
+{n:'Hannover Messe',a:1,d:'5-8 Apr 2027',att:'5-6 Apr',dys:2,l:'Hannover',co:'DE',t:'A',fq:'1yr',e:'4,000+',f:'Biggest industrial event in Europe; needs a pre-built target list',tr:'Direct LHR to Hannover (~1h30)',st:'4-star Hannover, scarce, book early or Hildesheim',u:'https://www.hannovermesse.de/'},
+{n:'Achema',a:1,d:'14-18 Jun 2027',att:'14-15 Jun',dys:2,l:'Frankfurt',co:'DE',t:'A',fq:'3yr',e:'3,800',f:'Global process industry: pumps, valves, seals, filtration',tr:'Direct LHR/LCY to Frankfurt (~1h30)',st:'4-star near Messe Frankfurt',u:'https://www.achema.de/'},
+{n:'Pumps + Valves Dortmund',a:0,d:'24-25 Feb 2027',att:'',dys:0,l:'Dortmund',co:'DE',t:'A',fq:'2yr',e:'~250',f:'Smaller and more intimate than Valve World; easier founder access',tr:'',st:'',u:'https://www.pumps-valves-dortmund.de/'},
+{n:'Fastener Fair Global',a:0,d:'6-8 Apr 2027',att:'',dys:0,l:'Stuttgart',co:'DE',t:'A',fq:'2yr',e:'1,000+',f:'Best fastener-owner event, but clashes with Hannover Messe',tr:'',st:'',u:'https://www.fastenerfair.com/stuttgart/'},
+{n:'AMB Stuttgart',a:0,d:'15-19 Sep 2026',att:'',dys:0,l:'Stuttgart',co:'DE',t:'B',fq:'2yr',e:'~1,500',f:'Subcontract component makers; fewer pure C-parts owners',tr:'',st:'',u:'https://www.messe-stuttgart.de/amb/'},
+{n:'Motek',a:0,d:'6-8 Oct 2026',att:'',dys:0,l:'Stuttgart',co:'DE',t:'B',fq:'1yr',e:'~900',f:'Component suppliers: linear motion, grippers, sensors; intimate booths',tr:'',st:'',u:'https://www.motek-messe.de/'},
+{n:'DKT German Rubber Conf.',a:0,d:'Jul 2027 (TBC)',att:'',dys:0,l:'Nuremberg',co:'DE',t:'B',fq:'3yr',e:'n/a',f:'Specialist; useful if rubber and seals becomes a high priority',tr:'',st:'',u:'https://www.dkt2027.de/'},
+{n:'BAU Munich',a:0,d:'13-17 Jan 2027',att:'',dys:0,l:'Munich',co:'DE',t:'C',fq:'2yr',e:'n/a',f:'Adjacent, construction MRO; skip unless a specific target exhibits',tr:'',st:'',u:'https://bau-muenchen.com/'},
+{n:'LIGNA',a:0,d:'May 2027 (TBC)',att:'',dys:0,l:'Hannover',co:'DE',t:'C',fq:'2yr',e:'n/a',f:'Adjacent, wood; skip unless a specific target exhibits',tr:'',st:'',u:'https://www.ligna.de/'}
+];
+const TABS=['Daily To-Dos','Execution plan','Outreach funnel','Trade fairs','DD timeline','Cadence','Progress log','Decisions'];
+const DASH_OWNER='leif.berger26@gmail.com';
+let activeTab=0,progressFilter='all',progressSearch='',todoFilter='open',todoOwnerFilter='all',decFilter='open',_dashInited=false;
+// Dashboard state lives in the shared CRM state under S.dash (Firebase). The daily sweep writes
+// dash* patch ops (see dashApplyOp); the browser edits are saved through the normal CRM save path.
+function dashData(){if(typeof S==='undefined'||!S){return {progress:[],decisions:[],todos:[],dismissed:[],funnel:{}}}S.dash=S.dash||{};const d=S.dash;d.progress=d.progress||[];d.decisions=d.decisions||[];d.todos=d.todos||[];d.dismissed=d.dismissed||[];d.funnel=d.funnel||{};return d}
+function dashVisible(){return !!(typeof currentUser!=='undefined'&&currentUser&&currentUser.email===DASH_OWNER)}
+function dashSave(){try{dashData().savedAt=new Date().toISOString()}catch(e){}if(typeof saveDebounced==='function')saveDebounced()}
+function saveTodos(){try{localStorage.setItem('dynamo-todo-filter',todoFilter);localStorage.setItem('dynamo-todo-owner-filter',todoOwnerFilter)}catch(e){}dashSave()}
+function allDismissed(){return dashData().dismissed.slice()}
+function dismissDecision(decIdx,tabIdx){const d=dashData().decisions[decIdx];if(!d)return;const dm=dashData().dismissed;if(!dm.includes(d.decision)){dm.push(d.decision);dashSave()}renderDecisions(tabIdx)}
+function restoreAllDecisions(tabIdx){dashData().dismissed=[];dashSave();renderDecisions(tabIdx)}
+function dashApplyOp(o){
+  const d=dashData();
+  if(o.op==='dashSet'){if(!o.key)return false;d[o.key]=o.value;return true}
+  if(o.op==='dashAddProgress'){const e=o.entry;if(!e||!e.desc)return false;if(d.progress.some(x=>x.d===e.d&&x.desc===e.desc))return false;d.progress.unshift(e);return true}
+  if(o.op==='dashUpsertTodo'){let t=(o.id!==undefined&&o.id!==null)?d.todos.find(x=>x.id===o.id):null;if(t){Object.assign(t,o.set||{});return true}if(!o.set||!o.set.title)return false;t=Object.assign({id:(o.id!==undefined&&o.id!==null)?o.id:Date.now(),title:'',desc:'',owner:'Leif',dl:'',tag:'outreach',priority:'active',done:false},o.set);d.todos.unshift(t);return true}
+  if(o.op==='dashRemoveTodo'){const t=d.todos.find(x=>x.id===o.id);if(!t)return false;t.deleted=true;return true}
+  if(o.op==='dashUpsertDecision'){if(!o.decision)return false;let x=d.decisions.find(y=>y.decision===o.decision);if(x){Object.assign(x,o.set||{});return true}d.decisions.unshift(Object.assign({date:'Open',owner:'Leif',status:'Pending',decision:o.decision,outcome:'',rationale:'',trigger:''},o.set||{}));return true}
+  if(o.op==='dashDismiss'){if(!o.decision)return false;if(!d.dismissed.includes(o.decision))d.dismissed.push(o.decision);return true}
+  if(o.op==='dashRestore'){if(!o.decision)return false;d.dismissed=d.dismissed.filter(x=>x!==o.decision);return true}
+  return false;
+}
+function dashInit(){if(_dashInited)return;_dashInited=true;try{const f=localStorage.getItem('dynamo-todo-filter');if(f)todoFilter=f;const o=localStorage.getItem('dynamo-todo-owner-filter');if(o)todoOwnerFilter=o}catch(e){}initTabs();dRenderAll()}
+function dashRefresh(){const tab=document.getElementById('dashTab');if(!tab)return;const vis=dashVisible();tab.style.display=vis?'':'none';if(!vis)return;if(!_dashInited)dashInit();else rebuildTabs();const open=dashData().todos.filter(t=>!t.done&&!t.deleted).length;const b=document.getElementById('dashBadge');if(b){b.textContent=open;b.style.display=open?'':'none'}}
+function safeNum(v){if(v==null)return 0;if(typeof v==='number')return v;let s=String(v).replace(/[^0-9.\-]/g,'').trim();return parseFloat(s)||0}
+function dEsc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function fmtNum(v,dec){if(v==null||v==='')return'-';let n=typeof v==='number'?v:parseFloat(String(v).replace(/[^0-9.\-]/g,''));if(isNaN(n))return'-';return n.toFixed(dec)}
+function fmtPct(v){if(v==null||v==='')return'-';let n=typeof v==='number'?v:parseFloat(v);if(isNaN(n))return'-';if(n<1)n=n*100;return n.toFixed(1)+'%'}
+function getTodayMonth(){const now=new Date();const y=now.getFullYear();const m=now.getMonth();// Jun 2026 = month 0 of the plan. Check if within range Jun 2026 (y=2026,m=5) to May 2027 (y=2027,m=4)
+const inRange=(y===2026&&m>=5)||(y===2027&&m<=4);if(!inRange)return 1.5;// default to mid-July
+const start=new Date(2026,5,1);const diffMs=now-start;const diffMonths=diffMs/(1000*60*60*24*30.44);return Math.min(Math.max(diffMonths,0),12)}
+function initTabs(){const t=document.getElementById('dtabs'),p=document.getElementById('dpanels');const openTodos=dashData().todos.filter(x=>!x.done&&!x.deleted).length;const openDecs=dashData().decisions.filter(d=>(d.status||'').toLowerCase()==='pending').length;const badges={};TABS.forEach((n,i)=>{if(n==='Daily To-Dos')badges[i]=openTodos;else if(n==='Progress log')badges[i]=dashData().progress.length;else if(n==='Decisions')badges[i]=openDecs});TABS.forEach((name,i)=>{const tab=document.createElement('div');tab.className='dtab'+(i===0?' active':'');tab.draggable=true;tab.dataset.idx=i;tab.innerHTML=dEsc(name)+(badges[i]?`<span class="dtab-badge">${badges[i]}</span>`:'');tab.onclick=()=>switchTab(i);tab.ondblclick=()=>{switchTab(i);const n=TABS[i];if(n==='Daily To-Dos'){todoFilter='open';todoOwnerFilter='all';saveTodos();renderTodos(i)}else if(n==='Progress log'){progressFilter='all';progressSearch='';renderProgress(i)}else if(n==='Decisions'){decFilter='open';renderDecisions(i)}};tab.ondragstart=e=>{e.dataTransfer.setData('text/plain',i);tab.classList.add('dragging')};tab.ondragend=()=>tab.classList.remove('dragging');tab.ondragover=e=>{e.preventDefault();tab.classList.add('drag-over')};tab.ondragleave=()=>tab.classList.remove('drag-over');tab.ondrop=e=>{e.preventDefault();tab.classList.remove('drag-over');const from=parseInt(e.dataTransfer.getData('text/plain'));const to=i;if(from===to)return;const moved=TABS.splice(from,1)[0];TABS.splice(to,0,moved);rebuildTabs()};t.appendChild(tab)});TABS.forEach((name,i)=>{const panel=document.createElement('div');panel.id='dp'+i;panel.className='dpanel'+(i===0?' active':'');panel.innerHTML='<div class="loading">Loading...</div>';p.appendChild(panel)})}
+function rebuildTabs(){const t=document.getElementById('dtabs');const p=document.getElementById('dpanels');t.innerHTML='';p.innerHTML='';initTabs();dRenderAll();switchTab(activeTab)}
+function switchTab(i){activeTab=i;document.querySelectorAll('#dtabs .dtab').forEach((t,idx)=>{t.classList.toggle('active',idx===i)});document.querySelectorAll('#dpanels .dpanel').forEach((p,idx)=>{p.classList.toggle('active',idx===i)})}
+function toggleSection(el){const body=el.nextElementSibling;const chev=el.querySelector('.chevron');if(!body)return;if(body.classList.contains('collapsed')){body.classList.remove('collapsed');body.style.maxHeight=body.scrollHeight+'px';if(chev)chev.classList.remove('collapsed')}else{body.style.maxHeight=body.scrollHeight+'px';requestAnimationFrame(()=>{body.classList.add('collapsed');body.style.maxHeight='0'});if(chev)chev.classList.add('collapsed')}}
+function dRenderAll(){const tabMap={};TABS.forEach((name,i)=>tabMap[name]=i);if(tabMap['Daily To-Dos']!==undefined)renderTodos(tabMap['Daily To-Dos']);if(tabMap['Execution plan']!==undefined)renderExecPlan(tabMap['Execution plan']);if(tabMap['Outreach funnel']!==undefined)renderFunnel(tabMap['Outreach funnel']);if(tabMap['Trade fairs']!==undefined)renderFairs(tabMap['Trade fairs']);if(tabMap['DD timeline']!==undefined)renderDDTimeline(tabMap['DD timeline']);if(tabMap['Cadence']!==undefined)renderCadence(tabMap['Cadence']);if(tabMap['Progress log']!==undefined)renderProgress(tabMap['Progress log']);if(tabMap['Decisions']!==undefined)renderDecisions(tabMap['Decisions'])}
+function renderExecPlan(idx){const el=document.getElementById('dp'+idx);if(!el)return;let tt=0,ip=0,dn=0,fl=0;PHASES.forEach(([,tasks])=>tasks.forEach(([,,,,st])=>{tt++;if(st===1)ip++;if(st===2)dn++;if(st===3)fl++}));const pn=tt-ip-dn-fl;const todayM=getTodayMonth();const dateStr=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});let h='<div class="exec-summary">';h+=`<div class="exec-summary-item"><span class="exec-summary-val">${tt}</span> total</div><div class="exec-summary-item"><span class="gantt-dot gantt-dot-ip"></span><span class="exec-summary-val">${ip}</span> in progress</div><div class="exec-summary-item"><span class="gantt-dot gantt-dot-done"></span><span class="exec-summary-val">${dn}</span> done</div><div class="exec-summary-item"><span class="gantt-dot gantt-dot-flagged"></span><span class="exec-summary-val">${fl}</span> flagged</div><div class="exec-summary-item"><span class="gantt-dot gantt-dot-pending"></span><span class="exec-summary-val">${pn}</span> pending</div><div style="margin-left:auto;color:var(--gray);font-size:11px">Updated ${dateStr}</div></div>`;h+='<div class="dsec"><div class="dsec-hdr" onclick="toggleSection(this)">12-month execution plan <span class="chevron">&#9660;</span></div><div class="dsec-body" style="max-height:none"><div class="gantt" id="gantt-container"><div class="gantt-row"><div class="gantt-task"></div>';MC.forEach((m,i)=>h+=`<div class="gantt-month">${m}<br><span style="font-size:9px">${MONTHS[i]}</span></div>`);h+='</div>';PHASES.forEach(([phase,tasks])=>{h+=`<div class="gantt-row"><div class="gantt-hdr" style="grid-column:1/14">${dEsc(phase)}</div></div>`;tasks.forEach(([name,ms,me,shaded,status])=>{const dc=status===2?'gantt-dot gantt-dot-done':(status===1?'gantt-dot gantt-dot-ip':(status===3?'gantt-dot gantt-dot-flagged':'gantt-dot gantt-dot-pending'));h+=`<div class="gantt-row"><div class="gantt-task"><span class="${dc}"></span>${dEsc(name)}</div>`;for(let m=1;m<=12;m++){const a=m>=ms&&m<=me;let c='';if(a){c=shaded?'gantt-fill-s':'gantt-fill'}h+=`<div class="gantt-cell ${c}"></div>`}h+='</div>'})});const tPct=(todayM/12*100).toFixed(2);const tOff=(200*(1-todayM/12)).toFixed(1);h+=`<div class="today-line" style="left:calc(${tOff}px + ${tPct}%)"><span class="today-label">Today</span></div>`;h+='</div><div class="legend"><span class="legend-box" style="background:'+NAVY+'"></span> Core <span class="legend-box" style="background:'+SHADED+'"></span> Background <span style="margin-left:12px"><span class="gantt-dot gantt-dot-done"></span> Done</span> <span><span class="gantt-dot gantt-dot-ip"></span> In progress</span> <span><span class="gantt-dot gantt-dot-flagged"></span> Flagged</span> <span><span class="gantt-dot gantt-dot-pending"></span> Pending</span></div></div></div>';el.innerHTML=h}
+function renderFunnel(idx){const el=document.getElementById('dp'+idx);if(!el)return;const F=dashData().funnel||{};const pipe=F.pipe||[],stages=F.crmStages||[],sl=F.shortlist||[];
+const sum=(k)=>stages.filter(([s])=>k.includes(s)).reduce((a,[,v])=>a+v,0);const inCrm=stages.reduce((a,[,v])=>a+v,0)-sum(['Dead']);
+let h=`<div class="stat-grid"><div class="stat"><div class="stat-val">${pipe[0]?pipe[0][1].toLocaleString('en-GB'):'-'}</div><div class="stat-label">Universe (DE)</div></div><div class="stat"><div class="stat-val">${pipe[1]?pipe[1][1].toLocaleString('en-GB'):'-'}</div><div class="stat-label">Analysed</div></div><div class="stat"><div class="stat-val">${pipe[2]?pipe[2][1]:'-'}</div><div class="stat-label">Shortlist</div></div><div class="stat"><div class="stat-val">${pipe[3]?pipe[3][1]:'-'}</div><div class="stat-label">In CRM</div></div><div class="stat"><div class="stat-val">${sum(['Contacted','Replied','Meeting','NDA','Info received','IOI/LOI','Diligence','Closed'])}</div><div class="stat-label">Contacted</div></div><div class="stat"><div class="stat-val">${sum(['Replied','Meeting','NDA','Info received','IOI/LOI','Diligence','Closed'])}</div><div class="stat-label">Replied</div></div></div>`;
+h+='<div class="dsec"><div class="dsec-hdr" onclick="toggleSection(this)">Screen to shortlist, Germany <span class="chevron">&#9660;</span></div><div class="dsec-body" style="max-height:none"><table><tr><th>Stage</th><th class="r">Companies</th><th class="r">Of previous</th><th>Source</th></tr>';
+pipe.forEach((row,i)=>{const[st,v,n]=row;const prev=i?pipe[i-1][1]:null;const pct=prev?(v/prev*100):null;h+=`<tr><td>${dEsc(st)}</td><td class="num">${Number(v).toLocaleString('en-GB')}</td><td class="r">${pct===null?'':(pct<1?pct.toFixed(2):pct.toFixed(0))+'%'}</td><td class="note">${dEsc(n)}</td></tr>`});
+h+='</table></div></div>';
+h+='<div class="dsec" style="margin-top:16px"><div class="dsec-hdr" onclick="toggleSection(this)">Live pipeline by CRM stage <span class="chevron">&#9660;</span></div><div class="dsec-body" style="max-height:none"><table><tr><th>Stage</th><th class="r">Now</th><th>Companies</th></tr>';
+stages.forEach(([st,v,n])=>{h+=`<tr><td${v?' style="font-weight:600"':''}>${dEsc(st)}</td><td class="num">${v}</td><td class="note">${dEsc(n)}</td></tr>`});
+h+='</table><div style="font-size:11px;padding:6px 8px">Current stage, not cumulative. The live Pipeline tab of the CRM is the current view; this snapshot is dated '+dEsc(F.src||'')+'.</div></div></div>';
+const fd=[{l:'In CRM',v:pipe[3]?pipe[3][1]:inCrm},{l:'Contacted',v:sum(['Contacted','Replied','Meeting','NDA','Info received','IOI/LOI','Diligence','Closed'])},{l:'Replied',v:sum(['Replied','Meeting','NDA','Info received','IOI/LOI','Diligence','Closed'])},{l:'Meeting',v:sum(['Meeting'])},{l:'NDA',v:sum(['NDA'])},{l:'IOI/LOI',v:sum(['IOI/LOI'])},{l:'Diligence',v:sum(['Diligence'])},{l:'Closed',v:sum(['Closed'])}];
+h+='<div class="dsec" style="margin-top:16px"><div class="dsec-hdr" onclick="toggleSection(this)">Pipeline funnel <span class="chevron">&#9660;</span></div><div class="dsec-body" style="max-height:none"><div class="funnel-visual">';
+fd.forEach((f,i)=>{const w=100-i*(100/fd.length);const c=i<3?NAVY:SHADED;h+=`<div class="funnel-bar-wrap"><div class="funnel-bar-label">${f.l}</div><div class="funnel-bar-track"><div class="funnel-bar" style="width:${w}%;background:${c}">${f.v}</div></div></div>`});
+h+='</div></div></div>';
+h+='<div class="dsec" style="margin-top:16px"><div class="dsec-hdr" onclick="toggleSection(this)">Shortlist <span class="chevron">&#9660;</span></div><div class="dsec-body" style="max-height:none"><table><tr><th>Company</th><th class="r">Score</th><th class="r">Rev (EURm)</th><th class="r">EBITDA</th><th class="r">EBIT</th><th class="r">FTE</th><th>CRM stage</th></tr>';
+sl.forEach(([n,sc,rv,eb,ei,fte,stg])=>{const inband=ei>=4&&ei<=8;h+=`<tr class="${inband?'highlight-row':''}"><td style="font-weight:600">${dEsc(n)}</td><td class="r">${Number(sc).toFixed(1)}</td><td class="r">${Number(rv).toFixed(1)}</td><td class="r">${Number(eb).toFixed(2)}</td><td class="r">${Number(ei).toFixed(2)}</td><td class="r">${fte}</td><td>${dEsc(stg)}</td></tr>`});
+h+='</table><div style="font-size:11px;padding:6px 8px">Highlighted rows sit inside the EUR 4-8m EBIT band.</div></div></div>';
+h+=`<div style="font-size:11px;padding:6px 8px;color:var(--gray)">Source: ${dEsc(F.src||'')}.</div>`;
+el.innerHTML=h}
+function renderFairs(idx){const el=document.getElementById('dp'+idx);if(!el)return;const go=FAIRS.filter(f=>f.a);const rest=FAIRS.filter(f=>!f.a);const days=go.reduce((a,f)=>a+f.dys,0);
+let h=`<div class="stat-grid"><div class="stat"><div class="stat-val">${go.length}</div><div class="stat-label">Fairs attending</div></div><div class="stat"><div class="stat-val">${days}</div><div class="stat-label">Days on the ground</div></div><div class="stat"><div class="stat-val">Oct 26</div><div class="stat-label">First fair</div></div><div class="stat"><div class="stat-val">Jun 27</div><div class="stat-label">Last fair</div></div></div>`;
+h+='<div class="dsec"><div class="dsec-hdr" onclick="toggleSection(this)">Attending <span class="chevron">&#9660;</span></div><div class="dsec-body" style="max-height:none"><table><tr><th>Fair</th><th>Location</th><th>Full run</th><th>Attending</th><th class="r">Days</th><th class="r">Exhibitors</th><th>Why</th><th></th></tr>';
+go.forEach(f=>{h+=`<tr><td style="font-weight:700">${dEsc(f.n)}</td><td>${dEsc(f.l)}</td><td>${dEsc(f.d)}</td><td style="font-weight:600">${dEsc(f.att)}</td><td class="r">${f.dys}</td><td class="r">${dEsc(f.e)}</td><td style="font-size:11px">${dEsc(f.f)}</td><td><a class="link" href="${f.u}" target="_blank">Link</a></td></tr>`});
+h+='</table></div></div>';
+h+='<div class="dsec" style="margin-top:16px"><div class="dsec-hdr" onclick="toggleSection(this)">Travel and stay <span class="chevron">&#9660;</span></div><div class="dsec-body" style="max-height:none"><table><tr><th>Fair</th><th>Travel from London</th><th>Stay</th></tr>';
+go.forEach(f=>{h+=`<tr><td style="font-weight:600">${dEsc(f.n)}</td><td style="font-size:11px">${dEsc(f.tr)}</td><td style="font-size:11px">${dEsc(f.st)}</td></tr>`});
+h+='</table><div style="font-size:11px;padding:6px 8px">Airlines load schedules about 11 months out and Messe-town hotels sell out early. Reserve refundable rooms now and buy flights as each window opens. Preferred airports Heathrow, City, Gatwick; cabin economy; hotels 4-star near the fairground.</div></div></div>';
+h+='<div class="dsec" style="margin-top:16px"><div class="dsec-hdr" onclick="toggleSection(this)">Considered, not attending <span class="chevron">&#9660;</span></div><div class="dsec-body" style="max-height:none"><table><tr><th>Fair</th><th>Dates</th><th>Location</th><th>Tier</th><th>Freq</th><th>Note</th></tr>';
+rest.forEach(f=>{h+=`<tr><td style="font-weight:600">${dEsc(f.n)}</td><td>${dEsc(f.d)}</td><td>${dEsc(f.l)}</td><td>${dEsc(f.t)}</td><td>${dEsc(f.fq)}</td><td style="font-size:11px">${dEsc(f.f)}</td></tr>`});
+h+='</table></div></div>';
+h+='<div class="dsec" style="margin-top:16px"><div class="dsec-hdr" onclick="toggleSection(this)">Open prep items <span class="chevron">&#9660;</span></div><div class="dsec-body" style="max-height:none"><div class="preloi-list">';
+['Build pre-fair target lists for Fakuma, SPS and Valve World over the next 8 to 10 weeks, filtered to the right niche per fair','Email priority stands ahead of each fair: 15 to 20 minutes, specific to their business. Highest-leverage pre-fair action','Build a one-page leave-behind on Kinetix positioning, capital and contact','Reserve refundable hotel rooms for Fakuma, Hannover and Achema now'].forEach(x=>{h+=`<div class="preloi-item"><span class="preloi-bullet">&#9656;</span><span>${dEsc(x)}</span></div>`});
+h+='</div></div></div>';el.innerHTML=h}
+function renderDDTimeline(idx){const el=document.getElementById('dp'+idx);if(!el)return;let h='<div class="dsec"><div class="dsec-hdr" onclick="toggleSection(this)">Pre-LOI screening <span class="chevron">&#9660;</span></div><div class="dsec-body" style="max-height:none"><div class="preloi-list"><p style="color:var(--gray);font-size:11px;padding:4px 0 8px">Items to evaluate before signing LOI</p>';PRELOI_ITEMS.forEach(item=>h+=`<div class="preloi-item"><span class="preloi-bullet">&#9656;</span><span>${dEsc(item)}</span></div>`);h+='</div></div></div>';h+='<div class="dsec" style="margin-top:16px"><div class="dsec-hdr" onclick="toggleSection(this)">DD timeline - LOI to close (90 days) <span class="chevron">&#9660;</span></div><div class="dsec-body" style="max-height:none"><div class="dd-gantt"><div class="dd-row"><div class="dd-task" style="font-weight:600">Workstream</div>';for(let w=1;w<=12;w++)h+=`<div class="gantt-month">Wk${w}</div>`;h+='</div>';DD_SECTIONS.forEach(([sec,tasks])=>{h+=`<div class="dd-row"><div class="gantt-hdr" style="grid-column:1/14">${dEsc(sec)}</div></div>`;tasks.forEach(([name,weeks])=>{h+=`<div class="dd-row"><div class="dd-task">${dEsc(name)}</div>`;for(let w=1;w<=12;w++){const a=weeks.includes(w);const isCl=a&&(name.toLowerCase().includes('signing')||name.toLowerCase().includes('day 1')||name.toLowerCase().includes('100-day'));h+=`<div class="dd-cell ${a?(isCl?'gantt-fill-t':'gantt-fill'):''}"></div>`}h+='</div>'})});h+='</div></div></div>';h+='<div class="dsec" style="margin-top:16px"><div class="dsec-hdr" onclick="toggleSection(this)">DD cost budget (EUR) <span class="chevron">&#9660;</span></div><div class="dsec-body" style="max-height:none"><table class="cost-tbl"><tr><th>Workstream</th><th class="r">Low</th><th class="r">High</th><th>Notes</th></tr>';[['Financial QoE','25,000','50,000','Specialty firm'],['Legal (DE + UK)','40,000','100,000','Parallel counsel; most expensive'],['Tax structure','10,000','25,000','Cross-border (Luxco)'],['Environmental + insurance','5,000','15,000','Phase I + gap analysis'],['Total','80,000','190,000','Commercial, customer, HR, tech in-house']].forEach(([ws,lo,hi,n])=>{const isTot=ws==='Total';h+=`<tr class="${isTot?'tot-row':''}"><td${isTot?' style="font-weight:700"':''}>${dEsc(ws)}</td><td class="r"${isTot?' style="font-weight:700"':''}>${lo}</td><td class="r"${isTot?' style="font-weight:700"':''}>${hi}</td><td style="color:var(--gray);font-size:11px">${dEsc(n)}</td></tr>`});h+='</table></div></div>';el.innerHTML=h}
+function renderCadence(idx){const el=document.getElementById('dp'+idx);if(!el)return;let h='<div class="dsec"><div class="dsec-hdr" onclick="toggleSection(this)">Weekly rhythm <span class="chevron">&#9660;</span></div><div class="dsec-body" style="max-height:none"><table><tr><th style="width:90px">Day</th><th>Activity</th><th>Owner</th><th>Notes</th></tr>';[['Monday','Pipeline review + tracker update','Leif + Tommy','Review funnel, prioritize, assign follow-ups'],['Tuesday','Target research + broker check-ins','Leif','Bundesanzeiger, CH, CIQ screening'],['Wednesday','Cold outreach (5) + warm follow-ups','Leif','Personalized emails/calls'],['Thursday','Advisor calls (bi-weekly) + trade press scan','Leif','Rotate: FO, legal, QoE, brokers'],['Friday','Weekly memo to Tommy + CRM hygiene','Leif','Targets contacted, meetings, pipeline changes']].forEach(([d,a,o,n])=>h+=`<tr><td style="font-weight:600">${dEsc(d)}</td><td>${dEsc(a)}</td><td>${dEsc(o)}</td><td style="color:var(--gray);font-size:11px">${dEsc(n)}</td></tr>`);h+='</table></div></div>';h+='<div class="dsec" style="margin-top:16px"><div class="dsec-hdr" onclick="toggleSection(this)">Monthly cadence <span class="chevron">&#9660;</span></div><div class="dsec-body" style="max-height:none"><table><tr><th style="width:120px">Timing</th><th>Activity</th><th>Owner</th><th>Deliverable</th></tr>';[['1st week','Pipeline report + investor update','Leif','Funnel snapshot, conversion rates'],['2nd week','Broker review + target deep-dive','Leif + Tommy','Quality assessment, 1-2 company write-ups'],['3rd week','Market intelligence synthesis','Leif','Trade press, fair follow-ups, trends'],['4th week','Strategy session (90 min)','Leif + Tommy','Thesis refinement, pivots, resource allocation'],['Ongoing','Trade fair prep (6 weeks out)','Leif','Exhibitor lists, meeting requests, logistics']].forEach(([t,a,o,d])=>h+=`<tr><td style="font-weight:600">${dEsc(t)}</td><td>${dEsc(a)}</td><td>${dEsc(o)}</td><td style="color:var(--gray);font-size:11px">${dEsc(d)}</td></tr>`);h+='</table></div></div>';h+='<div class="dsec" style="margin-top:16px"><div class="dsec-hdr" onclick="toggleSection(this)">Outreach phases <span class="chevron">&#9660;</span></div><div class="dsec-body" style="max-height:none"><table><tr><th>Phase</th><th>Period</th><th class="r">/week</th><th class="r">Mtgs/mo</th><th>Channel</th><th>Goal</th></tr>';[['List building','M1-2 (Jun-Jul)','0','0','Scraping, CIQ, brokers','250 identified'],['Soft launch','M3 (Aug)','5','3','Email + brokers','Test messaging'],['Ramp-up','M4-6 (Sep-Nov)','5','5-6','Outreach + fairs + brokers','Meeting pipeline'],['Steady state','M7-9 (Dec-Feb)','5','4-5','Warm + new + broker flow','Convert to interest'],['DD focus','M10-11 (Mar-Apr)','2-3','3','Maintenance only','Close lead deal'],['Close','M12 (May)','1','2','Maintenance','Integration prep']].forEach(([p,per,tw,mm,ch,g])=>h+=`<tr><td style="font-weight:600">${dEsc(p)}</td><td>${dEsc(per)}</td><td class="r">${tw}</td><td class="r">${mm}</td><td style="color:var(--gray);font-size:11px">${ch}</td><td style="color:var(--gray);font-size:11px">${g}</td></tr>`);h+='</table></div></div>';el.innerHTML=h}
+function renderProgress(idx){const el=document.getElementById('dp'+idx);if(!el)return;const cats=[...new Set(dashData().progress.map(e=>e.w))];let h='<div class="search-bar"><input class="search-input" type="text" placeholder="Search entries..." oninput="progressSearch=this.value.toLowerCase();renderProgress('+idx+')">';h+=`<span class="filter-btn ${progressFilter==='all'?'active':''}" onclick="progressFilter='all';renderProgress(${idx})">All</span>`;cats.forEach(c=>h+=`<span class="filter-btn ${progressFilter===c?'active':''}" onclick="progressFilter='${c}';renderProgress(${idx})">${dEsc(c)}</span>`);h+='</div>';const filtered=dashData().progress.filter(e=>(progressFilter==='all'||e.w===progressFilter)&&(!progressSearch||[e.desc,e.w,e.detail].join(' ').toLowerCase().includes(progressSearch)));h+=`<div class="dsec"><div class="dsec-hdr">Progress (${filtered.length})</div><div style="padding:4px 0">`;filtered.forEach(e=>{h+=`<div class="progress-entry" onclick="this.classList.toggle('expanded')"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:600">${dEsc(e.w)}</span><span style="color:var(--gray);font-size:11px">${dEsc(e.d)} | ${dEsc(e.o)}</span></div><div>${dEsc(e.desc)}</div><div class="pe-detail"><div style="color:var(--navy);font-size:11px;margin-top:6px;padding:6px 8px;background:#F0F0F5;border-radius:3px">${dEsc(e.detail)}</div></div><div style="color:var(--gray);font-size:11px;margin-top:4px">Next: ${dEsc(e.next)} (${dEsc(e.dl)})</div></div>`});h+='</div></div>';h+='<div class="dsec" style="margin-top:16px"><div class="dsec-hdr" onclick="toggleSection(this)">Key milestones <span class="chevron">&#9660;</span></div><div class="dsec-body" style="max-height:none"><div style="padding:8px 0">';[{d:'Jun 2026',m:'Thesis v1 drafted',o:'Leif + Tommy',s:'Done'},{d:'Jun 2026',m:'ERIKS/Galaxy access confirmed',o:'Tommy',s:'Done'},{d:'Jul 2026',m:'Target profiles finalized (4-8m EBIT)',o:'Leif',s:'Done'},{d:'Jul 2026',m:'CRM built (custom Firebase)',o:'Leif',s:'Done'},{d:'Jul 2026',m:'Financing wave 1 sent (15 emails)',o:'Leif',s:'Done'},{d:'Jul 2026',m:'GmbH formation started',o:'Leif',s:'In progress'},{d:'Aug 2026',m:'GmbH bank account opened',o:'Leif',s:'Done'},{d:'Sep 2026',m:'Intern hired',o:'Leif',s:'In progress'},{d:'Sep 2026',m:'GmbH registered',o:'Leif',s:'Pending'},{d:'Sep 2026',m:'First target outreach wave',o:'Leif',s:'Pending'},{d:'Oct 2026',m:'250 targets identified',o:'Leif',s:'In progress'},{d:'Oct 2026',m:'Broker network activated',o:'Leif + Tommy',s:'In progress'},{d:'Jan 2027',m:'First mgmt meeting',o:'Leif + Tommy',s:'Pending'},{d:'TBD',m:'LOI signed',o:'Leif + Tommy',s:'Pending'}].forEach(m=>{const sC=m.s==='Done'?`background:${GREEN};color:white`:(m.s==='In progress'?`background:${GOLD};color:white`:'');h+=`<div class="milestone"><div class="milestone-date">${dEsc(m.d)}</div><div class="milestone-text"><strong>${dEsc(m.m)}</strong> <span style="color:var(--gray);font-size:11px">(${dEsc(m.o)})</span></div><div class="milestone-status" style="${sC}">${dEsc(m.s)}</div></div>`});h+='</div></div></div>';el.innerHTML=h}
+function renderDecisions(idx){const el=document.getElementById('dp'+idx);if(!el)return;const dismissed=allDismissed();const live=dashData().decisions.map((d,i)=>({d,i})).filter(x=>!dismissed.includes(x.d.decision));const pend=live.filter(x=>(x.d.status||'').toLowerCase()==='pending');const done=live.filter(x=>(x.d.status||'').toLowerCase()!=='pending');const dismissedCount=dismissed.filter(k=>dashData().decisions.some(d=>d.decision===k)).length;
+let h=`<div class="search-bar"><span class="filter-btn ${decFilter==='open'?'active':''}" onclick="decFilter='open';renderDecisions(${idx})">Open (${pend.length})</span><span class="filter-btn ${decFilter==='decided'?'active':''}" onclick="decFilter='decided';renderDecisions(${idx})">Decided (${done.length})</span><span class="filter-btn ${decFilter==='all'?'active':''}" onclick="decFilter='all';renderDecisions(${idx})">All</span></div>`;
+if(decFilter!=='decided'){h+=`<div class="dsec"><div class="dsec-hdr">Open decisions (${pend.length})</div><div style="padding:8px 0">`;if(!pend.length)h+='<div style="padding:8px;color:var(--gray);font-size:12px">Nothing open.</div>';pend.forEach(({d,i})=>{h+=`<div class="dec-card dec-card-pending"><button class="dec-dismiss" onclick="event.stopPropagation();dismissDecision(${i},${idx})" title="Dismiss">x</button><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;padding-right:24px"><span class="dec-meta">${dEsc(d.owner)}</span><span class="dec-badge dec-badge-pending">Open</span></div><div class="dec-title">${dEsc(d.decision)}</div>`;if(d.rationale)h+=`<div style="font-size:12px;color:var(--gray);margin-top:4px;line-height:1.45">${dEsc(d.rationale)}</div>`;if(d.trigger)h+=`<div style="font-size:10px;color:var(--gray);margin-top:6px;font-style:italic">Source: ${dEsc(d.trigger)}</div>`;h+='</div>'});h+='</div></div>'}
+if(decFilter!=='open'){h+=`<div class="dsec" style="margin-top:16px"><div class="dsec-hdr" onclick="toggleSection(this)">Decided (${done.length}) <span class="chevron">&#9660;</span></div><div class="dsec-body" style="max-height:none"><table><tr><th style="width:90px">Date</th><th style="width:28%">Decision</th><th>Outcome</th><th style="width:60px">Owner</th><th style="width:26px"></th></tr>`;done.forEach(({d,i})=>{h+=`<tr title="${dEsc(d.rationale||'')}"><td style="color:var(--gray);font-size:11px">${dEsc(d.date)}</td><td style="font-weight:600">${dEsc(d.decision)}</td><td style="font-size:11px">${dEsc(d.outcome||'')}</td><td style="color:var(--gray);font-size:11px">${dEsc(d.owner)}</td><td><button class="dec-dismiss" style="position:static" onclick="dismissDecision(${i},${idx})" title="Dismiss">x</button></td></tr>`});h+='</table><div style="font-size:10px;color:var(--gray);padding:6px 8px">Hover a row for the rationale.</div></div></div>'}
+if(dismissedCount>0){h+=`<div class="dec-dismissed-bar"><span>${dismissedCount} decision${dismissedCount>1?'s':''} dismissed</span><button onclick="restoreAllDecisions(${idx})">Restore all</button></div>`}el.innerHTML=h}
+function renderTodos(idx){const el=document.getElementById('dp'+idx);if(!el)return;const open=dashData().todos.filter(t=>!t.done&&!t.deleted);const uc=open.filter(t=>t.priority==='urgent').length,ac=open.filter(t=>t.priority==='active').length,mc=open.filter(t=>t.priority==='midterm').length,ic=open.filter(t=>t.priority==='info').length;const dueSoon=open.filter(t=>{const d=daysUntil(t.dl);return d!==null&&d<=10}).length;let h=`<div class="todo-stats"><div class="todo-stat"><div class="todo-stat-val">${open.length}</div><div class="todo-stat-label">Open</div></div><div class="todo-stat"><div class="todo-stat-val" style="color:var(--terra)">${uc}</div><div class="todo-stat-label">Urgent</div></div><div class="todo-stat"><div class="todo-stat-val" style="color:var(--gold)">${ac}</div><div class="todo-stat-label">Active</div></div><div class="todo-stat"><div class="todo-stat-val" style="color:#7C3AED">${mc}</div><div class="todo-stat-label">Mid-term</div></div><div class="todo-stat"><div class="todo-stat-val" style="color:var(--navy)">${ic}</div><div class="todo-stat-label">Backlog</div></div><div class="todo-stat"><div class="todo-stat-val" style="color:var(--terra)">${dueSoon}</div><div class="todo-stat-label">Due &le;10d</div></div></div>`;
+h+=`<div class="add-todo-bar"><input class="add-todo-input" type="text" placeholder="Add a new to-do..." id="new-todo-input" onkeydown="if(event.key==='Enter')addTodo(${idx})"><select id="new-todo-priority" style="padding:7px 8px;border:1px solid #D0D0D8;border-radius:6px;font-size:12px;font-family:Arial"><option value="urgent">Urgent</option><option value="active" selected>Active</option><option value="midterm">Mid-term</option><option value="info">Backlog</option></select><select id="new-todo-tag" style="padding:7px 8px;border:1px solid #D0D0D8;border-radius:6px;font-size:12px;font-family:Arial"><option value="outreach">Outreach</option><option value="financing">Financing (debt)</option><option value="equity">Equity</option><option value="setup">Setup</option><option value="legal">Legal</option><option value="hiring">Hiring</option><option value="research">Research</option><option value="strategy">Strategy</option><option value="data">Data</option></select><button class="add-todo-btn" onclick="addTodo(${idx})">+ Add</button></div>`;
+h+='<div class="search-bar"><input class="search-input" type="text" placeholder="Search to-dos..." oninput="document.getElementById(\'dp'+idx+'\')._search=this.value.toLowerCase();todoFilter=this.value?\'search\':\'open\';renderTodos('+idx+')">';
+h+=`<span class="filter-btn ${todoFilter==='open'?'active':''}" onclick="todoFilter='open';todoOwnerFilter='all';saveTodos();renderTodos(${idx})">Open</span><span class="filter-btn ${todoFilter==='urgent'?'active':''}" onclick="todoFilter='urgent';todoOwnerFilter='all';saveTodos();renderTodos(${idx})">Urgent</span><span class="filter-btn ${todoFilter==='active'?'active':''}" onclick="todoFilter='active';todoOwnerFilter='all';saveTodos();renderTodos(${idx})">Active</span><span class="filter-btn ${todoFilter==='midterm'?'active':''}" onclick="todoFilter='midterm';todoOwnerFilter='all';saveTodos();renderTodos(${idx})">Mid-term</span><span class="filter-btn ${todoFilter==='duesoon'?'active':''}" onclick="todoFilter='duesoon';todoOwnerFilter='all';saveTodos();renderTodos(${idx})">Due soon</span><span class="filter-btn ${todoFilter==='done'?'active':''}" onclick="todoFilter='done';todoOwnerFilter='all';saveTodos();renderTodos(${idx})">Done</span><span class="filter-btn ${todoFilter==='all'?'active':''}" onclick="todoFilter='all';todoOwnerFilter='all';saveTodos();renderTodos(${idx})">All</span>`;
+h+=`<span style="border-left:1px solid #D0D0D8;height:20px;margin:0 4px"></span>`;
+h+=`<span class="filter-btn-owner ${todoOwnerFilter==='Leif'?'active':''}" onclick="todoOwnerFilter='Leif';todoFilter='open';saveTodos();renderTodos(${idx})">Leif</span><span class="filter-btn-owner ${todoOwnerFilter==='Tommy'?'active':''}" onclick="todoOwnerFilter='Tommy';todoFilter='open';saveTodos();renderTodos(${idx})">Tommy</span></div>`;
+const isSubset=(todoFilter!=='all'&&todoFilter!=='open'&&todoFilter!=='search')||todoOwnerFilter!=='all';let filterLabel='';if(todoOwnerFilter!=='all')filterLabel='Owner: '+todoOwnerFilter;else if(todoFilter==='urgent')filterLabel='Priority: Urgent';else if(todoFilter==='active')filterLabel='Priority: Active';else if(todoFilter==='midterm')filterLabel='Priority: Mid-term';else if(todoFilter==='duesoon')filterLabel='Due within 10 days';else if(todoFilter==='done')filterLabel='Status: Done';
+if(isSubset){h+=`<div class="todo-filter-active"><div class="todo-filter-indicator"><span>Showing: ${dEsc(filterLabel)}</span><span style="cursor:pointer;font-size:12px;color:var(--gray)" onclick="todoFilter='open';todoOwnerFilter='all';saveTodos();renderTodos(${idx})">Clear filter</span></div></div>`}
+const sv=el?._search||'';const filtered=dashData().todos.filter(t=>{if(t.deleted)return false;if(todoOwnerFilter!=='all'&&!(t.owner||'').includes(todoOwnerFilter))return false;if(todoFilter==='open')return !t.done;if(todoFilter==='urgent')return t.priority==='urgent'&&!t.done;if(todoFilter==='active')return t.priority==='active'&&!t.done;if(todoFilter==='midterm')return t.priority==='midterm'&&!t.done;if(todoFilter==='duesoon'){if(t.done)return false;const d=daysUntil(t.dl);return d!==null&&d<=10}if(todoFilter==='done')return t.done;if(todoFilter==='search')return(t.title+t.desc).toLowerCase().includes(sv);return true});
+const g={urgent:[],active:[],midterm:[],info:[],done:[]};filtered.forEach(t=>{if(t.done)g.done.push(t);else if(t.priority)g[t.priority]?.push(t)});
+if(g.urgent.length){h+='<div class="todo-section-hdr">Urgent</div>';g.urgent.forEach(t=>h+=todoCard(t,idx))}
+if(g.active.length){h+='<div class="todo-section-hdr">Active</div>';g.active.forEach(t=>h+=todoCard(t,idx))}
+if(g.midterm.length){h+='<div class="todo-section-hdr" style="color:#7C3AED">Mid-term <span style="font-weight:400;font-size:11px;color:var(--gray)">(reminder appears 10 days before deadline)</span></div>';g.midterm.sort((a,b)=>{const x=daysUntil(a.dl),y=daysUntil(b.dl);return (x===null?9999:x)-(y===null?9999:y)});g.midterm.forEach(t=>h+=todoCard(t,idx))}
+if(g.info.length){h+='<div class="todo-section-hdr">Backlog</div>';g.info.forEach(t=>h+=todoCard(t,idx))}
+if(g.done.length){h+='<div class="todo-section-hdr" style="color:var(--gray)">Completed ('+g.done.length+')</div>';g.done.forEach(t=>h+=todoCard(t,idx))}
+el.innerHTML=h;updateBadge(idx)}
+// Deadline parsing -> days until due (null if no parseable date)
+const MON={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+function daysUntil(dl){if(!dl)return null;const s=String(dl).trim();let m=s.match(/^(\d{1,2})\s+([A-Za-z]{3})[a-z]*\s+(\d{4})$/);let d;if(m){d=new Date(+m[3],MON[m[2].toLowerCase()],+m[1])}else{m=s.match(/^([A-Za-z]{3})[a-z]*\s+(\d{4})$/);if(!m)return null;const y=+m[2],mo=MON[m[1].toLowerCase()];if(mo===undefined)return null;d=new Date(y,mo+1,0)}const now=new Date();now.setHours(0,0,0,0);return Math.round((d-now)/86400000)}
+function todoCard(t,idx){const pc=t.priority==='urgent'?'todo-card-urgent':(t.priority==='active'?'todo-card-active':(t.priority==='midterm'?'todo-card-midterm':'todo-card-info'));const tc='todo-tag-'+(t.tag||'research');const du=t.done?null:daysUntil(t.dl);const soon=du!==null&&du<=10;const dueTxt=du===null?'':(du<0?`${-du}d overdue`:(du===0?'due today':`due in ${du}d`));return `<div class="todo-card ${pc} ${soon?'todo-due-soon':''} ${t.done?'done':''}" id="todo-${t.id}" draggable="${!t.done}" ondragstart="event.dataTransfer.setData('todo-id','${t.id}');this.classList.add('dragging')" ondragend="this.classList.remove('dragging')" ondragover="event.preventDefault();this.classList.add('drag-over-todo')" ondragleave="this.classList.remove('drag-over-todo')" ondrop="event.preventDefault();this.classList.remove('drag-over-todo');reorderTodo(event.dataTransfer.getData('todo-id'),${t.id},${idx})"><div class="todo-check ${t.done?'checked':''}" onclick="event.stopPropagation();toggleTodo(${t.id},${idx})"></div><div class="todo-content"><div class="todo-title">${dEsc(t.title)}</div><div class="todo-desc">${dEsc(t.desc)}</div><div class="todo-meta"><span class="todo-tag ${tc}">${dEsc(t.tag)}</span><span class="todo-owner">${dEsc(t.owner)}</span><span class="todo-deadline">${dEsc(t.dl)}</span>${soon?`<span class="todo-due-badge">${dueTxt}</span>`:''}</div></div><button class="delete-btn" onclick="event.stopPropagation();deleteTodo(${t.id},${idx})" title="Remove">x</button></div>`}
+function toggleTodo(id,idx){const t=dashData().todos.find(x=>x.id===id);if(t)t.done=!t.done;saveTodos();renderTodos(idx)}
+function deleteTodo(id,idx){const t=dashData().todos.find(x=>x.id===id);if(t)t.deleted=true;saveTodos();renderTodos(idx)}
+function addTodo(idx){const inp=document.getElementById('new-todo-input');const pri=document.getElementById('new-todo-priority');const tag=document.getElementById('new-todo-tag');if(!inp||!inp.value.trim())return;dashData().todos.unshift({id:Date.now(),title:inp.value.trim(),desc:'',owner:'Leif',dl:'',tag:tag.value,priority:pri.value,done:false});inp.value='';saveTodos();renderTodos(idx)}
+function reorderTodo(fromId,toId,idx){fromId=parseInt(fromId);toId=parseInt(toId);if(fromId===toId)return;const fromIdx=dashData().todos.findIndex(t=>t.id===fromId);const toIdx=dashData().todos.findIndex(t=>t.id===toId);if(fromIdx<0||toIdx<0)return;const item=dashData().todos.splice(fromIdx,1)[0];dashData().todos.splice(toIdx,0,item);saveTodos();renderTodos(idx)}
+function updateBadge(todoIdx){const tabs=document.querySelectorAll('#dtabs .dtab');if(tabs[todoIdx]){const b=tabs[todoIdx].querySelector('.dtab-badge');if(b)b.textContent=dashData().todos.filter(t=>!t.done&&!t.deleted).length}}
 
 document.getElementById('tabs').addEventListener('click',e=>{
   const t=e.target.closest('.tab');if(!t)return;
