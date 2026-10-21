@@ -2613,6 +2613,7 @@ function cleanCity(s){
 function recCity(r){return cleanCity(r.city||r.location||'')}
 function cityLL(c){return (S.geoCache||{})[(c||'').toLowerCase()]||null}
 function addrKey(r){if(!r)return null;const a=(r.address||'').trim();if(!a||!/\d/.test(a))return null;const c=cleanCity(r.city||r.location||'');return ('addr:'+a+(c&&!a.toLowerCase().includes(c.toLowerCase())?', '+c:'')).toLowerCase().replace(/[.#$\/\[\]]/g,'_')}
+function addrQuery(r){let a=(r.address||'').split(/[;|]|\.\s*Weitere|\s+Weitere Standorte/i)[0].replace(/\(.*?\)/g,'').trim();const city=cleanCity(r.city||r.location||'');if(city&&!a.toLowerCase().includes(city.toLowerCase()))a+=', '+city;const ctry=(r.geo&&r.geo!=='DE')?({CH:'Switzerland',AT:'Austria',UK:'United Kingdom',FR:'France',NL:'Netherlands',LU:'Luxembourg',US:'USA'}[r.geo]||''):'Germany';return a+(ctry?', '+ctry:'')}
 function addrLL(r){const k=addrKey(r);return k?((S.geoCache||{})[k]||null):null}
 function distKm(a,b){const R=6371,t=x=>x*Math.PI/180;
   const dLat=t(b[0]-a[0]),dLon=t(b[1]-a[1]);
@@ -2841,12 +2842,12 @@ function renderLocations(){
 async function geocodeMissing(){
   S.geoCache=S.geoCache||{};
   const cities=[...new Set(allRecs().map(recCity).filter(Boolean))].filter(c=>!S.geoCache[c.toLowerCase()]);
-  const addrs=[];allRecs().forEach(r=>{const k=addrKey(r);if(k&&!S.geoCache[k]&&!addrs.some(x=>x[0]===k))addrs.push([k,k.slice(5)])});
+  const addrs=[];allRecs().forEach(r=>{const k=addrKey(r);if(k&&!S.geoCache[k]&&!addrs.some(x=>x[0]===k))addrs.push([k,addrQuery(r)])});
   if(!cities.length&&!addrs.length){toast('All cities and addresses geocoded');return}
   toast('Geocoding '+cities.length+' cities and '+addrs.length+' addresses…');
   for(const c of [...cities,...addrs]){
     try{
-      const isA=Array.isArray(c);const q=isA?(c[1].split(/[;|]| weitere /)[0].replace(/\(.*?\)/g,'').trim()+', Germany'):c+', Europe';
+      const isA=Array.isArray(c);const q=isA?c[1]:c+', Europe';
       const res=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q));
       const j=await res.json();
       if(j[0])S.geoCache[isA?c[0]:c.toLowerCase()]=[+j[0].lat,+j[0].lon];
