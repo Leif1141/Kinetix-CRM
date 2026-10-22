@@ -173,9 +173,9 @@ function applyRemote(path,key,value,prev){
 export function save(){
   if(!stateRef)return;
   if(legacyMode){toast('Read-only: the database is still in the old layout. Run tools/migrate.html first.');return}
-  pushUndo();
   const next=shard(S);
   const ops=diffTree(lastTree||{},next);
+  recordUndo(ops);
   lastTree=next;
   const paths=Object.keys(ops);
   if(!paths.length)return;
@@ -190,8 +190,12 @@ export function saveDebounced(){
   clearTimeout(_saveTimer);
   _saveTimer=setTimeout(save,300);
 }
-// ── Undo: snapshot before every save ──
+// ── Undo: before each save the fields about to change are stored with their previous values (from the last
+// known server tree). An undo writes those values back as one small update instead of rewriting the state. ──
 export const _undoStack=[];let _undoBusy=false;
-export function pushUndo(){try{if(_undoBusy)return;const snap=JSON.stringify(S);if(_undoStack.length&&_undoStack[_undoStack.length-1]===snap)return;_undoStack.push(snap);if(_undoStack.length>25)_undoStack.shift();const b=document.getElementById('undoBtn');if(b){b.style.display='inline-block';b.textContent='Undo ('+_undoStack.length+')'}}catch(e){}}
-export function undoLast(){if(!_undoStack.length){toast('Nothing to undo');return}const snap=_undoStack.pop();_undoBusy=true;try{const prev=JSON.parse(snap);Object.keys(S).forEach(k=>delete S[k]);Object.assign(S,prev);save();renderAll();toast('Last change undone')}finally{_undoBusy=false}const b=document.getElementById('undoBtn');if(b){b.textContent='Undo ('+_undoStack.length+')';if(!_undoStack.length)b.style.display='none'}}
+function updateUndoBtn(){const b=document.getElementById('undoBtn');if(!b)return;b.textContent='Undo ('+_undoStack.length+')';b.style.display=_undoStack.length?'inline-block':'none'}
+function recordUndo(ops){try{if(_undoBusy)return;const paths=Object.keys(ops);if(!paths.length)return;const inv={};for(const p of paths){const v=treeGet(p);inv[p]=v===undefined?null:JSON.parse(JSON.stringify(v))}_undoStack.push(inv);if(_undoStack.length>25)_undoStack.shift();updateUndoBtn()}catch(e){}}
+function treeApply(tree,path,value){const parts=path.split('/');let n=tree;for(const s of parts.slice(0,-1)){if(!isObj(n[s]))n[s]={};n=n[s]}const last=parts[parts.length-1];if(value===null||value===undefined)delete n[last];else n[last]=value}
+export function pushUndo(){} // kept for callers; undo entries are recorded inside save()
+export function undoLast(){if(!_undoStack.length){toast('Nothing to undo');return}const inv=_undoStack.pop();_undoBusy=true;try{const tree=JSON.parse(JSON.stringify(lastTree||{}));for(const [p,v] of Object.entries(inv))treeApply(tree,p,v);const prev=ensureDefaults(unshard(tree));Object.keys(S).forEach(k=>delete S[k]);Object.assign(S,prev);save();renderAll();toast('Last change undone')}finally{_undoBusy=false}updateUndoBtn()}
 export function lastKnownTree(){return lastTree}

@@ -55,10 +55,10 @@ export function nearbyBriefing(){
   if(rows===null){box.innerHTML='<p class="muted" style="padding:12px">'+esc(city)+' ist noch nicht geocodiert. Erst auf "Geocode new cities" klicken.</p>';return}
   if(onlyOpen)rows=rows.filter(x=>x.open);
   if(!rows.length){box.innerHTML='<p class="muted" style="padding:12px">Nobody within '+km+' km.</p>';return}
-  const GRP=x=>x.r.kind==='target'?'Zielunternehmen':x.r.kind==='advisor'?'Berater und Partner':'Kontakte';
+  const GRP=x=>x.r.kind==='target'?'Targets':x.r.kind==='advisor'?'Advisers and partners':'Contacts';
   const g={};rows.forEach(x=>{(g[GRP(x)]=g[GRP(x)]||[]).push(x)});
   let html='',txt='Within '+km+' km of '+city+':\n';
-  ['Zielunternehmen','Berater und Partner','Kontakte'].forEach(k=>{
+  ['Targets','Advisers and partners','Contacts'].forEach(k=>{
     if(!g[k])return;
     html+='<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b>'+k+' ('+g[k].length+')</b></div>';
     txt+='\n'+k+':\n';
@@ -102,8 +102,8 @@ export function renderClusters(){
   rows.sort((x,y)=>y.t.length-x.t.length);
   box.innerHTML=rows.length?rows.slice(0,10).map(x=>
     '<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b>'+esc(x.c)+'</b> '
-    +'<span class="chip" style="background:#C00000;color:#fff">'+x.t.length+' Ziele</span> '
-    +'<span class="chip">'+x.a.length+' Kontakte</span> '
+    +'<span class="chip" style="background:#C00000;color:#fff">'+x.t.length+' targets</span> '
+    +'<span class="chip">'+x.a.length+' contacts</span> '
     +'<button class="sm" onclick="document.getElementById(\'locNear\').value=\''+esc(x.c).replace(/'/g,"")+'\';nearbyBriefing();">Briefing</button>'
     +'<div class="muted" style="font-size:12px;margin-top:3px">'+x.t.slice(0,6).map(y=>esc(dispName(y.r))).join(' · ')+(x.t.length>6?' …':'')+'</div></div>'
   ).join(''):'<p class="muted" style="padding:12px">No region with three or more targets within '+km+' km yet.</p>';

@@ -1,5 +1,5 @@
 import {CHANNELS, DEADREASONS, LIVE, STAGES} from '../constants.js';
-import {S, allRecs, deadCatOf, dispName, fixUml, lastTouch, liveOnly, orgTouches, stageDate, tType} from '../state.js';
+import {S, allRecs, deadCatOf, dispName, fixUml, isSysNote, lastTouch, liveOnly, orgTouches, stageDate, tType, touchList} from '../state.js';
 import {catOf} from './lists.js';
 import {daysAgo, esc, fmtAgo, foldSearch} from '../util.js';
 import {shareIndex, sharedByRec} from '../shares.js';
@@ -98,5 +98,24 @@ export function renderReports(){
   document.getElementById('tisTable').innerHTML='<tr><th>Company</th><th style="width:140px">Stage</th><th style="width:110px;text-align:right">Days in stage</th></tr>'+tis.map(x=>'<tr class="rowlink" onclick="openProfile(findRec(\''+x.c.id+'\'))"><td><b>'+esc(fixUml(x.c.name))+'</b></td><td>'+stagePill(x.c.stage)+'</td><td style="text-align:right">'+x.d+'</td></tr>').join('');
 }
 export async function weeklyDigest(){
-  document.getElementById('dig_out').textContent='Weekly digest requires the Claude API. Use the Cowork artifact version or add a backend proxy.';
+  const D=14,t0=Date.now()-D*864e5;const inWin=t=>t&&t.date&&new Date(t.date).getTime()>=t0;
+  const seen=new Set();const recent=[];
+  allRecs().forEach(r=>Object.entries(r.touches||{}).forEach(([k,t])=>{if(seen.has(k)||!inWin(t)||isSysNote(t))return;seen.add(k);recent.push({r,t})}));
+  const n=f=>recent.filter(f).length;
+  const lines=[];
+  lines.push('Last '+D+' days: '+n(x=>x.t.dir==='out'&&tType(x.t)==='Email')+' emails out, '+n(x=>x.t.dir==='in'&&tType(x.t)==='Email')+' replies in, '+n(x=>tType(x.t)==='Meeting')+' meetings, '+n(x=>tType(x.t)==='Call')+' calls, '+n(x=>tType(x.t)==='Letter')+' letters.');
+  const moves=[];(S.companies||[]).forEach(c=>(c.stageLog||[]).forEach(l=>{if(l.date&&new Date(l.date).getTime()>=t0)moves.push(fixUml(c.name)+' to '+l.stage+' ('+String(l.date).slice(5,10)+')')}));
+  if(moves.length)lines.push('Stage moves ('+moves.length+'): '+moves.slice(0,15).join('; ')+(moves.length>15?'; and '+(moves.length-15)+' more':'')+'.');
+  const dead=(S.companies||[]).filter(c=>c.stage==='Dead'&&(c.stageLog||[]).some(l=>l.stage==='Dead'&&l.date&&new Date(l.date).getTime()>=t0));
+  if(dead.length)lines.push('Passed: '+dead.map(c=>fixUml(c.name)+' ('+(deadCatOf(c)||'no category')+')').join('; ')+'.');
+  const replied=[...new Set(recent.filter(x=>x.t.dir==='in'&&x.r.kind!=='person').map(x=>fixUml(dispName(x.r))))];
+  if(replied.length)lines.push('Replies from: '+replied.slice(0,25).join(', ')+(replied.length>25?' and '+(replied.length-25)+' more':'')+'.');
+  const cnt={};recent.filter(x=>x.r.kind==='advisor').forEach(x=>{const k=fixUml(dispName(x.r));cnt[k]=(cnt[k]||0)+1});
+  const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  if(top.length)lines.push('Most exchanges: '+top.map(([k,v])=>k+' ('+v+')').join(', ')+'.');
+  const quiet=liveOnly(S.companies||[]).filter(c=>LIVE.includes(c.stage)&&c.stage!=='Identified'&&!orgTouches(c).some(inWin));
+  if(quiet.length)lines.push('Live deals with no contact in '+D+' days: '+quiet.map(c=>fixUml(c.name)).join(', ')+'.');
+  const due=allRecs().filter(r=>r.nextDate&&r.nextDate<new Date().toISOString().slice(0,10)).length;
+  lines.push('Overdue next actions right now: '+due+'.');
+  document.getElementById('dig_out').textContent=lines.join('\n');
 }

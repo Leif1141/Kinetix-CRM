@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>KinetixCRM module tests</title>
+<style>
+body{font-family:Arial,sans-serif;font-size:13px;color:#000;background:#fff;margin:18px}
+h1{font-size:16px;margin:0 0 10px}
+.ok{color:#2E7D32}.fail{color:#C00000;font-weight:bold}
+pre{font-size:11px;background:#F4F5F9;padding:8px;border-radius:4px;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<h1>KinetixCRM module tests</h1>
+<p>Pure module tests, no Firebase. Serve the repo root with <code>tools/harness/serve.py</code> and open this page; the data comes from <code>tools/harness/data/KinetixCRM Backup.json</code>.</p>
+<div id="out"></div>
+<pre id="log"></pre>
+<script type="module">
+import {shard, unshard, diffTree, legacyExport, ensureDefaults, isLegacyBlob, encodeKeys, decodeKeys, encodePath, stableStringify} from '../../src/store/shards.js';
+const out=document.getElementById('out'), logEl=document.getElementById('log');
+const results=[];
+function t(name,fn){let ok=false,msg='';try{const r=fn();ok=r===true||r===undefined;if(typeof r==='string'){ok=false;msg=r}}catch(e){ok=false;msg=e.message}results.push({name,ok,msg});
+  const d=document.createElement('div');d.className=ok?'ok':'fail';d.textContent=(ok?'PASS  ':'FAIL  ')+name+(msg?'  ('+msg+')':'');out.appendChild(d)}
+const byId=arr=>{const m={};(arr||[]).forEach(r=>{if(r&&r.id)m[r.id]=r});return m};
+const sameSets=(a,b)=>{const A=byId(a),B=byId(b);const ka=Object.keys(A),kb=Object.keys(B);if(ka.length!==kb.length)return 'count '+ka.length+' vs '+kb.length;for(const k of ka){if(stableStringify(A[k])!==stableStringify(B[k]))return 'record '+k+' differs'}return true};
+const strip=o=>JSON.parse(JSON.stringify(o,(k,v)=>k==='_ord'?undefined:v));
+
+const resp=await fetch('../../tools/harness/data/KinetixCRM Backup.json');
+const blob=await resp.json();
+logEl.textContent='backup: companies '+blob.companies.length+', advisors '+blob.advisors.length+', people '+blob.people.length+', threads '+(blob.threads||[]).length;
+
+t('backup is recognised as the legacy blob layout',()=>isLegacyBlob(blob)===true||'isLegacyBlob false');
+const S0=ensureDefaults(JSON.parse(JSON.stringify(blob)));
+const tree=shard(S0);
+t('shard produces the expected top-level nodes',()=>{const k=Object.keys(tree).filter(x=>x!=='inbox').sort().join(',');return k==='advisors,companies,dash,meta,people,threads,touches'||k}); // inbox is absent while nothing is unmatched
+t('sharded tree is not the legacy layout',()=>isLegacyBlob(tree)===false||'still legacy');
+const S1=ensureDefaults(unshard(tree));
+t('round trip keeps every company',()=>sameSets(S0.companies,S1.companies));
+t('round trip keeps every adviser',()=>sameSets(S0.advisors,S1.advisors));
+t('round trip keeps every person',()=>sameSets(S0.people,S1.people));
+t('round trip keeps the touch count',()=>{const n=s=>['companies','advisors','people'].reduce((a,c)=>a+s[c].reduce((m,r)=>m+Object.keys(r.touches||{}).length,0),0);return n(S0)===n(S1)||n(S0)+' vs '+n(S1)});
+t('round trip keeps threads in order',()=>{const a=strip(S0.threads||[]),b=strip(S1.threads||[]);return stableStringify(a)===stableStringify(b)||'threads differ'});
+t('round trip keeps dash todos, progress and decisions',()=>{for(const k of ['todos','progress','decisions']){if(stableStringify(strip(S0.dash[k]))!==stableStringify(strip(S1.dash[k])))return k+' differs'}return true});
+t('legacyExport reproduces the backup shape',()=>{const e=legacyExport(S1);const miss=Object.keys(blob).filter(k=>!(k in e));return miss.length?'missing keys: '+miss.join(','):true});
+t('legacyExport strips the internal order field',()=>{const e=legacyExport(S1);return !JSON.stringify(e).includes('"_ord"')||'_ord leaked'});
+t('encodeKeys/decodeKeys round trip on dotted keys',()=>{const o={'a.b@c.de':{'x$y':1,'#k':[1,2]}};return stableStringify(decodeKeys(encodeKeys(o)))===stableStringify(o)||'differs'});
+t('encodePath encodes each segment',()=>encodePath('meta/senderMap/a.b@c.de')==='meta/senderMap/a__dot__b@c__dot__de'||encodePath('meta/senderMap/a.b@c.de'));
+t('diffTree: one field change gives one op',()=>{const a=shard(S0);const S2=JSON.parse(JSON.stringify(S0));S2.advisors[0].cadence=(S2.advisors[0].cadence||30)+1;const ops=diffTree(a,shard(S2));const k=Object.keys(ops);return (k.length===1&&k[0]==='advisors/'+S2.advisors[0].id+'/cadence')||JSON.stringify(k).slice(0,120)});
+t('diffTree: a removed field gives null',()=>{const a=shard(S0);const S2=JSON.parse(JSON.stringify(S0));delete S2.advisors[0].notes;const ops=diffTree(a,shard(S2));const p='advisors/'+S2.advisors[0].id+'/notes';return (p in ops&&ops[p]===null)||JSON.stringify(ops).slice(0,120)});
+t('diffTree: a new touch gives one op under touches',()=>{const a=shard(S0);const S2=JSON.parse(JSON.stringify(S0));const r=S2.advisors[1];r.touches=r.touches||{};r.touches['test_key_1']={date:'2026-10-22',dir:'out',src:'Note',subject:'t'};const ops=diffTree(a,shard(S2));const k=Object.keys(ops);return (k.length===1&&k[0]==='touches/'+r.id+'/test_key_1')||JSON.stringify(k).slice(0,120)});
+t('diffTree: identical trees give no ops',()=>Object.keys(diffTree(shard(S0),shard(S0))).length===0||'ops found');
+t('ensureDefaults is idempotent',()=>stableStringify(ensureDefaults(JSON.parse(JSON.stringify(S1))))===stableStringify(S1)||'changed');
+const fails=results.filter(r=>!r.ok).length;
+const sum=document.createElement('div');sum.style.marginTop='10px';sum.innerHTML='<b>'+(results.length-fails)+' of '+results.length+' passed</b>';out.appendChild(sum);
+window.__testResults=results;document.title=(fails?'FAIL ':'PASS ')+document.title;
+</script>
+</body>
+</html>

@@ -136,6 +136,7 @@ export function refreshRecordPage(){ // called from renderAll after remote chang
   if(!profRec||!document.body.classList.contains('rec-open'))return;
   if(document.querySelector('#p-record .rfe'))return;
   if(profRec.id&&!findRec(profRec.id)&&!isNew){closeProfile();return}
+  const fresh=profRec.id&&findRec(profRec.id);if(fresh&&fresh!==profRec)profRec=fresh; // state objects are replaced by undo and import
   const y=window.scrollY;renderRecordPage();window.scrollTo(0,y);
 }
 export function openProfile(rec){

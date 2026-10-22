@@ -110,7 +110,7 @@ export function renderThreads(){
       +'<input type="checkbox" title="'+(done?'Ticked on '+esc(S.threadsDone[t.id]):'Tick off')+'" onclick="thToggle(\''+t.id+'\',event)"'+(done?' checked':'')+'>'
       +'<div class="th-bd"><div class="th-head"><span class="th-nm" onclick="thOpen(\''+t.id+'\',event)">'+esc(t.name)+'</span>'
       +(function(){const _r=findRec(t.id);const _c=(_r&&_r.kind!=='person'&&_r.contact)?_r.contact:t.contact;return _c&&_c!==t.name?'<span class="muted">'+esc(fixUml(_c))+'</span>':''})()
-      +pill(TH_CLS[v],TH_V[v])+(t.p&&t.p!=='Niedrig'?pill(t.p.toLowerCase(),t.p):'')
+      +pill(TH_CLS[v],TH_V[v])+(t.p&&t.p!=='Niedrig'?pill(t.p.toLowerCase(),({Hoch:'High',Mittel:'Medium'})[t.p]||t.p):'')
       +(still!=null&&still<9999?pill('lite',still+' days quiet'):'')
       +(t.auto?pill('lite','new since snapshot'):'')
       +(st.v?pill('lite','Status changed'):'')
