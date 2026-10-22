@@ -1,20 +1,231 @@
 import {invalidateThreads} from '../views/threads.js';
 import {ACT_TYPES, ADV_CATS, ADV_STATUS, CHANNELS, DEADREASONS, PRIORITIES, PTYPES, STAGES, VERDICTS} from '../constants.js';
-import {S, addTouch, chanOf, deadCatOf, dispName, findRec, fixUml, isSysNote, newPerson, orgPeople, personOrg, splitPhones, tType, touchList} from '../state.js';
-
+import {S, addTouch, chanOf, deadCatOf, dispName, findRec, fixUml, isSysNote, newPerson, orgPeople, personOrg, splitPhones, tType, touchList, lastTouch} from '../state.js';
 import {addDays, cleanPrev, esc, fmtAgo, fmtD, normName, toast, today, uid} from '../util.js';
-import {fld, gv, n1, selFld, starHtml} from './ui.js';
+import {fld, gv, n1, selFld, starHtml, stagePill} from './ui.js';
 import {letterBox} from './pipeline.js';
 import {renderAll} from '../main.js';
 import {save} from '../store/firebase.js';
 import {shareHtml} from '../shares.js';
+import {logDone} from './actions.js';
+import {openPromises} from './home.js';
 
+// ═══════════════════════════════════════════════════════════════
+// RECORD PAGE: one scrolling page per record, click-to-edit fields, autosave per field.
+// Route #rec/{id}. Replaces the modal editor.
+// ═══════════════════════════════════════════════════════════════
 export let profRec=null;
 export let profChart=null;
+let prevTab='home',isNew=false;
 
+const COUNTRIES=['Germany','United Kingdom','Switzerland','France','Netherlands','Luxembourg','Sweden','Denmark','Austria','United States','Other'];
+const F=(key,label,type,opts)=>Object.assign({key,label,type:type||'text'},opts||{});
+function fieldSpecs(r){
+  const next=[F('nextAction','Next action','textarea'),F('nextDate','Due','date'),F('priority','Priority','select',{options:PRIORITIES})];
+  if(r.kind==='target')return {
+    sections:[
+      ['Company',[F('name','Company name','text',{required:true}),F('contact','Primary contact (owner / MD)'),F('email','Email'),F('phone','Phone (office)'),F('mobile','Mobile'),F('domain','Website'),F('location','Location')]],
+      ['Deal',[F('stage','Stage','select',{options:STAGES}),F('channel','Channel','select',{options:CHANNELS,get:c=>chanOf(c)}),F('channelVia','Via (partner, fair, contact)'),F('revenue','Revenue (€m)','number'),F('ebitda','EBITDA (€m)','number'),F('ebit','EBIT (€m)','number'),F('gm','Gross margin %','number',{get:c=>c.gm==null||c.gm===''?null:Math.round(c.gm*1000)/10,set:v=>v==null?null:v/100}),F('score','Score /100','number'),F('verdict','Verdict','select',{options:VERDICTS})]
+        .concat(r.stage==='Dead'?[F('deadCat','Dead category','select',{options:DEADREASONS,get:deadCatOf}),F('revisitDate','Revisit date','date'),F('deadReason','Dead reason (detail)','textarea')]:[])],
+      ['Profile',[F('description','Description','textarea'),F('ownership','Ownership'),F('flag','Flag'),F('notes','Research notes','textarea',{rows:6})]]
+    ],next};
+  if(r.kind==='advisor')return {
+    sections:[
+      ['Firm',[F('firm','Firm name','text',{required:true}),F('contact','Primary contact'),F('email','Email'),F('phone','Phone (office)'),F('mobile','Mobile'),F('domain','Domain'),F('city','City'),F('address','Address')]],
+      ['Relationship',[F('category','Category','select',{options:ADV_CATS}),F('status','Status','select',{options:ADV_STATUS}),F('market','Market','select',{options:['DE','UK'],get:a=>a.market||(/uk|united kingdom/i.test(a.geo||'')?'UK':'DE')}),F('geo','Geo (country)','select',{options:COUNTRIES}),F('cadence','Check-in cadence (days)','int',{def:30}),F('introPath','Intro path'),F('notes','Notes','textarea')]]
+    ],next};
+  return {
+    sections:[
+      ['Person',[F('name','Full name','text',{required:true}),F('title','Title'),F('ptype','Type','select',{options:PTYPES}),F('firm','Organisation'),F('email','Email'),F('phone','Phone (office)'),F('mobile','Mobile'),F('linkedin','LinkedIn'),F('city','City')]],
+      ['Context',[F('angle','Angle / notes','textarea'),F('networkPath','Network path')]]
+    ],next};
+}
+const getVal=(r,s)=>s.get?s.get(r):r[s.key];
+function display(r,s){
+  const v=getVal(r,s);
+  if(v===null||v===undefined||v==='')return '<span class="muted">–</span>';
+  if(s.type==='date')return esc(fmtD(v))+' <span class="muted">'+esc(v)+'</span>';
+  if(s.type==='number')return esc(n1(v)===''?String(v):n1(v));
+  if(s.key==='stage')return stagePill(v);
+  if(s.key==='domain'||s.key==='linkedin'){const u=/^https?:/.test(v)?v:'https://'+v;return '<a href="'+esc(u)+'" target="_blank" onclick="event.stopPropagation()">'+esc(v)+'</a>'}
+  if(s.key==='email')return '<a href="mailto:'+esc(v)+'" onclick="event.stopPropagation()">'+esc(v)+'</a>';
+  return esc(fixUml(String(v))).replace(/\n/g,'<br>');
+}
+function fieldHtml(r,s){return '<div class="rf" data-f="'+s.key+'"><label>'+esc(s.label)+'</label><div class="rfv" tabindex="0" title="Click to edit">'+display(r,s)+'</div></div>'}
+function editorHtml(r,s){
+  const v=getVal(r,s);const cur=v===null||v===undefined?'':String(v);
+  if(s.type==='select'){const has=cur===''||s.options.includes(cur);return '<select class="rfe">'+s.options.map(o=>'<option value="'+esc(o)+'"'+(o===cur?' selected':'')+'>'+esc(o)+'</option>').join('')+(has?'':'<option selected>'+esc(cur)+'</option>')+'</select>'}
+  if(s.type==='textarea')return '<textarea class="rfe" rows="'+(s.rows||3)+'">'+esc(cur)+'</textarea>';
+  if(s.type==='date')return '<input class="rfe" type="date" value="'+esc(cur)+'">';
+  if(s.type==='number'||s.type==='int')return '<input class="rfe" type="text" inputmode="decimal" value="'+esc(cur)+'">';
+  return '<input class="rfe" type="text" value="'+esc(cur)+'">';
+}
+function ensureInState(r){
+  if(r.kind==='target'&&!S.companies.find(c=>c.id===r.id))S.companies.push(r);
+  if(r.kind==='advisor'&&!S.advisors.find(a=>a.id===r.id))S.advisors.push(r);
+  if(r.kind==='person'&&!(S.people||[]).find(p=>p.id===r.id)){S.people=S.people||[];S.people.push(r)}
+  isNew=false;
+}
+export function commitField(r,s,raw){
+  let v=(raw??'').toString();
+  if(s.type!=='textarea')v=v.trim();
+  if(s.type==='number'){if(v===''){v=null}else{const n=+v.replace(',','.');if(isNaN(n)){toast('Not a number: '+v);return false}v=n}}
+  else if(s.type==='int'){const n=parseInt(v,10);v=isNaN(n)?(s.def??null):n}
+  if(s.required&&(v===''||v===null)){toast(s.label+' cannot be empty');return false}
+  if(s.set)v=s.set(v);
+  const old=getVal(r,s);
+  const same=(a,b)=>(a===null||a===undefined||a==='')&&(b===null||b===undefined||b==='')||a===b;
+  if(s.key==='gm'?same(r.gm,v):same(old,v))return true;
+  if(s.key==='stage'){r.stageLog=r.stageLog||[];r.stageLog.push({stage:v,date:today()})}
+  if(s.key==='nextAction'){r.nextSet=today();invalidateThreads()}
+  if(s.key==='deadCat'){r.deadCat=v}
+  else if(s.key==='channel'){r.channel=v}
+  else r[s.key]=v;
+  if(s.key==='phone')splitPhones(r);
+  ensureInState(r);
+  save();
+  return true;
+}
+
+// ---- page rendering ----
+function headHtml(r){
+  const isT=r.kind==='target',isA=r.kind==='advisor';
+  const kind=isT?'Target':isA?'Advisor':'Person';
+  const status=isT?stagePill(r.stage):(isA?'<span class="chip">'+esc(r.status||'')+'</span>':(r.firm?'<span class="chip">'+esc(fixUml(r.firm))+'</span>':''));
+  const org=r.kind==='person'?personOrg(r):null;
+  return '<div class="rec-head"><button class="sm" id="recBack" title="Back (Esc)">&larr; Back</button>'
+    +'<div class="rec-title"><h2>'+(isNew?'<span class="muted">New '+kind.toLowerCase()+'</span>':esc(fixUml(dispName(r))))+'</h2><div class="muted" style="font-size:11px">'+kind+' &middot; '+status+(org?' &middot; <a href="#rec/'+org.id+'">'+esc(fixUml(dispName(org)))+'</a>':'')+' &middot; last contact '+(lastTouch(r)?fmtAgo(lastTouch(r)):'never')+'</div></div>'
+    +'<div class="rec-tools">'+starHtml(r)+'</div></div>';
+}
+function promisesHtml(r){
+  const lines=openPromises(r);
+  const log=(r.actionLog||[]).slice(-5).reverse();
+  let h='<div class="pbox" id="recNext"><h4>Next step</h4><div class="pgrid">'+fieldSpecs(r).next.slice(1).map(s=>fieldHtml(r,s)).join('')+'</div>'+fieldHtml(r,fieldSpecs(r).next[0]);
+  if(lines.length)h+='<div style="margin-top:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">Open promises</div>'+lines.map((l,i)=>'<div class="promise"><button class="sm primary" data-promise="'+i+'">Done</button> <span>'+esc(l)+'</span></div>').join('')+'</div>';
+  if(log.length)h+='<details style="margin-top:8px"><summary class="muted" style="font-size:11px;cursor:pointer">Completed ('+(r.actionLog||[]).length+')</summary>'+log.map(a=>'<div style="font-size:11px;margin-top:3px"><span class="muted">'+fmtD(a.done)+'</span> '+esc(fixUml(a.what||''))+'</div>').join('')+'</details>';
+  return h+'</div>';
+}
+export function renderRecordPage(){
+  const r=profRec;const el=document.getElementById('p-record');if(!r||!el)return;
+  const spec=fieldSpecs(r);const isT=r.kind==='target',isP=r.kind==='person';
+  const ppl=isP?[]:orgPeople(r);
+  const details=spec.sections.map(([title,fs])=>'<div class="pbox"><h4>'+esc(title)+'</h4><div class="pgrid">'+fs.map(s=>s.type==='textarea'?'</div>'+fieldHtml(r,s)+'<div class="pgrid">':fieldHtml(r,s)).join('')+'</div></div>').join('');
+  el.innerHTML=headHtml(r)
+    +'<div class="rec-grid"><div class="rec-l">'
+    +details
+    +(isT?'<div class="pbox"><h4>Letter and cadence</h4>'+letterBox(r)+'</div>':'')
+    +'<div class="pbox"><h4>Lists</h4>'+listChips(r)+'</div>'
+    +(isP?'':'<div class="pbox"><h4>People <button class="sm" onclick="addPersonToOrg()">+ Add</button></h4>'+peopleBoxHtml(r,ppl)+'</div>')
+    +'<div class="pbox"><h4>Files <button class="sm" onclick="addLink()">+ Link</button></h4>'+filesHtml(r)+'</div>'
+    +(isT?'<details class="pbox"><summary style="font-size:11px;color:var(--deep);text-transform:uppercase;letter-spacing:.4px;cursor:pointer;font-weight:700">Deal maths</summary><div class="pgrid" style="margin-top:6px">'+fld('dm_e','EBITDA (€m)',r.ebitda,'number')+fld('dm_m','Multiple',6,'number')+fld('dm_d','Debt %',60,'number')+fld('dm_r','Interest rate %',5,'number')+fld('dm_t','Tenor (yrs)',7,'number')+'</div><button class="sm primary" onclick="calcMaths()" style="margin-top:6px">Calculate</button><div id="dm_out" style="margin-top:8px"></div></details>':'')
+    +'</div><div class="rec-r">'
+    +promisesHtml(r)
+    +wrapUpHtml(r)
+    +'<div class="pbox"><h4>'+(isT?'Shared with':'Names you gave them')+(isT?' <button class="sm" onclick="addShare()">+ Add</button>':'')+'</h4>'+shareHtml(r)+'</div>'
+    +'<div class="pbox"><h4>Log activity</h4><div class="inline">'+selFld('la_type','Type',ACT_TYPES,'Call')+fld('la_date','Date',today(),'date')+fld('la_txt','Subject','')+'</div><label>Note</label><textarea id="la_note" rows="2"></textarea><div class="inline" style="margin-top:4px">'+fld('la_owe','I promised (becomes an open promise)','')+fld('la_owe_by','By',addDays(today(),3),'date')+'</div><button class="sm primary" onclick="logActivity()" style="margin-top:4px">Log</button></div>'
+    +'<div class="pbox"><h4>Activity timeline <span class="muted" style="font-weight:400">'+Object.keys(r.touches||{}).length+' activities</span></h4>'
+      +'<div class="tl-ctl">Period: <select onchange="setTlPeriod(+this.value)"><option value="13"'+(tlPeriod===13?' selected':'')+'>13 weeks</option><option value="26"'+(tlPeriod===26?' selected':'')+'>26 weeks</option><option value="52"'+(tlPeriod===52?' selected':'')+'>52 weeks</option></select> '
+      +Object.keys(tlTypes).map(ty=>'<label><input type="checkbox" '+(tlTypes[ty]?'checked':'')+' onchange="toggleTlType(\''+ty+'\',this.checked)"> '+ty+'</label>').join(' ')
+      +'</div><div style="height:160px"><canvas id="profTl"></canvas></div></div>'
+    +'<div class="pbox"><h4>Contact history</h4>'+tlHtml(r)+'</div>'
+    +'<div class="pbox rec-danger"><h4>Danger zone</h4><button onclick="deleteRec()" style="border-color:var(--red);color:var(--red)">Delete this record</button></div>'
+    +'</div></div>';
+  drawTimeline(r);
+}
+export function refreshRecordPage(){ // called from renderAll after remote changes; never while a field is being edited
+  if(!profRec||!document.body.classList.contains('rec-open'))return;
+  if(document.querySelector('#p-record .rfe'))return;
+  if(profRec.id&&!findRec(profRec.id)&&!isNew){closeProfile();return}
+  const y=window.scrollY;renderRecordPage();window.scrollTo(0,y);
+}
+export function openProfile(rec){
+  if(!rec)return;
+  const open=document.body.classList.contains('rec-open');
+  if(!open){const t=document.querySelector('.tab.active');prevTab=t?t.dataset.t:'home'}
+  profRec=rec;isNew=!findRec(rec.id);
+  document.body.classList.add('rec-open');
+  const want='#rec/'+(isNew?'new':rec.id);
+  if(location.hash!==want){if(open)history.replaceState(null,'',want);else location.hash=want}
+  renderRecordPage();
+  window.scrollTo(0,0);
+}
+export function closeProfile(){
+  if(!document.body.classList.contains('rec-open'))return;
+  if(profChart){try{profChart.destroy()}catch(e){}profChart=null}
+  profRec=null;isNew=false;
+  document.body.classList.remove('rec-open');
+  const el=document.getElementById('p-record');if(el)el.innerHTML='';
+  if(location.hash.startsWith('#rec/'))history.replaceState(null,'',location.pathname+location.search);
+  renderAll();
+}
+export function initRecordPage(){
+  const el=document.getElementById('p-record');if(!el||el._wired)return;el._wired=true;
+  window.addEventListener('hashchange',()=>{
+    const m=location.hash.match(/^#rec\/(.+)$/);
+    if(!m){if(profRec)closeProfile();return}
+    if(m[1]==='new')return;
+    if(profRec&&profRec.id===m[1])return;
+    const r=findRec(m[1]);if(r)openProfile(r);else{toast('Record not found');history.replaceState(null,'',location.pathname+location.search);closeProfile()}
+  });
+  el.addEventListener('click',e=>{
+    if(e.target.closest('#recBack')){closeProfile();return}
+    const pb=e.target.closest('button[data-promise]');if(pb){donePromise(+pb.dataset.promise);return}
+    const fv=e.target.closest('.rfv');if(fv&&!e.target.closest('a'))startEdit(fv.parentElement);
+  });
+  el.addEventListener('keydown',e=>{
+    const fv=e.target.closest&&e.target.closest('.rfv');
+    if(fv&&(e.key==='Enter'||e.key===' ')){e.preventDefault();startEdit(fv.parentElement)}
+  });
+  document.addEventListener('keydown',e=>{if(e.key!=='Escape'||!document.body.classList.contains('rec-open'))return;const t=e.target;if(t&&t.closest&&t.closest('.rfe,input,textarea,select'))return;if(document.querySelector('#p-record .rfe'))return;closeProfile()});
+}
+function specFor(r,key){const sp=fieldSpecs(r);return [...sp.sections.flatMap(x=>x[1]),...sp.next].find(s=>s.key===key)}
+function startEdit(wrap){
+  const r=profRec;if(!r||!wrap||wrap.querySelector('.rfe'))return;
+  const s=specFor(r,wrap.dataset.f);if(!s)return;
+  const fv=wrap.querySelector('.rfv');fv.style.display='none';
+  wrap.insertAdjacentHTML('beforeend',editorHtml(r,s));
+  const ed=wrap.querySelector('.rfe');
+  let done=false;
+  const finish=(commit,moveNext)=>{
+    if(done)return;done=true;
+    let ok=true;
+    if(commit)ok=commitField(r,s,ed.value);
+    ed.remove();fv.style.display='';
+    if(ok!==false){fv.innerHTML=display(r,s);afterCommit(s.key)}
+    if(moveNext){const all=[...document.querySelectorAll('#p-record .rf')];const i=all.indexOf(wrap);const nx=all[i+1];if(nx)startEdit(nx)}
+  };
+  ed.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){e.preventDefault();e.stopPropagation();finish(false)}
+    else if(e.key==='Enter'&&(s.type!=='textarea'||e.ctrlKey||e.metaKey)){e.preventDefault();finish(true)}
+    else if(e.key==='Tab'){e.preventDefault();finish(true,!e.shiftKey)}
+  });
+  ed.addEventListener('blur',()=>setTimeout(()=>finish(true),0));
+  if(s.type==='select'||s.type==='date')ed.addEventListener('change',()=>finish(true));
+  ed.focus();if(ed.select&&s.type!=='select')try{ed.select()}catch(e){}
+}
+let _rt=null;
+function afterCommit(key){
+  // header, dependent blocks and the other tabs, without tearing down the field being edited next
+  const r=profRec;if(!r)return;
+  const head=document.querySelector('#p-record .rec-head');if(head)head.outerHTML=headHtml(r);
+  if(key==='stage'||key==='nextAction'||key==='nextDate'||key==='priority'){setTimeout(()=>{if(!document.querySelector('#p-record .rfe'))renderRecordPage()},50)}
+  clearTimeout(_rt);_rt=setTimeout(renderAll,150);
+}
+function donePromise(i){
+  const r=profRec;if(!r)return;
+  const lines=(r.nextAction||'').split('|').map(s=>s.trim()).filter(Boolean);
+  const prom=lines.filter(s=>/^Promised\b/.test(s));const line=prom[i];if(!line)return;
+  logDone(r,line);
+  const rest=lines.filter(s=>s!==line);
+  r.nextAction=rest.join(' | ');
+  if(!rest.length){r.nextDate='';r.nextSet=''}
+  invalidateThreads();save();renderRecordPage();toast('Promise logged as kept');
+}
+
+// ---- pieces reused from the former modal ----
 export function tlHtml(r){
   const ts=touchList(r);
-  const legend='<div style="font-size:10px;color:#595959;margin-bottom:6px;line-height:1.6"><span style="color:#2E3C65">\u25CF</span> Email sent &nbsp;<span style="color:#C6943E">\u25CF</span> Email received &nbsp;<span style="color:#008A3E">\u25CF</span> Meeting/Granola &nbsp;<span style="color:#7030A0">\u25CF</span> Call &nbsp;<span style="color:#8C97B8">\u25CF</span> Note/other</div>';
+  const legend='<div style="font-size:10px;color:#595959;margin-bottom:6px;line-height:1.6"><span style="color:#2E3C65">●</span> Email sent &nbsp;<span style="color:#C6943E">●</span> Email received &nbsp;<span style="color:#008A3E">●</span> Meeting/Granola &nbsp;<span style="color:#7030A0">●</span> Call &nbsp;<span style="color:#8C97B8">●</span> Note/other</div>';
   return legend+'<div class="timeline">'+ts.slice(0,30).map(t=>{
     const k=Object.keys(r.touches||{}).find(k=>(r.touches||{})[k]===t);
     return '<div class="titem t'+tType(t)+(t.dir==='out'?' out':'')+'"><b>'+fmtD(t.date)+'</b> '+(t.link?'<a href="'+esc(t.link)+'" target="_blank" title="Open original">'+esc(fixUml(t.subject))+'</a>':esc(fixUml(t.subject)))+' <span class="chip">'+esc(srcLabel(t))+'</span>'+(t.who?' <span class="muted">— '+esc(fixUml(t.who))+'</span>':'')+(t.link?' <a href="'+esc(t.link)+'" target="_blank">↗</a>':'')+(k?'<br><button class="sm" onclick="editNote(\''+r.id+'\',\''+k+'\')">Note</button>':'')+(t.note?'<div class="tnote">'+esc(fixUml(t.note))+'</div>':(t.prev?'<div class="tnote">'+esc(fixUml(cleanPrev(t.prev,400)))+'</div>':''))+'</div>'
@@ -23,23 +234,23 @@ export function tlHtml(r){
 export function editNote(recId,key){
   const r=findRec(recId);const t=(r.touches||{})[key];if(!t)return;
   const n=prompt('Note for: '+t.subject,t.note||'');
-  if(n!==null){t.note=n;save();if(profRec)openProfile(profRec)}
+  if(n!==null){t.note=n;save();if(profRec)renderRecordPage()}
 }
 export function filesHtml(r){
   let h='';
-  (r.links||[]).forEach((l,i)=>{h+='<div style="margin-bottom:4px"><a href="'+esc(l.url)+'" target="_blank">'+esc(l.title)+'</a> <button class="sm" onclick="profRec.links.splice('+i+',1);save();openProfile(profRec)">×</button></div>'});
+  (r.links||[]).forEach((l,i)=>{h+='<div style="margin-bottom:4px"><a href="'+esc(l.url)+'" target="_blank">'+esc(l.title)+'</a> <button class="sm" onclick="profRec.links.splice('+i+',1);save();renderRecordPage()">×</button></div>'});
   (r.driveFiles||[]).forEach(f=>{h+='<div style="margin-bottom:4px"><a href="'+esc(f.link)+'" target="_blank">'+esc(f.name)+'</a> <span class="muted">'+esc(f.type||'')+'</span></div>'});
   const _seen=new Set();
-  touchList(r).forEach(t=>{(t.att||[]).forEach(n=>{if(_seen.has(n))return;_seen.add(n);h+='<div style="margin-bottom:4px">\uD83D\uDCCE '+esc(n)+' <span class="muted">'+fmtD(t.date)+(t.dir==='out'?' \u00B7 sent':' \u00B7 received')+'</span>'+(t.link?' <a href="'+esc(t.link)+'" target="_blank">\u2197</a>':'')+'</div>'})});
+  touchList(r).forEach(t=>{(t.att||[]).forEach(n=>{if(_seen.has(n))return;_seen.add(n);h+='<div style="margin-bottom:4px">📎 '+esc(n)+' <span class="muted">'+fmtD(t.date)+(t.dir==='out'?' · sent':' · received')+'</span>'+(t.link?' <a href="'+esc(t.link)+'" target="_blank">↗</a>':'')+'</div>'})});
   if(r.kind==='person'){
     const o=personOrg(r);
-    if(o)touchList(o).forEach(t=>{(t.att||[]).forEach(n=>{if(_seen.has(n))return;_seen.add(n);h+='<div style="margin-bottom:4px">\uD83D\uDCCE '+esc(n)+' <span class="muted">'+fmtD(t.date)+(t.dir==='out'?' \u00B7 sent':' \u00B7 received')+' \u00B7 via '+esc(dispName(o))+'</span>'+(t.link?' <a href="'+esc(t.link)+'" target="_blank">\u2197</a>':'')+'</div>'})});
+    if(o)touchList(o).forEach(t=>{(t.att||[]).forEach(n=>{if(_seen.has(n))return;_seen.add(n);h+='<div style="margin-bottom:4px">📎 '+esc(n)+' <span class="muted">'+fmtD(t.date)+(t.dir==='out'?' · sent':' · received')+' · via '+esc(dispName(o))+'</span>'+(t.link?' <a href="'+esc(t.link)+'" target="_blank">↗</a>':'')+'</div>'})});
   }
   return h||'<span class="muted">No files linked</span>';
 }
-export function addLink(){const t=prompt('Link title:');if(!t)return;const u=prompt('URL:');if(!u)return;profRec.links=profRec.links||[];profRec.links.push({title:t,url:u});save();openProfile(profRec)}
+export function addLink(){const t=prompt('Link title:');if(!t)return;const u=prompt('URL:');if(!u)return;profRec.links=profRec.links||[];profRec.links.push({title:t,url:u});ensureInState(profRec);save();renderRecordPage()}
 export function listChips(r){return '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px;align-items:start">'+(S.customLists||[]).map(l=>'<label style="font-size:11px;display:flex;align-items:flex-start;gap:5px;text-transform:none;margin:0;line-height:1.3"><input type="checkbox" style="margin:0" '+(((r.lists||[]).includes(l))?'checked':'')+' onchange="toggleList(\''+r.id+'\',\''+esc(l)+'\',this.checked)"> '+esc(l)+'</label>').join('')+'</div>'}
-export function toggleList(id,l,on){const r=findRec(id);r.lists=r.lists||[];if(on&&!r.lists.includes(l))r.lists.push(l);if(!on)r.lists=r.lists.filter(x=>x!==l);save()}
+export function toggleList(id,l,on){const r=findRec(id)||profRec;if(!r)return;r.lists=r.lists||[];if(on&&!r.lists.includes(l))r.lists.push(l);if(!on)r.lists=r.lists.filter(x=>x!==l);ensureInState(r);save()}
 
 export let tlPeriod=13,tlTypes={Email:true,Meeting:true,Call:true,Note:true,Letter:true};
 export function drawTimeline(r){
@@ -59,6 +270,7 @@ export function drawTimeline(r){
     out.push(ts.filter(t=>!isMeet(t)&&t.dir==='out').length);
     inn.push(ts.filter(t=>!isMeet(t)&&t.dir==='in').length);
   }
+  if(typeof Chart==='undefined')return;
   profChart=new Chart(el,{type:'bar',data:{labels,datasets:[{label:'Out (sent)',data:out,backgroundColor:'#2E3C65'},{label:'In (received)',data:inn,backgroundColor:'#FFC000'},{label:'Calls / meetings',data:mtg,backgroundColor:'#2E7D32'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{font:{size:10}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
 }
 export function srcLabel(t){const s=t.src||'';if(s==='Granola'||s==='Meeting')return 'Call';if(s==='Kinetix'||s==='Gmail'||s==='Email')return 'Email';return s}
@@ -76,7 +288,7 @@ export function wrapUpHtml(r){
   const lastIn=ts.find(t=>t.dir==='in'),lastOut=ts.find(t=>t.dir==='out');
   const open=(r.nextAction||'').trim();
   const ball=open
-    ? 'Ball with you - open item below (last exchange '+(newest.dir==='in'?'received ':'sent ')+fmtAgo(newest.date)+')'
+    ? 'Ball with you - open item above (last exchange '+(newest.dir==='in'?'received ':'sent ')+fmtAgo(newest.date)+')'
     : (newest.dir==='in'
       ? 'Ball with you - they wrote last, '+fmtAgo(newest.date)
       : 'Ball with them - you wrote last, '+fmtAgo(newest.date));
@@ -87,107 +299,21 @@ export function wrapUpHtml(r){
     '<h4>Where we left things</h4>'+
     '<div style="font-size:12px;font-weight:bold;margin-bottom:9px">'+ball+'</div>'+
     blk(lastIn,'Last received')+blk(lastOut,'Last sent')+
-    (r.nextAction?'<div style="margin-top:4px;padding-top:6px;border-top:1px solid var(--lgray)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">Open item</div><div style="font-size:12px">'+esc(r.nextAction)+(r.nextDate?' <span class="muted">('+fmtD(r.nextDate)+')</span>':'')+'</div></div>':'')+
     (older.length?'<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--lgray)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">Earlier in this thread</div>'+older.map(t=>'<div style="font-size:11px;margin-top:5px">'+fmtD(t.date)+' <span class="muted">'+(t.dir==='out'?'sent':'received')+' &middot; '+esc(srcLabel(t))+'</span> <b>'+linkWrap(t,esc(fixUml(t.subject||'')))+'</b>'+(t.prev?'<div class="tnote" style="margin-top:2px">'+esc(cut(fixUml(cleanPrev(t.prev,400)),400))+'</div>':'')+'</div>').join('')+'</div>':'')+
     '</div>';
 }
 export function setTlPeriod(w){tlPeriod=w;drawTimeline(profRec)}
 export function toggleTlType(ty,on){tlTypes[ty]=on;drawTimeline(profRec)}
-
-export function openProfile(rec){
-  profRec=rec;
-  const isT=rec.kind==='target',isA=rec.kind==='advisor',isP=rec.kind==='person';
-  const m=document.getElementById('modal');
-  const detailL=isT?
-    fld('e_name','Company name',rec.name)+
-    '<div class="pgrid">'+fld('e_tcontact','Primary contact (owner / MD)',rec.contact)+fld('e_temail','Email',rec.email)+fld('e_tphone','Phone (office)',rec.phone)+fld('e_tmobile','Mobile',rec.mobile)+fld('e_tdomain','Website',rec.domain)+'</div>'+
-    '<div class="pgrid">'+selFld('e_stage','Stage',STAGES,rec.stage)+fld('e_rev','Revenue (€m)',n1(rec.revenue),'number')+fld('e_ebitda','EBITDA (€m)',n1(rec.ebitda),'number')+fld('e_ebit','EBIT (€m)',n1(rec.ebit),'number')+fld('e_gm','Gross margin %',rec.gm?n1(rec.gm*100):null,'number')+selFld('e_chan','Channel',CHANNELS,chanOf(rec))+fld('e_chvia','Via (partner, fair, contact)',rec.channelVia)+fld('e_loc','Location',rec.location)+'</div>'+
-    '<label>Description</label><textarea id="e_desc" rows="2">'+esc(rec.description||'')+'</textarea>'+
-    '<label>Ownership</label><input id="e_own" value="'+esc(rec.ownership||'')+'">'+
-    '<label>Flag</label><input id="e_flag" value="'+esc(rec.flag||'')+'">'+
-    '<div class="pgrid">'+fld('e_score','Score /100',rec.score,'number')+selFld('e_verdict','Verdict',VERDICTS,rec.verdict)+'</div>'+
-    '<label>Research notes</label><textarea id="e_tnotes" rows="6" style="width:100%;font-size:11px">'+esc(rec.notes||'')+'</textarea>'+
-    (rec.stage==='Dead'?'<div class="pgrid">'+selFld('e_dc','Dead category',DEADREASONS,deadCatOf(rec))+fld('e_revd','Revisit date',rec.revisitDate,'date')+'</div>'+fld('e_dr','Dead reason (detail)',rec.deadReason):'')+
-    '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+'<label>Next action</label><textarea id="e_na" rows="3" style="width:100%">'+esc(rec.nextAction||'')+'</textarea>'+letterBox(rec):
-  isA?
-    fld('e_firm','Firm name',rec.firm)+fld('e_contact','Primary contact',rec.contact)+fld('e_email','Email',rec.email)+'<div class="pgrid">'+fld('e_aphone','Phone (office)',rec.phone)+fld('e_amobile','Mobile',rec.mobile)+'</div>'+fld('e_domain','Domain',rec.domain)+
-    '<div class="pgrid">'+selFld('e_cat','Category',ADV_CATS,rec.category)+selFld('e_market','Market',['DE','UK'],rec.market||(/uk|united kingdom/i.test(rec.geo||'')?'UK':'DE'))+selFld('e_geo2','Geo (country)',['Germany','United Kingdom','Switzerland','France','Netherlands','Luxembourg','Sweden','Denmark','Austria','United States','Other'],rec.geo)+'</div>'+
-    selFld('e_status','Status',ADV_STATUS,rec.status)+
-    '<div class="pgrid">'+fld('e_city','City',rec.city)+fld('e_addr','Address',rec.address)+'</div>'+
-    fld('e_intro','Intro path',rec.introPath)+
-    '<label>Notes</label><textarea id="e_notes" rows="3">'+esc(rec.notes||'')+'</textarea>'+
-    fld('e_cad','Check-in cadence (days)',rec.cadence||30,'number')+
-    '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+'<label>Next action</label><textarea id="e_na" rows="3" style="width:100%">'+esc(rec.nextAction||'')+'</textarea>':
-    fld('e_pname','Full name',rec.name)+fld('e_ptitle','Title',rec.title)+selFld('e_ptype','Type',PTYPES,rec.ptype)+fld('e_pfirm','Organization',rec.firm)+fld('e_pemail','Email',rec.email)+fld('e_pphone','Phone (office)',rec.phone)+fld('e_pmobile','Mobile',rec.mobile)+fld('e_plinkedin','LinkedIn',rec.linkedin)+fld('e_pcity','City',rec.city)+fld('e_pangle','Angle / notes',rec.angle)+fld('e_ppath','Network path',rec.networkPath)+
-    '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+'<label>Next action</label><textarea id="e_na" rows="3" style="width:100%">'+esc(rec.nextAction||'')+'</textarea>';
-
-  const ppl=isP?[]:orgPeople(rec);
-
-  m.innerHTML='<div class="mhead"><div><h2>'+esc(dispName(rec))+'</h2><span class="muted" style="font-size:11px">'+(isT?'Target':isA?'Advisor':'Person')+'</span></div><div style="display:flex;gap:8px;align-items:center">'+starHtml(rec)+' <button onclick="closeProfile()" style="background:transparent;border:none;color:#fff;font-size:20px;cursor:pointer">×</button></div></div>'+
-  '<div class="mbody"><div class="mcol-l">'+
-    '<div class="pbox"><h4>Details</h4>'+detailL+'</div>'+
-    '<div class="pbox"><h4>Lists</h4>'+listChips(rec)+'</div>'+
-    (isP?'':'<div class="pbox"><h4>People <button class="sm" onclick="addPersonToOrg()">+ Add</button></h4>'+peopleBoxHtml(rec,ppl)+'</div>')+
-    '<div class="pbox"><h4>Files <button class="sm" onclick="addLink()">+ Link</button></h4>'+filesHtml(rec)+'</div>'+
-    (isT?'<div class="pbox"><h4>Deal maths</h4><div class="pgrid">'+fld('dm_e','EBITDA (€m)',rec.ebitda,'number')+fld('dm_m','Multiple',6,'number')+fld('dm_d','Debt %',60,'number')+fld('dm_r','Interest rate %',5,'number')+fld('dm_t','Tenor (yrs)',7,'number')+'</div><button class="sm primary" onclick="calcMaths()" style="margin-top:6px">Calculate</button><div id="dm_out" style="margin-top:8px"></div></div>':'')+
-  '</div><div class="mcol-r">'+
-    wrapUpHtml(rec)+
-    '<div class="pbox"><h4>'+(isT?'Shared with':'Names you gave them')+(isT?' <button class="sm" onclick="addShare()">+ Add</button>':'')+'</h4>'+shareHtml(rec)+'</div>'+
-    '<div class="pbox"><h4>Log activity</h4><div class="inline">'+selFld('la_type','Type',ACT_TYPES,'Call')+fld('la_date','Date',today(),'date')+fld('la_txt','Subject','')+'</div><label>Note</label><textarea id="la_note" rows="2"></textarea><div class="inline" style="margin-top:4px">'+fld('la_owe','I promised (becomes the open item)','')+fld('la_owe_by','By',addDays(today(),3),'date')+'</div><button class="sm primary" onclick="logActivity()" style="margin-top:4px">Log</button></div>'+
-    '<div class="pbox"><h4>Activity timeline <span class="muted" style="font-weight:400">'+Object.keys(rec.touches||{}).length+' activities</span></h4>'+
-      '<div class="tl-ctl">Period: <select onchange="setTlPeriod(+this.value)"><option value="13"'+(tlPeriod===13?' selected':'')+'>13 weeks</option><option value="26"'+(tlPeriod===26?' selected':'')+'>26 weeks</option><option value="52"'+(tlPeriod===52?' selected':'')+'>52 weeks</option></select> '+
-      Object.keys(tlTypes).map(ty=>'<label><input type="checkbox" '+(tlTypes[ty]?'checked':'')+' onchange="toggleTlType(\''+ty+'\',this.checked)"> '+ty+'</label>').join(' ')+
-      '</div><div style="height:160px"><canvas id="profTl"></canvas></div>'+
-    '</div>'+
-    '<div class="pbox" style="max-height:400px;overflow-y:auto"><h4>Contact history</h4>'+tlHtml(rec)+'</div>'+
-  '</div></div>'+
-  '<div style="padding:10px 18px;display:flex;gap:8px;justify-content:space-between;border-top:1px solid var(--lgray)"><div><button class="primary" onclick="saveProfile()">Save</button> <button onclick="closeProfile()">Cancel</button></div><button onclick="deleteRec()" style="border-color:var(--red);color:var(--red)">Delete</button></div>';
-
-  document.getElementById('modalBg').classList.add('open');
-  m.classList.add('open');
-  drawTimeline(rec);
-}
-document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(document.getElementById('modal').classList.contains('open')){closeProfile();return}document.querySelectorAll('.open').forEach(el=>el.classList.remove('open'))});
-export function closeProfile(){document.getElementById('modal').classList.remove('open');document.getElementById('modalBg').classList.remove('open');profRec=null}
-export function saveProfile(){
-  const r=profRec;if(!r)return;
-  if(r.kind==='target'){
-    r.name=gv('e_name')||r.name;
-    const ns=gv('e_stage');if(ns!==r.stage){r.stage=ns;r.stageLog=r.stageLog||[];r.stageLog.push({stage:ns,date:today()})}
-    r.geo=r.geo||'DE';r.revenue=+gv('e_rev')||null;r.ebitda=+gv('e_ebitda')||null;r.ebit=+gv('e_ebit')||null;
-    const gm=+gv('e_gm');r.gm=gm?gm/100:null;
-    r.channel=gv('e_chan');r.channelVia=gv('e_chvia');r.location=gv('e_loc');r.description=gv('e_desc');r.ownership=gv('e_own');r.flag=gv('e_flag');
-    r.contact=gv('e_tcontact');r.email=gv('e_temail');r.phone=gv('e_tphone');r.mobile=gv('e_tmobile');r.domain=gv('e_tdomain');r.notes=gv('e_tnotes');
-    r.score=gv('e_score')!==''?+gv('e_score'):(r.score??null);r.verdict=gv('e_verdict')||'';
-    if(r.stage==='Dead'){r.deadCat=gv('e_dc');r.deadReason=gv('e_dr');r.revisitDate=gv('e_revd')}
-  } else if(r.kind==='advisor'){
-    r.firm=gv('e_firm')||r.firm;r.contact=gv('e_contact');r.email=gv('e_email');r.phone=gv('e_aphone');r.mobile=gv('e_amobile');r.domain=gv('e_domain');
-    r.category=gv('e_cat');r.market=gv('e_market');r.geo=gv('e_geo2')||r.geo;r.status=gv('e_status');r.introPath=gv('e_intro');r.city=gv('e_city')||r.city||'';r.address=gv('e_addr')||r.address||'';
-    r.notes=gv('e_notes');r.cadence=+gv('e_cad')||30;
-  } else {
-    r.name=gv('e_pname')||r.name;r.title=gv('e_ptitle');r.firm=gv('e_pfirm');r.email=gv('e_pemail');
-    r.phone=gv('e_pphone');r.mobile=gv('e_pmobile');r.linkedin=gv('e_plinkedin');r.city=gv('e_pcity');r.angle=gv('e_pangle');
-    r.networkPath=gv('e_ppath');r.ptype=gv('e_ptype');
-  }
-  splitPhones(r);
-  r.priority=gv('e_prio');r.nextDate=gv('e_nd');const _na=gv('e_na');if(_na!==r.nextAction){r.nextSet=today()}r.nextAction=_na;
-  // upsert into state
-  if(r.kind==='target'&&!S.companies.find(c=>c.id===r.id))S.companies.push(r);
-  if(r.kind==='advisor'&&!S.advisors.find(a=>a.id===r.id))S.advisors.push(r);
-  if(r.kind==='person'&&!(S.people||[]).find(p=>p.id===r.id)){S.people=S.people||[];S.people.push(r)}
-  save();closeProfile();renderAll();
-}
 export function deleteRec(){
   const r=profRec;if(!r)return;
   if(!confirm('Delete '+dispName(r)+'?'))return;
   S.companies=(S.companies||[]).filter(c=>c.id!==r.id);
   S.advisors=(S.advisors||[]).filter(a=>a.id!==r.id);
   S.people=(S.people||[]).filter(p=>p.id!==r.id);
-  save();closeProfile();renderAll();
+  save();closeProfile();
 }
 export function peopleBoxHtml(rec,ppl){
-  // Primary contact in full, everyone else on one line each. Keeps a company with eight
-  // contacts readable instead of eight equally loud blocks.
+  // Primary contact in full, everyone else on one line each.
   const prim=ppl.find(p=>rec.contact&&normName(p.name)===normName(rec.contact));
   const rest=ppl.filter(p=>p!==prim);
   let out='';
@@ -218,10 +344,10 @@ export function logActivity(){
   const owe=(gv('la_owe')||'').trim(),oweBy=gv('la_owe_by')||addDays(today(),3);
   if(owe){t.note=(t.note?t.note+' | ':'')+'Promised: '+owe}
   addTouch(r,key,t);
-  // also log to linked org
   if(r.orgId){const org=findRec(r.orgId);if(org)addTouch(org,key,t)}
   if(owe){const line='Promised ('+type+' '+fmtD(date)+'): '+owe;r.nextAction=r.nextAction&&r.nextAction.trim()?r.nextAction.trim()+' | '+line:line;if(!r.nextDate||oweBy<r.nextDate)r.nextDate=oweBy;r.nextSet=today();invalidateThreads()}
-  save();openProfile(r);toast(owe?'Logged, promise added to open item':'Activity logged');
+  ensureInState(r);
+  save();renderRecordPage();toast(owe?'Logged, promise added as an open item':'Activity logged');
 }
 export function calcMaths(){
   const r=profRec;if(!r)return;const el=document.getElementById('dm_out');if(!el)return;

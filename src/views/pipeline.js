@@ -1,7 +1,7 @@
 import {ACTIVE_STAGES, BOARD_COLS, CHANNELS, CH_DE, LETTER_TARGET_WEEK, LIVE, LS_DE, STAGES, ST_DE} from '../constants.js';
 import {S, addTouch, cadenceOf, chanOf, dispName, findRec, fixUml, isDue, lastTouch, tType, touchList} from '../state.js';
 import {addDays, daysAgo, daysBetween, esc, fmtDe, fmtM, toast, today, uid, weekStart} from '../util.js';
-import {openProfile, profRec} from './record.js';
+import {openProfile, profRec, renderRecordPage} from './record.js';
 import {renderAll} from '../main.js';
 import {save} from '../store/firebase.js';
 
@@ -33,7 +33,7 @@ export function letterBox(rec){
   return '<div style="margin-top:8px;padding:8px;border:1px solid #E3E5EC;border-radius:5px"><label style="margin:0">Brief und Kadenz</label><div style="font-size:12px">'+st+'</div>'+steps+
     '<div style="margin-top:6px">'+(cd?'':b('planned','Brief geplant')+b('ready','Brief entworfen'))+'<button class="sm" onclick="markLetterSent(\''+rec.id+'\')">Brief versendet...</button></div></div>';
 }
-export function setLetterStatus(id,v){const r=findRec(id);if(!r)return;r.letterStatus=r.letterStatus===v?'':v;save();if(document.getElementById('modal')&&document.getElementById('modal').style.display!=='none')openProfile(r);renderAll()}
+export function setLetterStatus(id,v){const r=findRec(id);if(!r)return;r.letterStatus=r.letterStatus===v?'':v;save();if(profRec&&profRec.id===id)renderRecordPage();renderAll()}
 export function toggleLetterReady(id){setLetterStatus(id,'ready')}
 export function markLetterSent(id){
   const r=findRec(id);if(!r)return;
@@ -46,7 +46,7 @@ export function markLetterSent(id){
   else{const ds=daysBetween(r.letterSent,dt);r.cadDone=r.cadDone||{};if(ds>330)r.cadDone.l12=dt;else if(ds>150)r.cadDone.l6=dt}
   r.letterStatus='sent';
   if(r.stage==='Identified'){r.stage='Contacted';r.stageLog=r.stageLog||[];r.stageLog.push({stage:'Contacted',date:dt})}
-  save();openProfile(r);renderAll();toast('Brief erfasst, Kadenz läuft');
+  save();if(profRec&&profRec.id===id)renderRecordPage();renderAll();toast('Letter recorded, cadence running');
 }
 export function pipeSetStage(id,ns){
   const r=findRec(id);if(!r||ns===r.stage)return;

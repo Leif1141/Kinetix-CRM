@@ -1,6 +1,6 @@
 import {S, dispName, findRec, fixUml, isSysNote, liveOnly, touchList} from './state.js';
 import {esc, fmtD, foldSearch, normName, toast, today} from './util.js';
-import {openProfile, profRec} from './views/record.js';
+import {openProfile, profRec, renderRecordPage} from './views/record.js';
 import {save} from './store/firebase.js';
 import {searchHay} from './views/search.js';
 
@@ -77,5 +77,5 @@ export function addShare(){
   const d=prompt('Date shared (YYYY-MM-DD):',today())||today();
   rec.sharedWith=rec.sharedWith||[];
   rec.sharedWith.push({recId:pick.id,date:d,note:'recorded by hand'});
-  _shareIdx=null;save();openProfile(rec);
+  _shareIdx=null;save();renderRecordPage();
 }

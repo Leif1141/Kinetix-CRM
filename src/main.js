@@ -8,6 +8,7 @@ import {dashRefresh} from './views/dash.js';
 import {migratePrevClean} from './sync/triage.js';
 import {renderData} from './views/data.js';
 import {renderHome, initHome} from './views/home.js';
+import {initRecordPage, refreshRecordPage} from './views/record.js';
 import {undoLast} from './store/firebase.js';
 import {renderGlobalSearch} from './views/search.js';
 import {renderInbox} from './views/inbox.js';
@@ -58,7 +59,7 @@ _expose({goTab,renderAll});
 
 
 export function goTab(t){if(t==='followups'||t==='overview')t='home';document.querySelector('.tab[data-t="'+t+'"]')?.click()}
-export function renderAll(){if(!S)return;try{const dt=document.getElementById('dataTab');if(dt&&(/[?#]data/.test(location.href)||localStorage.getItem('kxShowData')==='1'))dt.style.display=''}catch(e){}invalidateShares();invalidateThreads();try{migrateStages()}catch(e){}try{migratePrevClean()}catch(e){}try{migrateChannels()}catch(e){}initHome();renderHome();renderYield();renderGlobalSearch();renderOrgs();renderPeople();renderPipeline();renderThreads();renderInbox();renderReports();renderData();try{dashRefresh()}catch(e){console.warn('dashboard',e)}if(document.getElementById('p-locations').classList.contains('active'))renderLocations()}
+export function renderAll(){if(!S)return;try{const dt=document.getElementById('dataTab');if(dt&&(/[?#]data/.test(location.href)||localStorage.getItem('kxShowData')==='1'))dt.style.display=''}catch(e){}invalidateShares();invalidateThreads();try{migrateStages()}catch(e){}try{migratePrevClean()}catch(e){}try{migrateChannels()}catch(e){}initHome();initRecordPage();renderHome();renderYield();renderGlobalSearch();renderOrgs();renderPeople();renderPipeline();renderThreads();renderInbox();renderReports();renderData();try{dashRefresh()}catch(e){console.warn('dashboard',e)}if(document.getElementById('p-locations').classList.contains('active'))renderLocations();try{refreshRecordPage()}catch(e){console.warn('record page',e)}}
 
 document.getElementById('tabs').addEventListener('click',e=>{
   const t=e.target.closest('.tab');if(!t)return;
