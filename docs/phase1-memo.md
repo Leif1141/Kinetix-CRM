@@ -1,6 +1,6 @@
 # KinetixCRM phase 1: what changed and how to cut over
 
-Branch `phase1-shell`, six commits on top of phase 0. Nothing is pushed. A push to main deploys to GitHub Pages, so the cut-over order below matters.
+Branch `phase1-shell`, rebased onto main of 22.10.2026 (CRM v8 pipeline search and wide default, Outlook redirect fix, rules file), nine commits on top. Nothing is pushed. A push to main deploys to GitHub Pages, so the cut-over order below matters.
 
 ## What changed
 
@@ -53,7 +53,7 @@ Then open http://localhost:8765/_harness.html?mode=sharded (new layout) or ?mode
 
 ## Cut-over
 
-1. Review the branch; merge into main locally, do not push yet.
+1. Review the branch (it is rebased onto main, so the merge is a fast-forward); merge into main locally, do not push yet.
 2. Run `python tools/rules.py`, then Firebase console, Realtime Database, Rules: paste `database.rules.json`, publish.
 3. Close every open CRM tab (Leif and Tommy).
 4. Serve the merged main locally or push a preview; open tools/migrate.html, sign in as Leif, run steps 1 to 4, read the verification line ("identical").

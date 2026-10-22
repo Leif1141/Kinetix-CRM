@@ -16,7 +16,7 @@ export let msalInstance=null;
 // OUTLOOK (Microsoft Graph) SYNC
 // ═══════════════════════════════════════════════════════════════
 export function ensureMsal(){
-  if(!msalInstance)msalInstance=new msal.PublicClientApplication({auth:{clientId:AZURE_CLIENT_ID,authority:'https://login.microsoftonline.com/'+AZURE_TENANT,redirectUri:window.location.origin+window.location.pathname},cache:{cacheLocation:'localStorage'}});
+  if(!msalInstance)msalInstance=new msal.PublicClientApplication({auth:{clientId:AZURE_CLIENT_ID,authority:'https://login.microsoftonline.com/'+AZURE_TENANT,redirectUri:window.location.origin+window.location.pathname.replace(/index\.html$/,'')},cache:{cacheLocation:'localStorage'}});
   return msalInstance;
 }
 export function setConnUI(id,txt){const el=document.getElementById(id);if(el){el.className='conn-status';el.textContent=txt}}

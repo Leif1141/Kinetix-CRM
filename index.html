@@ -111,7 +111,7 @@
   <div class="kpis" id="pipeKpis"></div>
   <div class="filterbar">
     <button class="sm vbtn" data-v="board" onclick="setPipeView('board')">Board</button><button class="sm vbtn" data-v="focus" onclick="setPipeView('focus')">List</button><button class="sm vbtn" data-v="channel" onclick="setPipeView('channel')">Channels</button>
-    <input id="fSearch" placeholder="Search companies..." oninput="renderPipeline()">
+    <input id="fSearch" placeholder="Search companies (name, location, contact)..." oninput="renderPipeline()" style="flex:1;min-width:360px;font-size:14px;padding:6px 10px">
     <select id="fChan" onchange="renderPipeline()"><option value="">All channels</option></select>
     <label style="font-size:12px"><input type="checkbox" id="fFav" onchange="renderPipeline()"> Starred only</label>
     <button class="sm" onclick="toggleWide()" id="wideBtn">Wide view</button>

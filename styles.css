@@ -1,7 +1,7 @@
 :root{color-scheme:light;--navy:#2E3C65;--navy2:#434F80;--deep:#112149;--red:#C00000;--amber:#FFC000;--lav:#A9A4C6;--sub:#CFD1E2;--gray:#595959;--lgray:#D3D3D2;--bg:#F8F8FA;--green:#2E7D32}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:Arial,sans-serif;background:var(--bg);color:#000;font-size:13px;line-height:1.45}
-.wrap{max-width:none;margin:0 auto;padding:12px 18px}
+.wrap{max-width:1340px;margin:0 auto;padding:12px 18px}
 .gchip{display:inline-block;font-size:10px;color:#fff;padding:0 6px;border-radius:3px}
 table.ovt th{font-size:11px;color:#595959;text-align:left;border-bottom:1px solid #D3D3D2;padding:4px 6px}
 table.ovt td{vertical-align:top}

@@ -87,14 +87,14 @@ export function bCard(c){
     '<div style="margin-top:3px">'+dueDe(c.nextDate,c.id)+' <span class="mini" onclick="shiftDue(\''+c.id+'\',7,event)" title="one week later">+1W</span><span class="mini" onclick="shiftDue(\''+c.id+'\',30,event)" title="one month later">+1M</span>'+staleTxt(c)+'</div></div>'
 }
 export function renderPipeline(){
-  if(!pipeView){try{pipeView=localStorage.getItem('kxPipeView')||'board'}catch(e){pipeView='board'}try{if(localStorage.getItem('kxWide')==='1'&&!document.body.classList.contains('wide'))toggleWide()}catch(e){}}
+  if(!pipeView){try{pipeView=localStorage.getItem('kxPipeView')||'board'}catch(e){pipeView='board'}}
   document.querySelectorAll('#p-pipeline .vbtn').forEach(b=>b.classList.toggle('on',b.dataset.v===pipeView));
   const cs=(S.companies||[]).filter(c=>c.kind!=='advisor'&&!c.archived);
   const fc=document.getElementById('fChan');if(fc&&fc.options.length<2)fc.innerHTML='<option value="">All channels</option>'+CHANNELS.filter(Boolean).map(c=>'<option value="'+c+'">'+(CH_DE[c]||c)+'</option>').join('');
   const q=(document.getElementById('fSearch').value||'').toLowerCase(),fch=fc?fc.value:'',onlyFav=!!(document.getElementById('fFav')||{}).checked;
   const t=today(),ws=weekStart(t);
   const LIVE=ACTIVE_STAGES;
-  const base=cs.filter(c=>(!q||(c.name||'').toLowerCase().includes(q)||(c.location||'').toLowerCase().includes(q))&&(!fch||chanOf(c)===fch)&&(!onlyFav||c.fav));
+  const base=cs.filter(c=>(!q||(c.name||'').toLowerCase().includes(q)||(c.location||'').toLowerCase().includes(q)||(c.contact||'').toLowerCase().includes(q)||(c.channelVia||'').toLowerCase().includes(q))&&(!fch||chanOf(c)===fch)&&(!onlyFav||c.fav));
   const isReady=c=>c.stage==='Identified'&&(c.letterStatus==='ready'||c.letterStatus==='planned'||c.fav);
   const lettersWeek=cs.reduce((n,c)=>n+touchList(c).filter(x=>tType(x)==='Letter'&&x.dir!=='in'&&(x.date||'').slice(0,10)>=ws).length,0);
   const kdef=[
@@ -130,7 +130,7 @@ export function renderPipeline(){
     revisit:{k:'revisit',t:'Revisit',v:c=>c.revisitDate||'9999',h:c=>c.revisitDate?fmtDe(c.revisitDate):'-',muted:1},
     when:{k:'when',t:'Date',v:c=>{const l=(c.stageLog||[]).slice(-1)[0];return l?l.date:''},h:c=>{const l=(c.stageLog||[]).slice(-1)[0];return l?fmtDe(l.date):'-'},muted:1}
   };
-  const sec=(id,title,items,cols,limit,open)=>'<details class="psec"'+(open||pipeExpand[id]?' open':'')+' ontoggle="pipeExpand[\''+id+'\']=this.open"><summary>'+title+' <span style="font-weight:400">('+items.length+')</span></summary>'+(items.length?pTable(id,cols,items,limit):'<p class="muted" style="padding:6px 10px">None.</p>')+'</details>';
+  const sec=(id,title,items,cols,limit,open)=>'<details class="psec"'+(open||pipeExpand[id]||(q&&items.length)?' open':'')+' ontoggle="pipeExpand[\''+id+'\']=this.open"><summary>'+title+' <span style="font-weight:400">('+items.length+')</span></summary>'+(items.length?pTable(id,cols,items,limit):'<p class="muted" style="padding:6px 10px">None.</p>')+'</details>';
   const idl=list.filter(c=>c.stage==='Identified'&&!isReady(c)),hold=list.filter(c=>c.stage==='On hold'),dead=list.filter(c=>c.stage==='Dead'),closed=list.filter(c=>c.stage==='Closed');
   const lower=sec('idl','Identified, not yet approached',idl,[C.name,C.loc,C.rev,C.ebit,C.score,C.verdict,C.ls,C.next],50)+
     sec('hold','On hold',hold,[C.name,C.loc,C.ebit,C.chan,C.reason,C.revisit,C.when],50)+
