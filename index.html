@@ -445,6 +445,7 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
     <input id="thSearch" placeholder="Search..." oninput="renderThreads()" style="flex:1;min-width:160px">
     <select id="thCat" onchange="renderThreads()"><option value="">Alle Kategorien</option></select>
     <label style="font-size:12px"><input type="checkbox" id="thHideDone" onchange="renderThreads()"> Hide ticked</label>
+    <label style="font-size:12px" title="Items whose CRM record already carries a next-action date are on the Overview"><input type="checkbox" id="thHideSched" checked onchange="renderThreads()"> Hide items scheduled on the Overview</label>
     <button class="sm" onclick="thToggleAll()" id="thAllBtn">Alle Details</button>
     <span class="muted" id="thCount"></span>
   </div>
@@ -552,11 +553,17 @@ const STAGE_ALIAS={'Info received':'NDA','IOI/LOI':'LOI'};
 function migrateStages(){let n=0;(S.companies||[]).forEach(c=>{if(STAGE_ALIAS[c.stage]){c.stage=STAGE_ALIAS[c.stage];n++}(c.stageLog||[]).forEach(l=>{if(STAGE_ALIAS[l.stage])l.stage=STAGE_ALIAS[l.stage]})});return n}
 const OUTREACH=['','Email','LinkedIn','Letter','Phone call','Trade conference','Advisor outreach','Referral','nexxt-change','Other'];
 const LIVE=STAGES.filter(s=>!['Closed','Dead'].includes(s));
+const ACTIVE_STAGES=['Contacted','Replied','Meeting','NDA','LOI','Diligence']; // a live deal: approached and not yet closed, dead or on hold
+const ADV_STATUS=['To call','Emailed','Contact known','In dialogue','Active relationship','On hold','Dormant','Dead'];
+const ADV_CATS=['M&A sourcing intermediaries','Financing partners','Investors & family office','DD advisors','Legal','Executive search','HR, universities & interns','Chambers & bodies','Industry association','Admin & infrastructure','Personal network','Other'];
+const PTYPES=['','Target contact','M&A sourcing intermediaries','M&A compounders','Financing partners','Investors & family office','DD advisors','Legal','Executive search','Chambers & bodies','Industry association','Industry contact','Operator contact','Personal network','Intern applicant','Admin & infrastructure','Other'];
 const CHANNELS=['','Own letter','Partner letter','M&A house / advisor','Tax adviser / auditor','Trade fair','Own email','LinkedIn','Phone','Network / referral','Platform','Bank','Inbound','Other'];
 const CH_MAP={'Cold email':'Own email','Email':'Own email','Letter':'Own letter','Cold call':'Phone','Phone call':'Phone','Broker':'M&A house / advisor','Advisor outreach':'M&A house / advisor','Referral':'Network / referral','Personal network':'Network / referral','Event':'Trade fair','Trade conference':'Trade fair','nexxt-change':'Platform','Platform':'Platform','Inbound':'Inbound','LinkedIn':'LinkedIn','Other':'Other'};
 function migrateChannels(){if(S.chanMigV1)return;let n=0;(S.companies||[]).forEach(c=>{const old=c.channel||'';if(CHANNELS.includes(old)&&old)return;let ch='',via='';if(old){if(/rettig/i.test(old)){ch='Partner letter';via=old}else if(/fakuma|messe|fair/i.test(old)){ch='Trade fair';via=old}else if(/network/i.test(old)){ch='Network / referral'}else if(CH_MAP[old]){ch=CH_MAP[old]}else{ch='M&A house / advisor';via=old}}else if(c.outreachChannel){ch=CH_MAP[c.outreachChannel]||'Other'}if(ch){c.channel=ch;if(via&&!c.channelVia)c.channelVia=via;n++}});S.chanMigV1=today();if(n)save();return n}
 function chanOf(c){return c.channel||CH_MAP[c.outreachChannel]||''}
 const DEADREASONS=['No response','Not for sale','Valuation gap','Too small','Too large','Bad fit','Lost to buyer','Other'];
+// Structured dead category: the explicit deadCat wins, else the free-text deadReason is classified by keyword.
+function deadCatOf(c){if(!c||c.stage!=='Dead')return '';if(DEADREASONS.includes(c.deadCat))return c.deadCat;if(DEADREASONS.includes(c.deadReason))return c.deadReason;const s=(c.deadReason||'').toLowerCase();if(!s)return 'Other';if(/falsches gesch|außerhalb der these|reiner handel|handel statt|projektgesch|marge zu niedrig|margin too low/.test(s))return 'Bad fit';if(/zu klein|too small|zu wenig/.test(s))return 'Too small';if(/zu gro|too large|too big/.test(s))return 'Too large';if(/nicht verk|not for sale|kein verkauf|unabh|nicht in frage|stiftung/.test(s))return 'Not for sale';if(/bewertung|valuation|preisvorstellung|price gap/.test(s))return 'Valuation gap';if(/verkauft|lost to|anderen k|family office|investorenholding|konzern|tochter|teil der/.test(s))return 'Lost to buyer';if(/keine antwort|no response|ohne antwort|nicht reagiert/.test(s))return 'No response';if(/falsch|fit|projektgesch|handel statt|b2c|sektor|dienstleistung|these/.test(s))return 'Bad fit';return 'Other'}
 const VERDICTS=['','pursue','keep looking','watch','passed'];
 function parseFlag(c){
   if(c.score==null||c.score===''){const m=/score\s+([\d]+(?:[.,][\d]+)?)/i.exec(c.flag||'');if(m)c.score=parseFloat(m[1].replace(',','.'))}
@@ -1161,7 +1168,7 @@ function suggestionsRaw(){
 // RENDER: OVERVIEW
 // ═══════════════════════════════════════════════════════════════
 function renderOverview(){
-  const orgs=allOrgs(),live=S.companies.filter(c=>LIVE.includes(c.stage)&&c.stage!=='Identified');
+  const orgs=allOrgs(),live=S.companies.filter(c=>ACTIVE_STAGES.includes(c.stage));
   const due=allRecs().filter(r=>!isIgnoredRec(r)&&((r.nextDate&&r.nextDate<=today())||cadDue(r))).length;
   const sug=suggestions().filter(x=>ovMatch(x.rec));
   const k=[['Organizations',orgs.length,'orgs'],['People',(S.people||[]).length,'people'],['Live deals',live.length,'pipeline'],['Due or overdue',due,'followups']];
@@ -1339,7 +1346,7 @@ function partnerStats(a){
   const dates=ts.map(t=>(t.date||'').slice(0,10)).filter(Boolean).sort();
   const first=dates[0]||'', last=dates[dates.length-1]||'';
   const nm=foldSearch(dispName(a));
-  const sourced=(S.companies||[]).filter(c=>{const ch=foldSearch(c.channel||'');return ch&&nm&&(ch.includes(nm)||nm.includes(ch))});
+  const sourced=(S.companies||[]).filter(c=>{const via=foldSearch(c.channelVia||'');return via.length>2&&nm&&(via.includes(nm)||nm.includes(via))});
   const given=sharedByRec(a);
   return {a,out,inn,tot:out+inn,first,last,age:first?daysAgo(first):0,sourced,given};
 }
@@ -1356,7 +1363,7 @@ function renderYield(){
   const producing=stats.filter(x=>x.sourced.length).sort((a,b)=>b.sourced.length-a.sourced.length);
   const prodRows=producing.length?producing.map(x=>
     '<tr class="rowlink" onclick="openProfile(findRec(\''+x.a.id+'\'))"><td>'+link(x)+'</td><td class="muted">'+esc(catOf(x.a)||'')+'</td><td style="text-align:right">'+x.sourced.length+'</td><td style="text-align:right">'+x.tot+'</td><td class="muted" style="text-align:right">'+esc(x.sourced.map(c=>fixUml(dispName(c))).join(', ').slice(0,60))+'</td></tr>').join('')
-    :none(5,'No target yet carries a sourcing route. Fill in Channel on a target and this table starts working.');
+    :none(5,'No target yet names a partner in Via. Fill in Via on a target and this table starts working.');
 
   // B. long two-way conversations that have produced nothing
   const talk=stats.filter(x=>x.tot>=10&&x.inn>=3&&x.age>=90&&!x.sourced.length)
@@ -1374,11 +1381,11 @@ function renderYield(){
   // headline
   const out90=stats.reduce((n,x)=>n+realTouches(x.a,D).filter(t=>t.dir==='out').length,0);
   const in90=stats.reduce((n,x)=>n+realTouches(x.a,D).filter(t=>t.dir==='in').length,0);
-  const sourcedN=(S.companies||[]).filter(c=>(c.channel||'').trim()).length, tot=(S.companies||[]).length;
+  const sourcedN=(S.companies||[]).filter(c=>(c.channelVia||'').trim()).length, tot=(S.companies||[]).length;
   const givenN=Object.keys(shareIndex()).length;
 
   el.innerHTML=
-    '<div style="padding:10px 12px;font-size:11px" class="muted">Last '+D+' days: <b style="color:#000">'+out90+'</b> messages out, <b style="color:#000">'+in90+'</b> in, across <b style="color:#000">'+stats.filter(x=>realTouches(x.a,D).length).length+'</b> of '+stats.length+' partners. You have put <b style="color:#000">'+givenN+'</b> target names into the network. Sourcing route recorded on <b style="color:#000">'+sourcedN+' of '+tot+'</b> targets'+(sourcedN<tot*0.5?' - fill in Channel on a target and the first table below tells you who actually delivers.':'.')+'</div>'+
+    '<div style="padding:10px 12px;font-size:11px" class="muted">Last '+D+' days: <b style="color:#000">'+out90+'</b> messages out, <b style="color:#000">'+in90+'</b> in, across <b style="color:#000">'+stats.filter(x=>realTouches(x.a,D).length).length+'</b> of '+stats.length+' partners. You have put <b style="color:#000">'+givenN+'</b> target names into the network. Sourcing route recorded on <b style="color:#000">'+sourcedN+' of '+tot+'</b> targets'+(sourcedN<tot*0.5?' - fill in Via (the partner) on a target and the first table below tells you who actually delivers.':'.')+'</div>'+
     '<div style="padding:0 12px 12px">'+
       sub('Partners who have put a name in front of you')+
       '<table>'+hdr(['Partner','Type','Targets sourced','Touches','Which'])+prodRows+'</table>'+
@@ -1423,7 +1430,7 @@ function shortLoc(o){
 }
 function renderOrgs(){
   const sel=document.getElementById('oStage');
-  if(sel.options.length<3){STAGES.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o)});['Active','Inactive','Engaged','Paused'].forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o)})}
+  if(sel.options.length<3){STAGES.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o)});ADV_STATUS.filter(s=>!STAGES.includes(s)).forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o)})}
   const lsel=document.getElementById('oList');
   const keepList=lsel.value;
   while(lsel.options.length>2)lsel.remove(2);
@@ -1449,7 +1456,7 @@ function renderOrgs(){
     return [o.location,(o.revenue?fmtM(o.revenue)+' rev / '+fmtM(o.ebit)+' EBIT (€m)':''),(o.description||o.ownership||'').slice(0,110)].filter(Boolean).join(' · ');
   };
   const statusSel=o=>{
-    const opts=o.kind==='target'?STAGES:['To call','Emailed','Contact known','In dialogue','Active relationship','On hold','Dormant'];
+    const opts=o.kind==='target'?STAGES:ADV_STATUS;
     const cur=statusOf(o)||'';
     return '<select class="stagesel" onclick="event.stopPropagation()" onchange="setStatusInline(\''+o.id+'\',this.value)">'+opts.map(s=>'<option'+(s===cur?' selected':'')+'>'+esc(s)+'</option>').join('')+(opts.includes(cur)?'':'<option selected>'+esc(cur||'—')+'</option>')+'</select>';
   };
@@ -1633,7 +1640,7 @@ function renderPipeline(){
   const fc=document.getElementById('fChan');if(fc&&fc.options.length<2)fc.innerHTML='<option value="">Alle Kanäle</option>'+CHANNELS.filter(Boolean).map(c=>'<option value="'+c+'">'+(CH_DE[c]||c)+'</option>').join('');
   const q=(document.getElementById('fSearch').value||'').toLowerCase(),fch=fc?fc.value:'',onlyFav=!!(document.getElementById('fFav')||{}).checked;
   const t=today(),ws=weekStart(t);
-  const LIVE=['Contacted','Replied','Meeting','NDA','LOI','Diligence'];
+  const LIVE=ACTIVE_STAGES;
   const base=cs.filter(c=>(!q||(c.name||'').toLowerCase().includes(q)||(c.location||'').toLowerCase().includes(q))&&(!fch||chanOf(c)===fch)&&(!onlyFav||c.fav));
   const isReady=c=>c.stage==='Identified'&&(c.letterStatus==='ready'||c.letterStatus==='planned'||c.fav);
   const lettersWeek=cs.reduce((n,c)=>n+touchList(c).filter(x=>tType(x)==='Letter'&&x.dir!=='in'&&(x.date||'').slice(0,10)>=ws).length,0);
@@ -1780,11 +1787,11 @@ function ovEnhance(){
 
 const GRP_DEF=[
   {k:'Targets',t:'Targets',c:'#2E3C65'},
-  {k:'Berater',t:'Berater',c:'#2E7D32'},
-  {k:'Finanzierung',t:'Finanzierung',c:'#C6943E'},
+  {k:'Berater',t:'Advisers',c:'#2E7D32'},
+  {k:'Finanzierung',t:'Financing',c:'#C6943E'},
   {k:'Admin',t:'Admin & DD',c:'#595959'},
-  {k:'Netzwerk',t:'Netzwerk',c:'#7030A0'},
-  {k:'Sonstige',t:'Sonstige',c:'#8C97B8'}
+  {k:'Netzwerk',t:'Network',c:'#7030A0'},
+  {k:'Sonstige',t:'Other',c:'#8C97B8'}
 ];
 function grpOf(r){
   if(!r)return 'Sonstige';
@@ -1826,7 +1833,7 @@ function renderFollowups(){
   // Gruppenleiste
   const counts={};[...overdue,...dueToday,...cad].forEach(r=>{const g=grpOf(r);counts[g]=(counts[g]||0)+1});
   const bar=document.getElementById('ovGroups');
-  if(bar)bar.innerHTML='<button class="sm'+(ovGrp?'':' vbtn on')+'" onclick="setOvGrp(\'\')">Alle ('+n+')</button>'+GRP_DEF.map(g=>'<button class="sm'+(ovGrp===g.k?' vbtn on':'')+'" style="border-left:4px solid '+g.c+'" onclick="setOvGrp(\''+g.k+'\')">'+g.t+' ('+(counts[g.k]||0)+')</button>').join('');
+  if(bar)bar.innerHTML='<button class="sm'+(ovGrp?'':' vbtn on')+'" onclick="setOvGrp(\'\')">All ('+n+')</button>'+GRP_DEF.map(g=>'<button class="sm'+(ovGrp===g.k?' vbtn on':'')+'" style="border-left:4px solid '+g.c+'" onclick="setOvGrp(\''+g.k+'\')">'+g.t+' ('+(counts[g.k]||0)+')</button>').join('');
   const f=a=>a.filter(ovMatch);
   const dsort=(a,b)=>(a.nextDate||'9').localeCompare(b.nextDate||'9')||dispName(a).localeCompare(dispName(b));
   const OVC=[['act','Actions',230],['name','Name',260],['type','Type',120],['next','Next step',0],['due','Due',130],['last','Last contact',90]];const head='<tr>'+OVC.map(c=>'<th data-c="'+c[0]+'"'+(c[2]?' style="width:'+c[2]+'px"':'')+'>'+c[1]+'<span class="rz"></span></th>').join('')+'</tr>';
@@ -1842,7 +1849,7 @@ function renderFollowups(){
     (sec('⚠ Overdue',f(overdue).sort(dsort),'var(--red)',row,head)+
     sec('Due today',f(dueToday).sort(dsort),'#C6943E',row,head)+
     sec('Letter cadence due',f(cad),'#B86E1B',rowC,head)+
-    (f(week).length?'<details class="psec"><summary>This week ('+_wc+') <span style="font-weight:400">('+f(week).length+')</span></summary>'+sec('Due this week',f(week).sort(dsort),'var(--navy)',row,head)+'</details>':'')||'<p class="muted" style="padding:14px">Nichts fällig.</p>')+
+    (f(week).length?'<details class="psec"><summary>This week ('+_wc+') <span style="font-weight:400">('+f(week).length+')</span></summary>'+sec('Due this week',f(week).sort(dsort),'var(--navy)',row,head)+'</details>':'')||'<p class="muted" style="padding:14px">Nothing due.</p>')+
     (more?'<details class="psec"><summary>More hints (stale, no action, revisit)</summary>'+more+'</details>':'');
   const ign=allRecs().filter(isIgnoredRec);
   if(ign.length)document.getElementById('fuBody').innerHTML+='<p class="muted" style="font-size:11px;padding:4px 8px">Ignoriert bis zur nächsten Aktivität: '+ign.map(r=>esc(dispName(r))+' <a href="#" onclick="unignoreRec(\''+r.id+'\',event);return false">zurückholen</a>').join(' &middot; ')+'</p>';
@@ -1921,6 +1928,7 @@ function thShow(t,q,cat){
   if(document.getElementById('thHideDone').checked&&thDone(t.id))return false;
   if(q){const st=thState(t.id);const h=[t.name,t.contact,t.o,t.a,t.e,t.cat,t.email,t.r,st.note].join(' ').toLowerCase();if(!h.includes(q))return false}
   const v=thV(t),d=thDone(t.id);
+  if((document.getElementById('thHideSched')||{}).checked&&['open','leif','them','hoch'].includes(thFilt)){const r=thRec(t);if(r&&r.nextDate)return false}
   if(thFilt==='open')return thIsOpen(t)&&!d;
   if(thFilt==='leif')return v==='OPEN_LEIF'&&!d;
   if(thFilt==='them')return v==='OPEN_THEM'&&!d;
@@ -1937,7 +1945,8 @@ function renderThreads(){
   if(sel.options.length<=1){[...new Set(THREADS_LIVE().map(t=>t.cat).filter(Boolean))].sort().forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o)})}
   const q=(document.getElementById('thSearch').value||'').toLowerCase().trim(), cat=sel.value;
   const cnt=f=>THREADS_LIVE().filter(f).length;
-  const leif=cnt(t=>thV(t)==='OPEN_LEIF'&&!thDone(t.id)), them=cnt(t=>thV(t)==='OPEN_THEM'&&!thDone(t.id)), hoch=cnt(t=>t.p==='Hoch'&&thIsOpen(t)&&!thDone(t.id));
+  const hs=!!((document.getElementById('thHideSched')||{}).checked),sched=t=>{const r=thRec(t);return !!(r&&r.nextDate)};
+  const leif=cnt(t=>thV(t)==='OPEN_LEIF'&&!thDone(t.id)&&!(hs&&sched(t))), them=cnt(t=>thV(t)==='OPEN_THEM'&&!thDone(t.id)&&!(hs&&sched(t))), hoch=cnt(t=>t.p==='Hoch'&&thIsOpen(t)&&!thDone(t.id)&&!(hs&&sched(t)));
   const ticked=cnt(t=>thDone(t.id)), closed=cnt(t=>thV(t)==='CLOSED'), dead=cnt(t=>thV(t)==='DEAD'), unclear=cnt(t=>thV(t)==='UNCLEAR');
   const badge=document.getElementById('thBadge');badge.style.display=leif?'inline-block':'none';badge.textContent=leif;
   document.getElementById('thKpis').innerHTML=[[leif,'My move','leif',leif>0],[them,'Their move','them'],[hoch,'Open, high priority','hoch'],[ticked,'Ticked off','ticked'],[closed,'Done','closed'],[dead,'Dead','dead'],[unclear,'Unclear','unclear']]
@@ -2051,7 +2060,7 @@ function assignEmail(i,val){
 // ═══════════════════════════════════════════════════════════════
 function renderReports(){
   const live=(S.companies||[]).filter(c=>LIVE.includes(c.stage));
-  const allT=allOrgs().flatMap(r=>touchList(r));
+  const _seenT=new Set(),allT=[];allRecs().forEach(r=>Object.entries(r.touches||{}).forEach(([k,t])=>{if(!_seenT.has(k)){_seenT.add(k);allT.push(t)}}));
   const thisWeek=allT.filter(t=>daysAgo(t.date)<7);
   const k=[['Emails out (7d)',thisWeek.filter(t=>t.dir==='out'&&tType(t)==='Email').length],['Replies in (7d)',thisWeek.filter(t=>t.dir==='in'&&tType(t)==='Email').length],['Meetings (7d)',thisWeek.filter(t=>tType(t)==='Meeting').length],['Total touches',allT.length]];
   document.getElementById('repKpis').innerHTML=k.map(x=>'<div class="kpi"><div class="v">'+x[1]+'</div><div class="l">'+x[0]+'</div></div>').join('');
@@ -2067,7 +2076,7 @@ function renderReports(){
   mk('chActivity',{type:'bar',data:{labels:weeks.map(w=>w.slice(5)),datasets:[{type:'line',label:'Target',data:weeks.map(()=>TARGET_PER_WEEK),borderColor:'#C00000',borderDash:[5,4],pointRadius:0,borderWidth:1.5},{label:'Targets approached',data:wkNew,backgroundColor:'#2E3C65'}]}});
   const chs=CHANNELS.filter(Boolean);
   mk('chChannel',{type:'doughnut',data:{labels:chs,datasets:[{data:chs.map(ch=>(S.companies||[]).filter(c=>c.channel===ch).length),backgroundColor:['#2E3C65','#434F80','#6B7AAF','#A9A4C6','#C6943E','#2E7D32','#1565C0','#C00000','#888']}]}});
-  const dr=DEADREASONS.map(r=>(S.companies||[]).filter(c=>c.stage==='Dead'&&c.deadReason===r).length);
+  const dr=DEADREASONS.map(r=>(S.companies||[]).filter(c=>c.stage==='Dead'&&deadCatOf(c)===r).length);
   mk('chDead',{type:'bar',data:{labels:DEADREASONS,datasets:[{data:dr,backgroundColor:'#999'}]}});
   const tis=live.filter(c=>c.stage!=='Identified').map(c=>({c,d:daysAgo(stageDate(c))})).sort((a,b)=>b.d-a.d);
   document.getElementById('tisTable').innerHTML='<tr><th>Company</th><th style="width:140px">Stage</th><th style="width:110px;text-align:right">Days in stage</th></tr>'+tis.map(x=>'<tr class="rowlink" onclick="openProfile(findRec(\''+x.c.id+'\'))"><td><b>'+esc(fixUml(x.c.name))+'</b></td><td>'+stagePill(x.c.stage)+'</td><td style="text-align:right">'+x.d+'</td></tr>').join('');
@@ -2179,7 +2188,7 @@ function applyPatchOps(ops){
         if(t&&o.fields){['r','a','o','e','due','p','cat'].forEach(k=>{if(o.fields[k]!==undefined)t[k]=o.fields[k]});_threadsCache=null;made++}else skipped++;
       }else if(o.op==='setField'){
         const r=patchFind(o.match);
-        const _ok=['notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','mobile','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict','outreachChannel','stage','channel','channelVia','letterSent','letterStatus','fav','ignored','cadDone','archived'];
+        const _ok=['notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','mobile','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict','outreachChannel','stage','channel','channelVia','letterSent','letterStatus','fav','ignored','cadDone','archived','deadCat'];
         if(r&&o.field&&_ok.includes(o.field)){if(o.field==='stage'&&r.stage!==o.value){r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.value,date:o.date||today()})}r[o.field]=o.value;if(o.field==='phone')splitPhones(r);made++}else if(o.op==='addList'){
         if(o.name){S.customLists=S.customLists||[];if(!S.customLists.includes(o.name))S.customLists.push(o.name);made++}else skipped++;
       }else if(o.op==='renameList'){
@@ -2473,18 +2482,18 @@ function openProfile(rec){
     '<label>Flag</label><input id="e_flag" value="'+esc(rec.flag||'')+'">'+
     '<div class="pgrid">'+fld('e_score','Score /100',rec.score,'number')+selFld('e_verdict','Verdict',VERDICTS,rec.verdict)+'</div>'+
     '<label>Research notes</label><textarea id="e_tnotes" rows="6" style="width:100%;font-size:11px">'+esc(rec.notes||'')+'</textarea>'+
-    (rec.stage==='Dead'?selFld('e_dr','Dead reason',DEADREASONS,rec.deadReason)+fld('e_revd','Revisit date',rec.revisitDate,'date'):'')+
+    (rec.stage==='Dead'?'<div class="pgrid">'+selFld('e_dc','Dead category',DEADREASONS,deadCatOf(rec))+fld('e_revd','Revisit date',rec.revisitDate,'date')+'</div>'+fld('e_dr','Dead reason (detail)',rec.deadReason):'')+
     '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+'<label>Next action</label><textarea id="e_na" rows="3" style="width:100%">'+esc(rec.nextAction||'')+'</textarea>'+letterBox(rec):
   isA?
     fld('e_firm','Firm name',rec.firm)+fld('e_contact','Primary contact',rec.contact)+fld('e_email','Email',rec.email)+'<div class="pgrid">'+fld('e_aphone','Phone (office)',rec.phone)+fld('e_amobile','Mobile',rec.mobile)+'</div>'+fld('e_domain','Domain',rec.domain)+
-    '<div class="pgrid">'+selFld('e_cat','Category',['M&A sourcing intermediaries','Financing partners','DD advisors','Investors & family office','Executive search','HR, universities & interns','Admin & infrastructure','Personal network','Other'],rec.category)+selFld('e_market','Market',['DE','UK'],rec.market||(/uk|united kingdom/i.test(rec.geo||'')?'UK':'DE'))+selFld('e_geo2','Geo (country)',['Germany','United Kingdom','Switzerland','France','Netherlands','Luxembourg','Sweden','Denmark','Austria','United States','Other'],rec.geo)+'</div>'+
-    selFld('e_status','Status',['To call','Emailed','Contact known','In dialogue','Active relationship','On hold','Dormant'],rec.status)+
+    '<div class="pgrid">'+selFld('e_cat','Category',ADV_CATS,rec.category)+selFld('e_market','Market',['DE','UK'],rec.market||(/uk|united kingdom/i.test(rec.geo||'')?'UK':'DE'))+selFld('e_geo2','Geo (country)',['Germany','United Kingdom','Switzerland','France','Netherlands','Luxembourg','Sweden','Denmark','Austria','United States','Other'],rec.geo)+'</div>'+
+    selFld('e_status','Status',ADV_STATUS,rec.status)+
     '<div class="pgrid">'+fld('e_city','City',rec.city)+fld('e_addr','Address',rec.address)+'</div>'+
     fld('e_intro','Intro path',rec.introPath)+
     '<label>Notes</label><textarea id="e_notes" rows="3">'+esc(rec.notes||'')+'</textarea>'+
     fld('e_cad','Check-in cadence (days)',rec.cadence||30,'number')+
     '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+'<label>Next action</label><textarea id="e_na" rows="3" style="width:100%">'+esc(rec.nextAction||'')+'</textarea>':
-    fld('e_pname','Full name',rec.name)+fld('e_ptitle','Title',rec.title)+fld('e_pfirm','Organization',rec.firm)+fld('e_pemail','Email',rec.email)+fld('e_pphone','Phone (office)',rec.phone)+fld('e_pmobile','Mobile',rec.mobile)+fld('e_plinkedin','LinkedIn',rec.linkedin)+fld('e_pcity','City',rec.city)+fld('e_pangle','Angle / notes',rec.angle)+fld('e_ppath','Network path',rec.networkPath)+
+    fld('e_pname','Full name',rec.name)+fld('e_ptitle','Title',rec.title)+selFld('e_ptype','Type',PTYPES,rec.ptype)+fld('e_pfirm','Organization',rec.firm)+fld('e_pemail','Email',rec.email)+fld('e_pphone','Phone (office)',rec.phone)+fld('e_pmobile','Mobile',rec.mobile)+fld('e_plinkedin','LinkedIn',rec.linkedin)+fld('e_pcity','City',rec.city)+fld('e_pangle','Angle / notes',rec.angle)+fld('e_ppath','Network path',rec.networkPath)+
     '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+'<label>Next action</label><textarea id="e_na" rows="3" style="width:100%">'+esc(rec.nextAction||'')+'</textarea>';
 
   const ppl=isP?[]:orgPeople(rec);
@@ -2530,7 +2539,7 @@ function saveProfile(){
     r.channel=gv('e_chan');r.channelVia=gv('e_chvia');r.location=gv('e_loc');r.description=gv('e_desc');r.ownership=gv('e_own');r.flag=gv('e_flag');
     r.contact=gv('e_tcontact');r.email=gv('e_temail');r.phone=gv('e_tphone');r.mobile=gv('e_tmobile');r.domain=gv('e_tdomain');r.notes=gv('e_tnotes');
     r.score=gv('e_score')!==''?+gv('e_score'):(r.score??null);r.verdict=gv('e_verdict')||'';
-    if(r.stage==='Dead'){r.deadReason=gv('e_dr');r.revisitDate=gv('e_revd')}
+    if(r.stage==='Dead'){r.deadCat=gv('e_dc');r.deadReason=gv('e_dr');r.revisitDate=gv('e_revd')}
   } else if(r.kind==='advisor'){
     r.firm=gv('e_firm')||r.firm;r.contact=gv('e_contact');r.email=gv('e_email');r.phone=gv('e_aphone');r.mobile=gv('e_amobile');r.domain=gv('e_domain');
     r.category=gv('e_cat');r.market=gv('e_market');r.geo=gv('e_geo2')||r.geo;r.status=gv('e_status');r.introPath=gv('e_intro');r.city=gv('e_city')||r.city||'';r.address=gv('e_addr')||r.address||'';
@@ -2538,7 +2547,7 @@ function saveProfile(){
   } else {
     r.name=gv('e_pname')||r.name;r.title=gv('e_ptitle');r.firm=gv('e_pfirm');r.email=gv('e_pemail');
     r.phone=gv('e_pphone');r.mobile=gv('e_pmobile');r.linkedin=gv('e_plinkedin');r.city=gv('e_pcity');r.angle=gv('e_pangle');
-    r.networkPath=gv('e_ppath');
+    r.networkPath=gv('e_ppath');r.ptype=gv('e_ptype');
   }
   splitPhones(r);
   r.priority=gv('e_prio');r.nextDate=gv('e_nd');const _na=gv('e_na');if(_na!==r.nextAction){r.nextSet=today()}r.nextAction=_na;
@@ -2996,7 +3005,7 @@ if(decFilter!=='decided'){h+=`<div class="dsec"><div class="dsec-hdr">Open decis
 if(decFilter!=='open'){h+=`<div class="dsec" style="margin-top:16px"><div class="dsec-hdr" onclick="toggleSection(this)">Decided (${done.length}) <span class="chevron">&#9660;</span></div><div class="dsec-body" style="max-height:none"><table><tr><th style="width:90px">Date</th><th style="width:28%">Decision</th><th>Outcome</th><th style="width:60px">Owner</th><th style="width:26px"></th></tr>`;done.forEach(({d,i})=>{h+=`<tr title="${dEsc(d.rationale||'')}"><td style="color:var(--gray);font-size:11px">${dEsc(d.date)}</td><td style="font-weight:600">${dEsc(d.decision)}</td><td style="font-size:11px">${dEsc(d.outcome||'')}</td><td style="color:var(--gray);font-size:11px">${dEsc(d.owner)}</td><td><button class="dec-dismiss" style="position:static" onclick="dismissDecision(${i},${idx})" title="Dismiss">x</button></td></tr>`});h+='</table><div style="font-size:10px;color:var(--gray);padding:6px 8px">Hover a row for the rationale.</div></div></div>'}
 if(dismissedCount>0){h+=`<div class="dec-dismissed-bar"><span>${dismissedCount} decision${dismissedCount>1?'s':''} dismissed</span><button onclick="restoreAllDecisions(${idx})">Restore all</button></div>`}el.innerHTML=h}
 function renderTodos(idx){const el=document.getElementById('dp'+idx);if(!el)return;const open=dashData().todos.filter(t=>!t.done&&!t.deleted);const uc=open.filter(t=>t.priority==='urgent').length,ac=open.filter(t=>t.priority==='active').length,mc=open.filter(t=>t.priority==='midterm').length,ic=open.filter(t=>t.priority==='info').length;const dueSoon=open.filter(t=>{const d=daysUntil(t.dl);return d!==null&&d<=10}).length;let h=`<div class="todo-stats"><div class="todo-stat"><div class="todo-stat-val">${open.length}</div><div class="todo-stat-label">Open</div></div><div class="todo-stat"><div class="todo-stat-val" style="color:var(--terra)">${uc}</div><div class="todo-stat-label">Urgent</div></div><div class="todo-stat"><div class="todo-stat-val" style="color:var(--gold)">${ac}</div><div class="todo-stat-label">Active</div></div><div class="todo-stat"><div class="todo-stat-val" style="color:#7C3AED">${mc}</div><div class="todo-stat-label">Mid-term</div></div><div class="todo-stat"><div class="todo-stat-val" style="color:var(--navy)">${ic}</div><div class="todo-stat-label">Backlog</div></div><div class="todo-stat"><div class="todo-stat-val" style="color:var(--terra)">${dueSoon}</div><div class="todo-stat-label">Due &le;10d</div></div></div>`;
-{try{const t=today();const due=allRecs().filter(r=>!isIgnoredRec(r)&&r.nextDate&&r.nextDate<=t).sort((a,b)=>(a.nextDate||'').localeCompare(b.nextDate||''));h+='<div class="dsec"><div class="dsec-hdr" onclick="toggleSection(this)">Fällig aus dem CRM (Gegenparteien) <span class="chevron">&#9660;</span></div><div class="dsec-body" style="max-height:none">'+(due.length?due.slice(0,30).map(r=>'<div class="dtodo">'+actBtns(r.id)+'<div><b style="cursor:pointer" onclick="openProfile(findRec(\''+r.id+'\'))">'+dEsc(fixUml(dispName(r)))+'</b> <span class="muted" style="font-size:11px">'+dueDe(r.nextDate)+'</span><div style="font-size:11px">'+dEsc(r.nextAction||'')+'</div></div></div>').join('')+(due.length>30?'<div class="muted" style="padding:4px 8px">+'+(due.length-30)+' weitere im Overview</div>':''):'<div class="muted" style="padding:6px 8px">Nichts fällig.</div>')+'</div></div>'}catch(e){console.warn('crm due in dash',e)}}
+{try{const t=today();const dueN=allRecs().filter(r=>!isIgnoredRec(r)&&r.nextDate&&r.nextDate<=t).length;h+='<div class="muted" style="font-size:11px;padding:4px 8px 10px">'+dueN+' counterparty actions due or overdue sit on the <b style="cursor:pointer" onclick="goTab(\'overview\')">Overview</b>. This list holds only to-dos that are not tied to a CRM record.</div>'}catch(e){}}
 h+=`<div class="add-todo-bar"><input class="add-todo-input" type="text" placeholder="Add a new to-do..." id="new-todo-input" onkeydown="if(event.key==='Enter')addTodo(${idx})"><select id="new-todo-priority" style="padding:7px 8px;border:1px solid #D0D0D8;border-radius:6px;font-size:12px;font-family:Arial"><option value="urgent">Urgent</option><option value="active" selected>Active</option><option value="midterm">Mid-term</option><option value="info">Backlog</option></select><select id="new-todo-tag" style="padding:7px 8px;border:1px solid #D0D0D8;border-radius:6px;font-size:12px;font-family:Arial"><option value="outreach">Outreach</option><option value="financing">Financing (debt)</option><option value="equity">Equity</option><option value="setup">Setup</option><option value="legal">Legal</option><option value="hiring">Hiring</option><option value="research">Research</option><option value="strategy">Strategy</option><option value="data">Data</option></select><button class="add-todo-btn" onclick="addTodo(${idx})">+ Add</button></div>`;
 h+='<div class="search-bar"><input class="search-input" type="text" placeholder="Search to-dos..." oninput="document.getElementById(\'dp'+idx+'\')._search=this.value.toLowerCase();todoFilter=this.value?\'search\':\'open\';renderTodos('+idx+')">';
 h+=`<span class="filter-btn ${todoFilter==='open'?'active':''}" onclick="todoFilter='open';todoOwnerFilter='all';saveTodos();renderTodos(${idx})">Open</span><span class="filter-btn ${todoFilter==='urgent'?'active':''}" onclick="todoFilter='urgent';todoOwnerFilter='all';saveTodos();renderTodos(${idx})">Urgent</span><span class="filter-btn ${todoFilter==='active'?'active':''}" onclick="todoFilter='active';todoOwnerFilter='all';saveTodos();renderTodos(${idx})">Active</span><span class="filter-btn ${todoFilter==='midterm'?'active':''}" onclick="todoFilter='midterm';todoOwnerFilter='all';saveTodos();renderTodos(${idx})">Mid-term</span><span class="filter-btn ${todoFilter==='duesoon'?'active':''}" onclick="todoFilter='duesoon';todoOwnerFilter='all';saveTodos();renderTodos(${idx})">Due soon</span><span class="filter-btn ${todoFilter==='done'?'active':''}" onclick="todoFilter='done';todoOwnerFilter='all';saveTodos();renderTodos(${idx})">Done</span><span class="filter-btn ${todoFilter==='all'?'active':''}" onclick="todoFilter='all';todoOwnerFilter='all';saveTodos();renderTodos(${idx})">All</span>`;
