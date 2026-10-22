@@ -1,0 +1,12 @@
+{
+  "rules": {
+    "crm": {
+      ".read": "auth != null && auth.token.email_verified == true && (auth.token.email == 'leif.berger26@gmail.com' || auth.token.email == 'leif@kinetixcap.com' || auth.token.email == 'tommy@kinetix-industries.com')",
+      ".write": "auth != null && auth.token.email_verified == true && (auth.token.email == 'leif.berger26@gmail.com' || auth.token.email == 'leif@kinetixcap.com' || auth.token.email == 'tommy@kinetix-industries.com')"
+    },
+    "crm-config": {
+      ".read": "auth != null && auth.token.email == 'leif.berger26@gmail.com'",
+      ".write": "auth != null && auth.token.email == 'leif.berger26@gmail.com'"
+    }
+  }
+}
