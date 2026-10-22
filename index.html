@@ -710,7 +710,7 @@ function nameTokens(s){return normName(s).split(' ').filter(w=>w.length>=4)}
 // ═══════════════════════════════════════════════════════════════
 function seedAdvisor(a){return {id:uid(),kind:'advisor',firm:a.firm,contact:a.contact||'',email:a.email||'',domain:'',category:a.category||a.type||'',geo:a.geo||'',market:'',status:a.status||'Active',ptype:a.type||'',introPath:a.intro_path||'',notes:a.notes||'',detail:a.detail||'',cadence:30,fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:'',links:[]}}
 function seedCompany(t){return {id:uid(),kind:'target',name:t.company,geo:t.geo,revenue:t.revenue_eurm?+t.revenue_eurm:null,ebitda:t.ebitda_eurm?+t.ebitda_eurm:null,ebit:t.ebit_eurm?+t.ebit_eurm:null,gm:t.gross_margin?+t.gross_margin:null,description:t.description||'',ownership:t.ownership||'',flag:t.flag||'',stage:t.status==='Dead'?'Dead':t.status==='Active'?'Contacted':'Identified',channel:'',deadReason:'',revisitDate:'',stageLog:[{stage:'Identified',date:today()}],fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:'',links:[],location:t.location||''}}
-function seedPerson(p,orgId){return {id:uid(),kind:'person',name:p.name,title:p.title||'',firm:p.firm||'',orgId:orgId||'',email:p.email||'',phone:p.phone||'',linkedin:p.linkedin||'',city:p.city||'',market:p.market||'',ptype:p.ptype||p.source||'',angle:p.angle||'',networkPath:p.networkPath||'',fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:''}}
+function seedPerson(p,orgId){return {id:uid(),kind:'person',name:p.name,title:p.title||'',firm:p.firm||'',orgId:orgId||'',email:p.email||'',phone:p.phone||'',mobile:p.mobile||'',linkedin:p.linkedin||'',city:p.city||'',market:p.market||'',ptype:p.ptype||p.source||'',angle:p.angle||'',networkPath:p.networkPath||'',fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:''}}
 function orgByFirm(f){const nf=normName(f);if(!nf)return null;return S.companies.find(c=>normName(c.name)===nf||normName(c.description||'').includes(nf))||S.advisors.find(a=>normName(a.firm)===nf)}
 function buildPeople(){
   const people=[];
@@ -1485,7 +1485,7 @@ function contactRows(){
     const nc=normName(c);
     if((S.people||[]).some(p=>(p.orgId===o.id||normName(p.firm||'')===normName(dispName(o)))&&normName(p.name||'')===nc))return;
     out.push({__org:true,id:o.id,kind:'person',name:c,title:'Primary contact',firm:dispName(o),
-      email:o.email||'',phone:o.phone||'',linkedin:'',city:o.city||'',
+      email:o.email||'',phone:o.phone||'',mobile:o.mobile||'',linkedin:'',city:o.city||'',
       networkPath:o.introPath||'',ptype:o.category||'',angle:o.notes||o.detail||'',
       touches:o.touches||{},fav:o.fav,lists:o.lists||[],nextAction:o.nextAction,nextDate:o.nextDate,priority:o.priority});
   });
@@ -1520,7 +1520,7 @@ function sortPeople(k){if(psortK===k)psortD*=-1;else{psortK=k;psortD=k==='lastc'
 // ═══════════════════════════════════════════════════════════════
 function newCompany(){return {id:uid(),kind:'target',name:'',geo:'DE',revenue:null,ebitda:null,ebit:null,gm:null,stage:'Identified',channel:'',deadReason:'',revisitDate:'',stageLog:[{stage:'Identified',date:today()}],fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:'',links:[],description:'',ownership:'',flag:'',location:''}}
 function newAdvisor(){return {id:uid(),kind:'advisor',firm:'',contact:'',email:'',domain:'',category:'M&A sourcing intermediary',geo:'',market:'',status:'Active',ptype:'',introPath:'',notes:'',detail:'',cadence:30,fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:'',links:[]}}
-function newPerson(){return {id:uid(),kind:'person',name:'',title:'',firm:'',orgId:'',email:'',phone:'',linkedin:'',city:'',market:'',ptype:'',angle:'',networkPath:'',fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:''}}
+function newPerson(){return {id:uid(),kind:'person',name:'',title:'',firm:'',orgId:'',email:'',phone:'',mobile:'',linkedin:'',city:'',market:'',ptype:'',angle:'',networkPath:'',fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:''}}
 
 // ═══ PIPELINE v3 (21.10.2026): deutsches Board, klickbare KPIs, Fälligkeit inline, Drag & Drop, Brief-Kadenz ═══
 const CAD_STEPS=[{k:'email',d:10,label:'Nachfass-Mail'},{k:'call',d:20,label:'Nachfass-Anruf'},{k:'l6',d:182,label:'Zweiter Brief (6 Monate)'},{k:'l12',d:365,label:'Dritter Brief (12 Monate)'}];
@@ -2179,8 +2179,8 @@ function applyPatchOps(ops){
         if(t&&o.fields){['r','a','o','e','due','p','cat'].forEach(k=>{if(o.fields[k]!==undefined)t[k]=o.fields[k]});_threadsCache=null;made++}else skipped++;
       }else if(o.op==='setField'){
         const r=patchFind(o.match);
-        const _ok=['notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict','outreachChannel','stage','channel','channelVia','letterSent','letterStatus','fav','ignored','cadDone','archived'];
-        if(r&&o.field&&_ok.includes(o.field)){if(o.field==='stage'&&r.stage!==o.value){r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.value,date:o.date||today()})}r[o.field]=o.value;made++}else if(o.op==='addList'){
+        const _ok=['notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','mobile','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict','outreachChannel','stage','channel','channelVia','letterSent','letterStatus','fav','ignored','cadDone','archived'];
+        if(r&&o.field&&_ok.includes(o.field)){if(o.field==='stage'&&r.stage!==o.value){r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.value,date:o.date||today()})}r[o.field]=o.value;if(o.field==='phone')splitPhones(r);made++}else if(o.op==='addList'){
         if(o.name){S.customLists=S.customLists||[];if(!S.customLists.includes(o.name))S.customLists.push(o.name);made++}else skipped++;
       }else if(o.op==='renameList'){
         if(o.from&&o.to&&(S.customLists||[]).includes(o.from)){S.customLists=S.customLists.map(x=>x===o.from?o.to:x);allRecs().forEach(r=>{if(r.lists)r.lists=r.lists.map(x=>x===o.from?o.to:x)});made++}else skipped++;
@@ -2466,7 +2466,7 @@ function openProfile(rec){
   const m=document.getElementById('modal');
   const detailL=isT?
     fld('e_name','Company name',rec.name)+
-    '<div class="pgrid">'+fld('e_tcontact','Primary contact (owner / MD)',rec.contact)+fld('e_temail','Email',rec.email)+fld('e_tphone','Phone',rec.phone)+fld('e_tdomain','Website',rec.domain)+'</div>'+
+    '<div class="pgrid">'+fld('e_tcontact','Primary contact (owner / MD)',rec.contact)+fld('e_temail','Email',rec.email)+fld('e_tphone','Phone (office)',rec.phone)+fld('e_tmobile','Mobile',rec.mobile)+fld('e_tdomain','Website',rec.domain)+'</div>'+
     '<div class="pgrid">'+selFld('e_stage','Stage',STAGES,rec.stage)+fld('e_rev','Revenue (€m)',n1(rec.revenue),'number')+fld('e_ebitda','EBITDA (€m)',n1(rec.ebitda),'number')+fld('e_ebit','EBIT (€m)',n1(rec.ebit),'number')+fld('e_gm','Gross margin %',rec.gm?n1(rec.gm*100):null,'number')+selFld('e_chan','Channel',CHANNELS,chanOf(rec))+fld('e_chvia','Via (partner, fair, contact)',rec.channelVia)+fld('e_loc','Location',rec.location)+'</div>'+
     '<label>Description</label><textarea id="e_desc" rows="2">'+esc(rec.description||'')+'</textarea>'+
     '<label>Ownership</label><input id="e_own" value="'+esc(rec.ownership||'')+'">'+
@@ -2476,7 +2476,7 @@ function openProfile(rec){
     (rec.stage==='Dead'?selFld('e_dr','Dead reason',DEADREASONS,rec.deadReason)+fld('e_revd','Revisit date',rec.revisitDate,'date'):'')+
     '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+'<label>Next action</label><textarea id="e_na" rows="3" style="width:100%">'+esc(rec.nextAction||'')+'</textarea>'+letterBox(rec):
   isA?
-    fld('e_firm','Firm name',rec.firm)+fld('e_contact','Primary contact',rec.contact)+fld('e_email','Email',rec.email)+fld('e_domain','Domain',rec.domain)+
+    fld('e_firm','Firm name',rec.firm)+fld('e_contact','Primary contact',rec.contact)+fld('e_email','Email',rec.email)+'<div class="pgrid">'+fld('e_aphone','Phone (office)',rec.phone)+fld('e_amobile','Mobile',rec.mobile)+'</div>'+fld('e_domain','Domain',rec.domain)+
     '<div class="pgrid">'+selFld('e_cat','Category',['M&A sourcing intermediaries','Financing partners','DD advisors','Investors & family office','Executive search','HR, universities & interns','Admin & infrastructure','Personal network','Other'],rec.category)+selFld('e_market','Market',['DE','UK'],rec.market||(/uk|united kingdom/i.test(rec.geo||'')?'UK':'DE'))+selFld('e_geo2','Geo (country)',['Germany','United Kingdom','Switzerland','France','Netherlands','Luxembourg','Sweden','Denmark','Austria','United States','Other'],rec.geo)+'</div>'+
     selFld('e_status','Status',['To call','Emailed','Contact known','In dialogue','Active relationship','On hold','Dormant'],rec.status)+
     '<div class="pgrid">'+fld('e_city','City',rec.city)+fld('e_addr','Address',rec.address)+'</div>'+
@@ -2484,7 +2484,7 @@ function openProfile(rec){
     '<label>Notes</label><textarea id="e_notes" rows="3">'+esc(rec.notes||'')+'</textarea>'+
     fld('e_cad','Check-in cadence (days)',rec.cadence||30,'number')+
     '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+'<label>Next action</label><textarea id="e_na" rows="3" style="width:100%">'+esc(rec.nextAction||'')+'</textarea>':
-    fld('e_pname','Full name',rec.name)+fld('e_ptitle','Title',rec.title)+fld('e_pfirm','Organization',rec.firm)+fld('e_pemail','Email',rec.email)+fld('e_pphone','Phone',rec.phone)+fld('e_plinkedin','LinkedIn',rec.linkedin)+fld('e_pcity','City',rec.city)+fld('e_pangle','Angle / notes',rec.angle)+fld('e_ppath','Network path',rec.networkPath)+
+    fld('e_pname','Full name',rec.name)+fld('e_ptitle','Title',rec.title)+fld('e_pfirm','Organization',rec.firm)+fld('e_pemail','Email',rec.email)+fld('e_pphone','Phone (office)',rec.phone)+fld('e_pmobile','Mobile',rec.mobile)+fld('e_plinkedin','LinkedIn',rec.linkedin)+fld('e_pcity','City',rec.city)+fld('e_pangle','Angle / notes',rec.angle)+fld('e_ppath','Network path',rec.networkPath)+
     '<div class="pgrid">'+selFld('e_prio','Priority',PRIORITIES,rec.priority)+fld('e_nd','Next action date',rec.nextDate,'date')+'</div>'+'<label>Next action</label><textarea id="e_na" rows="3" style="width:100%">'+esc(rec.nextAction||'')+'</textarea>';
 
   const ppl=isP?[]:orgPeople(rec);
@@ -2515,6 +2515,11 @@ function openProfile(rec){
 }
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(document.getElementById('modal').classList.contains('open')){closeProfile();return}document.querySelectorAll('.open').forEach(el=>el.classList.remove('open'))});
 function closeProfile(){document.getElementById('modal').classList.remove('open');document.getElementById('modalBg').classList.remove('open');profRec=null}
+function splitPhones(r){ // 22.10.2026 (Leif): one number per field. 'Festnetz / M Mobil' wird in phone und mobile getrennt.
+  if(!r||!r.phone)return;const m=String(r.phone).match(/^(.+?)\s+[\/;|]\s+(?:M(?:obil|obile)?[.:]?\s*)?(\+?\d[\d\s\-()]+)$/i);
+  const dg=x=>(x.match(/\d/g)||[]).length;
+  if(m&&dg(m[1])>=7&&dg(m[2])>=7){r.phone=m[1].trim();if(!r.mobile)r.mobile=m[2].trim();}
+}
 function saveProfile(){
   const r=profRec;if(!r)return;
   if(r.kind==='target'){
@@ -2523,18 +2528,19 @@ function saveProfile(){
     r.geo=r.geo||'DE';r.revenue=+gv('e_rev')||null;r.ebitda=+gv('e_ebitda')||null;r.ebit=+gv('e_ebit')||null;
     const gm=+gv('e_gm');r.gm=gm?gm/100:null;
     r.channel=gv('e_chan');r.channelVia=gv('e_chvia');r.location=gv('e_loc');r.description=gv('e_desc');r.ownership=gv('e_own');r.flag=gv('e_flag');
-    r.contact=gv('e_tcontact');r.email=gv('e_temail');r.phone=gv('e_tphone');r.domain=gv('e_tdomain');r.notes=gv('e_tnotes');
+    r.contact=gv('e_tcontact');r.email=gv('e_temail');r.phone=gv('e_tphone');r.mobile=gv('e_tmobile');r.domain=gv('e_tdomain');r.notes=gv('e_tnotes');
     r.score=gv('e_score')!==''?+gv('e_score'):(r.score??null);r.verdict=gv('e_verdict')||'';
     if(r.stage==='Dead'){r.deadReason=gv('e_dr');r.revisitDate=gv('e_revd')}
   } else if(r.kind==='advisor'){
-    r.firm=gv('e_firm')||r.firm;r.contact=gv('e_contact');r.email=gv('e_email');r.domain=gv('e_domain');
+    r.firm=gv('e_firm')||r.firm;r.contact=gv('e_contact');r.email=gv('e_email');r.phone=gv('e_aphone');r.mobile=gv('e_amobile');r.domain=gv('e_domain');
     r.category=gv('e_cat');r.market=gv('e_market');r.geo=gv('e_geo2')||r.geo;r.status=gv('e_status');r.introPath=gv('e_intro');r.city=gv('e_city')||r.city||'';r.address=gv('e_addr')||r.address||'';
     r.notes=gv('e_notes');r.cadence=+gv('e_cad')||30;
   } else {
     r.name=gv('e_pname')||r.name;r.title=gv('e_ptitle');r.firm=gv('e_pfirm');r.email=gv('e_pemail');
-    r.phone=gv('e_pphone');r.linkedin=gv('e_plinkedin');r.city=gv('e_pcity');r.angle=gv('e_pangle');
+    r.phone=gv('e_pphone');r.mobile=gv('e_pmobile');r.linkedin=gv('e_plinkedin');r.city=gv('e_pcity');r.angle=gv('e_pangle');
     r.networkPath=gv('e_ppath');
   }
+  splitPhones(r);
   r.priority=gv('e_prio');r.nextDate=gv('e_nd');const _na=gv('e_na');if(_na!==r.nextAction){r.nextSet=today()}r.nextAction=_na;
   // upsert into state
   if(r.kind==='target'&&!S.companies.find(c=>c.id===r.id))S.companies.push(r);
