@@ -79,8 +79,10 @@ export async function startListening(){
     renderAll();
     return;
   }else{
+    // S and lastTree must never share objects: a shared touch map would be mutated in both at once and the
+    // diff in save() would see no change, so the write would be skipped while this client believes it was sent.
     lastTree=decodeKeys(data);
-    setS(ensureDefaults(unshard(lastTree)));
+    setS(ensureDefaults(unshard(clone(lastTree))));
   }
   renderAll();
   attachListeners();
@@ -118,6 +120,7 @@ export function onRemote(path,rawKey,rawValue){
   try{applyRemote(path,key,value,prev)}catch(e){console.error('applyRemote',path,key,e)}
   scheduleRender();
 }
+const clone=v=>(v&&typeof v==='object')?JSON.parse(JSON.stringify(v)):v;
 function syncFields(target,prev,next,skip){
   // set the fields that differ between prev and next on target; leave everything else (local, unsaved) alone
   const keys=new Set([...Object.keys(prev||{}),...Object.keys(next||{})]);
@@ -125,16 +128,16 @@ function syncFields(target,prev,next,skip){
     if(skip&&skip.includes(k))continue;
     const a=prev?prev[k]:undefined,b=next?next[k]:undefined;
     if(stableStringify(a)===stableStringify(b))continue;
-    if(b===undefined)delete target[k];else target[k]=b;
+    if(b===undefined)delete target[k];else target[k]=clone(b); // a copy, never the tree's own object
   }
 }
-function replaceInList(arr,idx,item){if(item===undefined){if(idx>=0)arr.splice(idx,1)}else if(idx>=0){syncFields(arr[idx],arr[idx],item)}else arr.push(item)}
+function replaceInList(arr,idx,item){if(item===undefined){if(idx>=0)arr.splice(idx,1)}else if(idx>=0){syncFields(arr[idx],arr[idx],item)}else arr.push(clone(item))}
 function applyRemote(path,key,value,prev){
   if(REC_COLLS[path]){
     const arr=S[path];const idx=arr.findIndex(r=>r&&r.id===key);
     if(value===undefined){if(idx>=0)arr.splice(idx,1);return}
     if(idx>=0){syncFields(arr[idx],prev,value,['touches']);return}
-    const rec={...value};const tc=treeGet('touches/'+key);if(tc)rec.touches={...tc};
+    const rec=clone(value);const tc=treeGet('touches/'+key);if(tc)rec.touches=clone(tc);
     if(!rec.touches)rec.touches={};
     arr.push(rec);return;
   }
