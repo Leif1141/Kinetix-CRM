@@ -47,7 +47,7 @@ export function thRec(t){let r=findRec(t.id);if(!r)(t.alias||[]).some(a=>(r=find
 export function thDone(id){return !!(S&&S.threadsDone&&S.threadsDone[id])}
 export function thIsOpen(t){const v=thV(t);return v==='OPEN_LEIF'||v==='OPEN_THEM'}
 export function thGo(f){thFilt=f;document.querySelectorAll('.th-f').forEach(x=>x.classList.toggle('on',x.dataset.f===f));renderThreads()}
-export function thOpen(id,ev){if(ev)ev.stopPropagation();const t=THREADS_LIVE().find(x=>x.id===id);const r=t?thRec(t):findRec(id);if(r)openProfile(r);else toast('Datensatz nicht mehr im CRM')}
+export function thOpen(id,ev){if(ev)ev.stopPropagation();const t=THREADS_LIVE().find(x=>x.id===id);const r=t?thRec(t):findRec(id);if(r)openProfile(r);else toast('Record no longer in the CRM')}
 export function thToggle(id,ev){
   if(ev)ev.stopPropagation();
   S.threadsDone=S.threadsDone||{};
@@ -61,12 +61,12 @@ export function thNote(id){S.threadsState=S.threadsState||{};const st=S.threadsS
 export function thAdopt(id,ev){if(ev)ev.stopPropagation();const t=THREADS_LIVE().find(x=>x.id===id);const r=t&&thRec(t);if(!r||!t.a)return;
   r.nextAction=t.a;if(t.due){const m=/^(\d\d)\.(\d\d)\.(\d\d)$/.exec(t.due);if(m)r.nextDate='20'+m[3]+'-'+m[2]+'-'+m[1]}
   r.priority=t.p==='Hoch'?'High':(t.p==='Mittel'?'Medium':(r.priority||''));r.nextSet=today();
-  if(S.dismissed)delete S.dismissed['due_'+r.id];save();renderAll();toast('Aktion im CRM gesetzt')}
+  if(S.dismissed)delete S.dismissed['due_'+r.id];save();renderAll();toast('Action set in the CRM')}
 export function thMore(id){if(thOpenIds.has(id))thOpenIds.delete(id);else thOpenIds.add(id);renderThreads()}
 export function thDraft(id){if(thDraftIds.has(id))thDraftIds.delete(id);else thDraftIds.add(id);renderThreads()}
 export function thToggleAll(){thAllOpen=!thAllOpen;thOpenIds=new Set(thAllOpen?THREADS_LIVE().map(t=>t.id):[]);document.getElementById('thAllBtn').textContent=thAllOpen?'Collapse all':'All details';renderThreads()}
 export function thCopy(id,what){const t=THREADS_LIVE().find(x=>x.id===id);const ta=document.getElementById('thta_'+id);const txt=ta?ta.value:(what==='cs'?t.cs:((t.dr.s?'Betreff: '+t.dr.s+'\n\n':'')+t.dr.b));
-  (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast('Kopiert'),()=>{if(ta){ta.select();document.execCommand('copy');toast('Kopiert')}})}
+  (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast('Copied'),()=>{if(ta){ta.select();document.execCommand('copy');toast('Copied')}})}
 export function thMail(id){const t=THREADS_LIVE().find(x=>x.id===id);const ta=document.getElementById('thta_'+id);let body=ta?ta.value:t.dr.b;body=body.replace(/^Betreff:.*\n\n?/,'');
   const u='mailto:'+encodeURIComponent(t.email||'')+'?subject='+encodeURIComponent(t.dr.s||'')+'&body='+encodeURIComponent(body);window.open(u,'_self')}
 export function thShow(t,q,cat){
@@ -123,22 +123,22 @@ export function renderThreads(){
     if(more){h+='<div class="th-more">'
       +(t.o?'<div class="lbl">Open point</div><div>'+esc(t.o)+'</div>':'')
       +(t.e?'<div class="lbl">Evidence</div><div>'+esc(t.e)+'</div>':'')
-      +'<div class="lbl">Verlauf</div><div>'+esc(t.cat||'')+(t.lo?' | zuletzt raus '+esc(t.lo):'')+(t.li?' | zuletzt rein '+esc(t.li):'')+' | '+(t.no||0)+' raus / '+(t.ni||0)+' rein'+(r?' | letzter Kontakt (CRM) '+fmtAgo(lt):'')
+      +'<div class="lbl">History</div><div>'+esc(t.cat||'')+(t.lo?' | last out '+esc(t.lo):'')+(t.li?' | last in '+esc(t.li):'')+' | '+(t.no||0)+' out / '+(t.ni||0)+' in'+(r?' | last contact (CRM) '+fmtAgo(lt):'')
       +(t.email?' | <a href="mailto:'+esc(t.email)+'">'+esc(t.email)+'</a>':'')+(st.v?' | Original-Urteil: '+TH_V[t.v]:'')+'</div></div>'}
     if(draft&&(t.dr||t.cs)){
       const txt=t.dr?((t.dr.s?'Betreff: '+t.dr.s+'\n\n':'')+t.dr.b):t.cs;
-      h+='<div class="th-draft"><div style="font-size:11px;font-weight:700;margin-bottom:4px">'+(t.dr?'Entwurf (bearbeitbar)':'Call guide')+'</div>'
+      h+='<div class="th-draft"><div style="font-size:11px;font-weight:700;margin-bottom:4px">'+(t.dr?'Draft (editable)':'Call guide')+'</div>'
         +'<textarea id="thta_'+t.id+'" rows="'+Math.min(18,Math.max(4,txt.split('\n').length+1))+'">'+esc(txt)+'</textarea>'
         +(t.att?'<div class="att">Attachment still to add: '+esc(t.att)+'</div>':'')
-        +'<div style="margin-top:6px"><button class="sm" onclick="thCopy(\''+t.id+'\',\''+(t.dr?'dr':'cs')+'\')">Kopieren</button> '
+        +'<div style="margin-top:6px"><button class="sm" onclick="thCopy(\''+t.id+'\',\''+(t.dr?'dr':'cs')+'\')">Copy</button> '
         +(t.dr&&t.email?'<button class="sm primary" onclick="thMail(\''+t.id+'\')">Open in mail client</button>':'')+'</div></div>'}
     h+='<div class="th-acts">'
-      +'<button class="sm" onclick="thMore(\''+t.id+'\')">'+(more?'Weniger':'Details')+'</button>'
-      +((t.dr||t.cs)?'<button class="sm'+(draft?' primary':'')+'" onclick="thDraft(\''+t.id+'\')">'+(t.dr?'Entwurf':'Leitfaden')+'</button>':'')
+      +'<button class="sm" onclick="thMore(\''+t.id+'\')">'+(more?'Less':'Details')+'</button>'
+      +((t.dr||t.cs)?'<button class="sm'+(draft?' primary':'')+'" onclick="thDraft(\''+t.id+'\')">'+(t.dr?'Draft':'Call guide')+'</button>':'')
       +(r&&t.a?'<button class="sm" onclick="thAdopt(\''+t.id+'\',event)" title="Copy the next action and date into the CRM record">Adopt into CRM</button>':'')
       +(r?'<button class="sm" onclick="quickSetAction(\''+r.id+'\',event)">Own action</button>':'')
-      +'<button class="sm" onclick="thNote(\''+t.id+'\')">Notiz</button>'
-      +'<button class="sm" onclick="thOpen(\''+t.id+'\',event)">Profil</button>'
+      +'<button class="sm" onclick="thNote(\''+t.id+'\')">Note</button>'
+      +'<button class="sm" onclick="thOpen(\''+t.id+'\',event)">Open record</button>'
       +'<span class="sp"></span><select onchange="thSetV(\''+t.id+'\',this.value)">'+TH_ORDER.map(x=>'<option value="'+x+'"'+(x===v?' selected':'')+'>'+TH_V[x]+'</option>').join('')+'</select>'
       +'</div></div></div>';
     return h;

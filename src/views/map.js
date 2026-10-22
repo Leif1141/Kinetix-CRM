@@ -16,7 +16,7 @@ export function cleanCity(s){
   return s;
 }
 export function recCity(r){return cleanCity(r.city||r.location||'')}
-export function locFocus(c){const g=cityLL(c);if(!g||!locMap){toast('Kein Geocode für '+c);return}locMap.setView(g,12);document.getElementById('locMap').scrollIntoView({behavior:'smooth',block:'start'})}
+export function locFocus(c){const g=cityLL(c);if(!g||!locMap){toast('No geocode for '+c);return}locMap.setView(g,12);document.getElementById('locMap').scrollIntoView({behavior:'smooth',block:'start'})}
 export function cityLL(c){return (S.geoCache||{})[(c||'').toLowerCase()]||null}
 export function addrKey(r){if(!r)return null;const a=(r.address||'').trim();if(!a||!/\d/.test(a))return null;const c=cleanCity(r.city||r.location||'');return ('addr:'+a+(c&&!a.toLowerCase().includes(c.toLowerCase())?', '+c:'')).toLowerCase().replace(/[.#$\/\[\]]/g,'_')}
 export function addrQuery(r){let a=(r.address||'').split(/[;|]|\.\s*Weitere|\s+Weitere Standorte/i)[0].replace(/\(.*?\)/g,'').trim();const city=cleanCity(r.city||r.location||'');if(city&&!a.toLowerCase().includes(city.toLowerCase()))a+=', '+city;const ctry=(r.geo&&r.geo!=='DE')?({CH:'Switzerland',AT:'Austria',UK:'United Kingdom',FR:'France',NL:'Netherlands',LU:'Luxembourg',US:'USA'}[r.geo]||''):'Germany';return a+(ctry?', '+ctry:'')}
@@ -85,8 +85,8 @@ export function nearbyBriefing(){
   box.innerHTML=html;
 }
 export function copyBriefing(){
-  if(!window.__brief){toast('Erst "Zeigen" klicken');return}
-  navigator.clipboard.writeText(window.__brief).then(()=>toast('Briefing kopiert'),()=>toast('Kopieren blockiert'));
+  if(!window.__brief){toast('Click "Show" first');return}
+  navigator.clipboard.writeText(window.__brief).then(()=>toast('Briefing copied'),()=>toast('Clipboard blocked'));
 }
 export function renderClusters(){
   const box=document.getElementById('locClusters'); if(!box)return;

@@ -32,12 +32,14 @@
 <div class="wrap">
 <header>
   <h1>Kinetix Deal CRM</h1>
+  <button class="sm hdr-menu" id="hdrMenu" onclick="document.body.classList.toggle('hdr-open')">Menu</button>
   <div class="hdr-right">
     <span id="userName" class="muted"></span>
     <span id="syncStatus" class="muted">Not synced yet</span>
     <button id="undoBtn" onclick="undoLast()" style="display:none" title="Undo last change (Ctrl+Z)">Undo</button>
     <button class="primary" id="btnSync" onclick="syncEmails()">Sync</button>
     <button id="btnUpd" onclick="checkDriveUpdates(false)">Updates</button>
+    <button class="conn-toggle" onclick="document.body.classList.toggle('show-conn')">Connections</button>
     <button onclick="signOut()" style="border-color:var(--gray);color:var(--gray)">Sign out</button>
   </div>
 </header>
@@ -108,11 +110,11 @@
 <div class="panel" id="p-pipeline">
   <div class="kpis" id="pipeKpis"></div>
   <div class="filterbar">
-    <button class="sm vbtn" data-v="board" onclick="setPipeView('board')">Board</button><button class="sm vbtn" data-v="focus" onclick="setPipeView('focus')">Liste</button><button class="sm vbtn" data-v="channel" onclick="setPipeView('channel')">Kanäle</button>
-    <input id="fSearch" placeholder="Firma suchen..." oninput="renderPipeline()">
-    <select id="fChan" onchange="renderPipeline()"><option value="">Alle Kanäle</option></select>
-    <label style="font-size:12px"><input type="checkbox" id="fFav" onchange="renderPipeline()"> Nur markierte</label>
-    <button class="sm" onclick="toggleWide()" id="wideBtn">Breite Ansicht</button>
+    <button class="sm vbtn" data-v="board" onclick="setPipeView('board')">Board</button><button class="sm vbtn" data-v="focus" onclick="setPipeView('focus')">List</button><button class="sm vbtn" data-v="channel" onclick="setPipeView('channel')">Channels</button>
+    <input id="fSearch" placeholder="Search companies..." oninput="renderPipeline()">
+    <select id="fChan" onchange="renderPipeline()"><option value="">All channels</option></select>
+    <label style="font-size:12px"><input type="checkbox" id="fFav" onchange="renderPipeline()"> Starred only</label>
+    <button class="sm" onclick="toggleWide()" id="wideBtn">Wide view</button>
   </div>
   <div id="pipeBody"></div>
 </div>
@@ -128,13 +130,13 @@
     <button class="sm th-f" data-f="hoch" onclick="thGo('hoch')">High priority only</button>
     <button class="sm th-f" data-f="all" onclick="thGo('all')">All</button>
     <input id="thSearch" placeholder="Search..." oninput="renderThreads()" style="flex:1;min-width:160px">
-    <select id="thCat" onchange="renderThreads()"><option value="">Alle Kategorien</option></select>
+    <select id="thCat" onchange="renderThreads()"><option value="">All categories</option></select>
     <label style="font-size:12px"><input type="checkbox" id="thHideDone" onchange="renderThreads()"> Hide ticked</label>
     <label style="font-size:12px" title="Items whose CRM record already carries a next-action date are on the Today tab"><input type="checkbox" id="thHideSched" checked onchange="renderThreads()"> Hide items scheduled on Today</label>
-    <button class="sm" onclick="thToggleAll()" id="thAllBtn">Alle Details</button>
+    <button class="sm" onclick="thToggleAll()" id="thAllBtn">All details</button>
     <span class="muted" id="thCount"></span>
   </div>
-  <div class="note muted" style="padding:0 2px 8px;font-size:11px">Mailverlauf aus dem CRM, Stand 15.09.2026 (187 Gegenparteien). Kachel oder Filter anklicken. Empfehlung und Entwurf sind von Claude vorbereitet; Status, Haken und Notizen werden im CRM gespeichert.</div>
+  <div class="note muted" style="padding:0 2px 8px;font-size:11px">Mail threads from the CRM, snapshot of 15.09.2026 (187 counterparties). Click a tile or a filter. Recommendation and draft were prepared by Claude; status, ticks and notes are saved in the CRM.</div>
   <div id="thBody"></div>
 </div>
 

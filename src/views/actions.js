@@ -22,7 +22,7 @@ export function completeAction(id,ev){
   logDone(r,r.nextAction);
   r.nextDate='';r.nextAction='';r.nextSet='';
   if(S.dismissed)delete S.dismissed['due_'+r.id];
-  save();renderAll();toast('Als erledigt erfasst');
+  save();renderAll();toast('Logged as done');
 }
 export function quickSetAction(id,ev){
   if(ev)ev.stopPropagation();
@@ -44,19 +44,19 @@ export function snoozeAction(id,ev,days){
   r.nextDate=d.toISOString().slice(0,10);
   save();renderAll();toast('Pushed to '+r.nextDate);
 }
-export function ignoreRec(id,ev){if(ev)ev.stopPropagation();const r=findRec(id);if(!r)return;r.ignored=today();save();renderAll();toast('Ignoriert bis zur nächsten Aktivität')}
+export function ignoreRec(id,ev){if(ev)ev.stopPropagation();const r=findRec(id);if(!r)return;r.ignored=today();save();renderAll();toast('Ignored until the next activity')}
 export function unignoreRec(id,ev){if(ev)ev.stopPropagation();const r=findRec(id);if(!r)return;delete r.ignored;save();renderAll()}
 export function sugKeysOf(id){return suggestionsRaw().filter(s=>s.rec.id===id).map(s=>s.key)}
 export function sugAct(kind,id,key,ev){if(ev)ev.stopPropagation();const r=findRec(id);if(!r)return;
   if(kind==='done'){
-    if(key.startsWith('cdz_')){const step=key.split('_').pop();r.cadDone=r.cadDone||{};r.cadDone[step]=today();logDone(r,'Cadence: '+(CAD_LABEL[step]||step));save();renderAll();toast('Kadenzschritt erledigt');return}
+    if(key.startsWith('cdz_')){const step=key.split('_').pop();r.cadDone=r.cadDone||{};r.cadDone[step]=today();logDone(r,'Cadence: '+(CAD_LABEL[step]||step));save();renderAll();toast('Cadence step done');return}
     if(r.nextAction){completeAction(id);return}
-    S.dismissed=S.dismissed||{};sugKeysOf(id).forEach(k=>S.dismissed[k]=today());save();renderAll();toast('Erledigt');return}
+    S.dismissed=S.dismissed||{};sugKeysOf(id).forEach(k=>S.dismissed[k]=today());save();renderAll();toast('Done');return}
   if(kind==='ignore'){ignoreRec(id);return}
   const days=kind==='1m'?30:7;
   if(r.nextDate&&r.nextDate<=addDays(today(),days)){const d=new Date((r.nextDate>=today())?r.nextDate:today());d.setDate(d.getDate()+days);r.nextDate=d.toISOString().slice(0,10)}
   S.snoozeUntil=S.snoozeUntil||{};const until=addDays(today(),days);sugKeysOf(id).forEach(k=>S.snoozeUntil[k]=until);
-  save();renderAll();toast('Verschoben bis '+fmtDe(until));
+  save();renderAll();toast('Pushed to '+fmtDe(until));
 }
 export function actBtns(id,key){key=key||('due_'+id);return '<span style="white-space:nowrap"><button class="sm primary" onclick="sugAct(\'done\',\''+id+'\',\''+key+'\',event)" title="Log as done">Done</button> <button class="sm" onclick="sugAct(\'1w\',\''+id+'\',\''+key+'\',event)">+1w</button> <button class="sm" onclick="sugAct(\'1m\',\''+id+'\',\''+key+'\',event)">+1m</button> <button class="sm" onclick="sugAct(\'ignore\',\''+id+'\',\''+key+'\',event)" title="Hide until there is new activity">Ignore</button></span>'}
 export function snoozeSugg(k,ev){if(ev)ev.stopPropagation();dismissSugg(k)}

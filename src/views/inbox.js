@@ -18,7 +18,7 @@ export function renderInbox(){
 }
 export function assignByName(i,inp){const v=(inp.value||'').trim();if(!v)return;const nn=normName(v.replace(/\s*\(.*\)$/,''));let r=(S.companies||[]).find(c=>normName(c.name||'')===nn)||(S.advisors||[]).find(a=>normName(a.firm||'')===nn)||(S.people||[]).find(p=>normName(p.name||'')===nn);
   if(!r){const all=[...(S.companies||[]),...(S.advisors||[]),...(S.people||[])];const cands=all.filter(x=>normName(dispName(x)||'').includes(nn));if(cands.length===1)r=cands[0]}
-  if(!r){if(!confirm('"'+v+'" ist nicht im CRM. Als neue Person anlegen?')){inp.value='';return}const firm=prompt('Firma der Person (optional):','')||'';const p=newPerson();p.name=v;p.firm=firm;const u=(S.unmatched||[])[i];const addr=((u&&(u.dir==='out'?(u.who||''):(u.sender||'')))||'').toLowerCase().match(/[\w.+-]+@[\w.-]+/);if(addr)p.email=addr[0];const o=firm?allOrgs().find(x=>normName(dispName(x))===normName(firm)):null;if(o)p.orgId=o.id;S.people=S.people||[];S.people.push(p);r=p}
+  if(!r){if(!confirm('"'+v+'" is not in the CRM. Create as a new person?')){inp.value='';return}const firm=prompt('Firm of the person (optional):','')||'';const p=newPerson();p.name=v;p.firm=firm;const u=(S.unmatched||[])[i];const addr=((u&&(u.dir==='out'?(u.who||''):(u.sender||'')))||'').toLowerCase().match(/[\w.+-]+@[\w.-]+/);if(addr)p.email=addr[0];const o=firm?allOrgs().find(x=>normName(dispName(x))===normName(firm)):null;if(o)p.orgId=o.id;S.people=S.people||[];S.people.push(p);r=p}
   assignEmail(i,r.id)}
 export function toggleInboxBody(i){const el=document.getElementById('inb_body_'+i);if(el)el.style.display=el.style.display==='none'?'':'none'}
 export function ignoreUnmatched(i,dom){
@@ -37,7 +37,7 @@ export function dismissUnmatched(i){
   const u=(S.unmatched||[])[i];if(!u||!u.key)return;
   S.dismissedUnmatched=S.dismissedUnmatched||{};S.dismissedUnmatched[u.key.replace(/\./g,'_')]=today();
   S.unmatched=(S.unmatched||[]).filter((_,j)=>j!==i);
-  save();renderAll();toast('Ausgeblendet');
+  save();renderAll();toast('Hidden');
 }
 export function isDismissedUnmatched(k){return !!(k&&S.dismissedUnmatched&&S.dismissedUnmatched[k.replace(/\./g,'_')])}
 export function assignEmail(i,val){

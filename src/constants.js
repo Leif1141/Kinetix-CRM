@@ -22,11 +22,11 @@ export const PRIO_COL={'Urgent':'#112149','High':'#2E3C65','Medium':'#6B7AAF','L
 export const PRIO_DEF={'Urgent':'act this week','High':'best fit, work actively','Medium':'fits, work when there is room','Low':'keep an eye on it'};
 export const LEGAL=/\b(gmbh|co|kg|ag|kgaa|ohg|e\.k\.|ek|se|ltd|limited|plc|llp|inc|holding|group|gruppe|cie|handels|vertrieb|technik|techni[cs]|industrie|engineering|services?|gmbh\s*&\s*co\.?\s*kg)\b/gi;
 
-// ═══ PIPELINE v3 (21.10.2026): deutsches Board, klickbare KPIs, Fälligkeit inline, Drag & Drop, Brief-Kadenz ═══
-export const CAD_STEPS=[{k:'email',d:10,label:'Nachfass-Mail'},{k:'call',d:20,label:'Nachfass-Anruf'},{k:'l6',d:182,label:'Zweiter Brief (6 Monate)'},{k:'l12',d:365,label:'Dritter Brief (12 Monate)'}];
-export const CAD_LABEL={email:'Nachfass-Mail',call:'Nachfass-Anruf',l6:'Zweiter Brief (6 Monate)',l12:'Dritter Brief (12 Monate)'};
-export const CH_DE={'Own letter':'Eigener Brief','Partner letter':'Partnerbrief','M&A house / advisor':'M&A-Berater','Tax adviser / auditor':'Steuerberater / WP','Trade fair':'Messe','Own email':'Eigene Mail','LinkedIn':'LinkedIn','Phone':'Telefon','Network / referral':'Netzwerk','Platform':'Plattform','Bank':'Bank','Inbound':'Eingehend','Other':'Sonstige','':'(kein Kanal)'};
-export const ST_DE={'Identified':'Identifiziert','Contacted':'Angeschrieben','Replied':'Antwort','Meeting':'Gespräch','NDA':'NDA / Infos','LOI':'LOI','Diligence':'Prüfung','Closed':'Abgeschlossen','On hold':'Zurückgestellt','Dead':'Absage'};
-export const LS_DE={planned:'Brief geplant',ready:'Brief entworfen, zu versenden',sent:'Brief versendet'};
-export const BOARD_COLS=[{k:'ready',t:'Zu kontaktieren'},{k:'Contacted',t:'Angeschrieben'},{k:'Replied',t:'Antwort'},{k:'Meeting',t:'Gespräch'},{k:'NDA',t:'NDA / Infos'},{k:'LOI',t:'LOI'},{k:'Diligence',t:'Prüfung'}];
+// Pipeline: board, clickable KPIs, inline due dates, drag and drop, letter cadence
+export const CAD_STEPS=[{k:'email',d:10,label:'Follow-up email'},{k:'call',d:20,label:'Follow-up call'},{k:'l6',d:182,label:'Second letter (6 months)'},{k:'l12',d:365,label:'Third letter (12 months)'}];
+export const CAD_LABEL={email:'Follow-up email',call:'Follow-up call',l6:'Second letter (6 months)',l12:'Third letter (12 months)'};
+export const CH_DE={'':'(no channel)'}; // channel names are shown as stored
+export const ST_DE={'NDA':'NDA / info'}; // stage names are shown as stored
+export const LS_DE={planned:'Letter planned',ready:'Letter drafted, to send',sent:'Letter sent'};
+export const BOARD_COLS=[{k:'ready',t:'To contact'},{k:'Contacted',t:'Contacted'},{k:'Replied',t:'Replied'},{k:'Meeting',t:'Meeting'},{k:'NDA',t:'NDA / info'},{k:'LOI',t:'LOI'},{k:'Diligence',t:'Diligence'}];
 export const LETTER_TARGET_WEEK=10;
