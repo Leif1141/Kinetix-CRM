@@ -51,7 +51,7 @@
 </div>
 
 <div class="tabs" id="tabs">
-  <div class="tab active" data-t="overview">Overview <span class="tab-badge" id="sugBadge" style="display:none"></span></div>
+  <div class="tab active" data-t="home">Today <span class="tab-badge" id="homeBadge" style="display:none"></span></div>
   <div class="tab" data-t="orgs">Organizations</div>
   <div class="tab" data-t="people">People</div>
   <div class="tab" data-t="pipeline">Pipeline</div>
@@ -63,24 +63,21 @@
   <div class="tab" data-t="dash" id="dashTab" style="display:none">Dashboard <span class="tab-badge" id="dashBadge" style="display:none"></span></div>
 </div>
 
-<div class="panel active" id="p-overview">
+<div class="panel active" id="p-home">
   <div class="filterbar" style="margin-bottom:10px">
-    <input id="gSearch" placeholder="Search everything - organizations, people, contacts, emails..." oninput="renderGlobalSearch()" style="flex:1;min-width:320px">
+    <input id="gSearch" placeholder="Search everything: organisations, people, contacts, emails (Ctrl+K)" oninput="renderGlobalSearch()" style="flex:1;min-width:260px">
     <button class="sm" onclick="document.getElementById('gSearch').value='';renderGlobalSearch()">Clear</button>
   </div>
   <div class="section" id="gSearchWrap" style="display:none"><div class="section-hdr">Search results <span id="gCount" style="font-weight:400;font-size:11px"></span></div><div id="gSearchBody"></div></div>
-  <div class="kpis" id="ovKpis"></div>
-  <div class="filterbar" style="margin:6px 0 10px"><span id="ovGroups" style="display:flex;gap:4px;flex-wrap:wrap"></span><input id="ovSearch" placeholder="Filter: Name, Kontakt, nächster Schritt..." oninput="renderFollowups()" style="min-width:260px"></div>
-  <div id="fuBody"></div>
-  <div class="section" style="display:none"><div class="section-hdr">Suggested actions <span style="font-weight:400;font-size:11px">rule-based — act or dismiss</span></div><div id="suggBody"></div></div>
-  
-  <div class="section" style="display:none"><div class="section-hdr">Researched, not yet approached <span style="font-weight:400;font-size:11px">ranked by score - no chasing, just the queue</span></div><div id="queueBody"></div></div>
-  <details class="psec"><summary>Recent activity</summary><div id="recentBody"></div></details>
-  <div class="ov-grid">
-    <div>
-      <div class="section" style="display:none"><div class="section-hdr">Favorites</div><div id="favBody"></div></div>
+  <div class="home-grid">
+    <div class="home-main">
+      <div class="filterbar" style="margin:0 0 10px"><span id="homeGroups" style="display:flex;gap:4px;flex-wrap:wrap"></span><input id="homeSearch" placeholder="Filter: name, contact, step" style="min-width:200px"></div>
+      <div id="homeQueue"></div>
+      <details class="psec"><summary>Recent activity</summary><div id="recentBody"></div></details>
     </div>
-    <div class="section" style="display:none"><div class="section-hdr">Custom lists <button class="sm" style="background:#fff" onclick="newList()">+ New list</button></div><div id="listsBody"></div></div>
+    <aside class="home-side">
+      <div class="section"><div class="section-hdr">This week</div><div id="homeScore"></div></div>
+    </aside>
   </div>
 </div>
 
@@ -133,7 +130,7 @@
     <input id="thSearch" placeholder="Search..." oninput="renderThreads()" style="flex:1;min-width:160px">
     <select id="thCat" onchange="renderThreads()"><option value="">Alle Kategorien</option></select>
     <label style="font-size:12px"><input type="checkbox" id="thHideDone" onchange="renderThreads()"> Hide ticked</label>
-    <label style="font-size:12px" title="Items whose CRM record already carries a next-action date are on the Overview"><input type="checkbox" id="thHideSched" checked onchange="renderThreads()"> Hide items scheduled on the Overview</label>
+    <label style="font-size:12px" title="Items whose CRM record already carries a next-action date are on the Today tab"><input type="checkbox" id="thHideSched" checked onchange="renderThreads()"> Hide items scheduled on Today</label>
     <button class="sm" onclick="thToggleAll()" id="thAllBtn">Alle Details</button>
     <span class="muted" id="thCount"></span>
   </div>

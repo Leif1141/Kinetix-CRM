@@ -7,7 +7,8 @@ import {auth, currentUser, initFirebase, showApp} from './store/firebase.js';
 import {dashRefresh} from './views/dash.js';
 import {migratePrevClean} from './sync/triage.js';
 import {renderData} from './views/data.js';
-import {renderFollowups, renderOverview, renderQueue} from './views/overview.js';
+import {renderHome, initHome} from './views/home.js';
+import {undoLast} from './store/firebase.js';
 import {renderGlobalSearch} from './views/search.js';
 import {renderInbox} from './views/inbox.js';
 import {renderLocations} from './views/map.js';
@@ -33,7 +34,7 @@ import * as _m14 from './sync/granola.js';
 import * as _m15 from './sync/index.js';
 import * as _m16 from './views/ui.js';
 import * as _m17 from './views/home.js';
-import * as _m18 from './views/overview.js';
+import * as _m18 from './views/home.js';
 import * as _m19 from './shares.js';
 import * as _m20 from './views/search.js';
 import * as _m21 from './views/lists.js';
@@ -56,8 +57,8 @@ _mods.forEach(_expose);
 _expose({goTab,renderAll});
 
 
-export function goTab(t){if(t==='followups')t='overview';document.querySelector('.tab[data-t="'+t+'"]')?.click()}
-export function renderAll(){if(!S)return;try{const dt=document.getElementById('dataTab');if(dt&&(/[?#]data/.test(location.href)||localStorage.getItem('kxShowData')==='1'))dt.style.display=''}catch(e){}invalidateShares();invalidateThreads();try{migrateStages()}catch(e){}try{migratePrevClean()}catch(e){}try{migrateChannels()}catch(e){}renderOverview();renderYield();renderQueue();renderGlobalSearch();renderOrgs();renderPeople();renderPipeline();renderFollowups();renderThreads();renderInbox();renderReports();renderData();try{dashRefresh()}catch(e){console.warn('dashboard',e)}if(document.getElementById('p-locations').classList.contains('active'))renderLocations()}
+export function goTab(t){if(t==='followups'||t==='overview')t='home';document.querySelector('.tab[data-t="'+t+'"]')?.click()}
+export function renderAll(){if(!S)return;try{const dt=document.getElementById('dataTab');if(dt&&(/[?#]data/.test(location.href)||localStorage.getItem('kxShowData')==='1'))dt.style.display=''}catch(e){}invalidateShares();invalidateThreads();try{migrateStages()}catch(e){}try{migratePrevClean()}catch(e){}try{migrateChannels()}catch(e){}initHome();renderHome();renderYield();renderGlobalSearch();renderOrgs();renderPeople();renderPipeline();renderThreads();renderInbox();renderReports();renderData();try{dashRefresh()}catch(e){console.warn('dashboard',e)}if(document.getElementById('p-locations').classList.contains('active'))renderLocations()}
 
 document.getElementById('tabs').addEventListener('click',e=>{
   const t=e.target.closest('.tab');if(!t)return;
@@ -97,3 +98,6 @@ if(initFirebase()){
 } else {
   document.getElementById('authScreen').style.display='flex';
 }
+
+// Undo with Ctrl+Z outside input fields
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){const t=e.target;const tag=(t&&t.tagName||'').toLowerCase();if(tag==='input'||tag==='textarea'||tag==='select'||(t&&t.isContentEditable))return;e.preventDefault();undoLast()}});
