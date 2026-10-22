@@ -1,3 +1,4 @@
+import {ADMIN_EMAILS} from '../config.js';
 import {S, allRecs, isIgnoredRec} from '../state.js';
 import {STAGES} from '../constants.js';
 import {currentUser, saveDebounced} from '../store/firebase.js';
@@ -39,12 +40,12 @@ export const FAIRS=[
 {n:'LIGNA',a:0,d:'May 2027 (TBC)',att:'',dys:0,l:'Hannover',co:'DE',t:'C',fq:'2yr',e:'n/a',f:'Adjacent, wood; skip unless a specific target exhibits',tr:'',st:'',u:'https://www.ligna.de/'}
 ];
 export const TABS=['Daily To-Dos','Execution plan','Outreach funnel','Trade fairs','DD timeline','Cadence','Progress log','Decisions'];
-export const DASH_OWNER='leif.berger26@gmail.com';
+export const DASH_OWNER=ADMIN_EMAILS[0];
 export let activeTab=0,progressFilter='all',progressSearch='',todoFilter='open',todoOwnerFilter='all',decFilter='open',_dashInited=false;
 // Dashboard state lives in the shared CRM state under S.dash (Firebase). The daily sweep writes
 // dash* patch ops (see dashApplyOp); the browser edits are saved through the normal CRM save path.
 export function dashData(){if(typeof S==='undefined'||!S){return {progress:[],decisions:[],todos:[],dismissed:[],funnel:{}}}S.dash=S.dash||{};const d=S.dash;d.progress=d.progress||[];d.decisions=d.decisions||[];d.todos=d.todos||[];d.dismissed=d.dismissed||[];d.funnel=d.funnel||{};return d}
-export function dashVisible(){return !!(typeof currentUser!=='undefined'&&currentUser&&currentUser.email===DASH_OWNER)}
+export function dashVisible(){return !!(typeof currentUser!=='undefined'&&currentUser&&ADMIN_EMAILS.includes(currentUser.email))}
 export function dashSave(){try{dashData().savedAt=new Date().toISOString()}catch(e){}if(typeof saveDebounced==='function')saveDebounced()}
 export function saveTodos(){try{localStorage.setItem('dynamo-todo-filter',todoFilter);localStorage.setItem('dynamo-todo-owner-filter',todoOwnerFilter)}catch(e){}dashSave()}
 export function allDismissed(){return dashData().dismissed.slice()}

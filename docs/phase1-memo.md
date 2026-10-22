@@ -49,12 +49,12 @@ Then open http://localhost:8765/_harness.html?mode=sharded (new layout) or ?mode
 ## Decisions still open
 
 1. Store layout as built (crm replaced in place, crm_legacy copy, dash split under crm/dash). Built on the assumption that this is approved.
-2. Tommy's address in `src/config.js` and `database.rules.json`: both carry tommy@kinetix-industries.com, the address that was in the app. If the Google account is tommybennett012@gmail.com, add it to both before publishing the rules.
+2. Tommy's address: `ALLOWED_EMAILS` in `src/config.js` carries tommy@kinetix-industries.com, the address that was in the app. If the Google account is tommybennett012@gmail.com, change that one line, run `python tools/rules.py` (it regenerates `database.rules.json` from `ALLOWED_EMAILS` and `ADMIN_EMAILS`), then publish the rules.
 
 ## Cut-over
 
 1. Review the branch; merge into main locally, do not push yet.
-2. Firebase console, Realtime Database, Rules: paste `database.rules.json`, publish.
+2. Run `python tools/rules.py`, then Firebase console, Realtime Database, Rules: paste `database.rules.json`, publish.
 3. Close every open CRM tab (Leif and Tommy).
 4. Serve the merged main locally or push a preview; open tools/migrate.html, sign in as Leif, run steps 1 to 4, read the verification line ("identical").
 5. Push main. Reload the app. The status line must not say "old layout".
