@@ -1,7 +1,7 @@
 import {legacyExport} from '../store/shards.js';
 import {S} from '../state.js';
 import {applyPatchObj} from './patch.js';
-import {db, save} from '../store/firebase.js';
+import {db, save, serverGet} from '../store/firebase.js';
 import {gmailToken} from './google.js';
 import {isoWeekKey, toast, today} from '../util.js';
 import {renderAll} from '../main.js';
@@ -137,6 +137,9 @@ export async function checkDriveUpdates(auto){
     }
     save();renderAll();
     toast(tot+' updates applied from '+files.length+' Claude patch file'+(files.length>1?'s':'')+(moved?', '+moved+' archived':'')+(bad.length?' | FAILED: '+bad.join('; '):''));
+    // Confirm on the server that each applied patch is recorded; a patch that did not land is sent again.
+    setTimeout(async()=>{const missing=[];for(const f of files){if(bad.some(b=>b.startsWith(f.name)))continue;try{if(await serverGet('meta/appliedPatchTitles/'+f.name)===undefined)missing.push(f.name)}catch(e){}}
+      if(missing.length){console.error('patch not confirmed on server',missing);toast('⚠ Not confirmed on the server: '+missing.join(', ')+'. Sending again.');save()}},4000);
     autoDriveBackup();
   }catch(e){toast('⚠ Claude-update check FAILED: '+e.message+(String(e.message).includes('403')?' — is the Drive API enabled in the Google Cloud project?':''))}
 }

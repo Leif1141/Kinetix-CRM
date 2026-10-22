@@ -175,14 +175,19 @@ export function save(){
   if(legacyMode){toast('Read-only: the database is still in the old layout. Run tools/migrate.html first.');return}
   const next=shard(S);
   const ops=diffTree(lastTree||{},next);
-  recordUndo(ops);
-  lastTree=next;
   const paths=Object.keys(ops);
   if(!paths.length)return;
+  recordUndo(ops);
   const enc={};for(const p of paths)enc[encodePath(p)]=encodeKeys(ops[p]);
   window.__lastOps=ops;
-  stateRef.update(enc).catch(e=>{toast('Save failed: '+e.message);console.error('save',e)});
+  // The server tree advances only once the write is accepted. A rejected write (rules, invalid data, offline)
+  // is reported and stays pending: the next save diffs against the old tree and sends it again.
+  const base=lastTree;lastTree=next;
+  const fail=e=>{if(lastTree===next)lastTree=base;window.__lastSaveError=String(e&&e.message||e);console.error('save rejected',paths,e);toast('Save failed: '+(e&&e.message||e)+'. It is sent again with the next change.')};
+  try{Promise.resolve(stateRef.update(enc)).then(()=>{window.__lastSaveOk=new Date().toISOString()},fail)}catch(e){fail(e)}
 }
+// Read one path straight from the server, bypassing the local tree. Used to confirm that a write landed.
+export async function serverGet(path){if(!stateRef)return undefined;const v=(await stateRef.child(encodePath(path)).once('value')).val();return v===null?undefined:decodeKeys(v)}
 
 // Debounced save for rapid edits
 export let _saveTimer=null;
