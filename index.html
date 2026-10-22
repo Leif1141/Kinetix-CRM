@@ -385,9 +385,9 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
   <div class="filterbar" style="margin:6px 0 10px"><span id="ovGroups" style="display:flex;gap:4px;flex-wrap:wrap"></span><input id="ovSearch" placeholder="Filter: Name, Kontakt, nächster Schritt..." oninput="renderFollowups()" style="min-width:260px"></div>
   <div id="fuBody"></div>
   <div class="section" style="display:none"><div class="section-hdr">Suggested actions <span style="font-weight:400;font-size:11px">rule-based — act or dismiss</span></div><div id="suggBody"></div></div>
-  <div class="section" style="display:none"><div class="section-hdr">Where the time is paying off <span style="font-weight:400;font-size:11px">last 90 days &middot; sourcing yield by channel and by partner</span></div><div id="yieldBody"></div></div>
+  
   <div class="section" style="display:none"><div class="section-hdr">Researched, not yet approached <span style="font-weight:400;font-size:11px">ranked by score - no chasing, just the queue</span></div><div id="queueBody"></div></div>
-  <div class="section"><div class="section-hdr">Recent activity</div><div id="recentBody"></div></div>
+  <details class="psec"><summary>Recent activity</summary><div id="recentBody"></div></details>
   <div class="ov-grid">
     <div>
       <div class="section" style="display:none"><div class="section-hdr">Favorites</div><div id="favBody"></div></div>
@@ -459,6 +459,7 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
 
 <div class="panel" id="p-reports">
   <div class="kpis" id="repKpis"></div>
+  <div class="section"><div class="section-hdr">Where the time is paying off <span style="font-weight:400;font-size:11px">last 90 days &middot; sourcing yield by channel and by partner</span></div><div id="yieldBody"></div></div>
   <div class="section"><div class="section-hdr">Weekly digest<button class="sm" style="background:#fff" id="dig_btn" onclick="weeklyDigest()">Generate</button></div><div id="dig_out" style="padding:10px 12px;font-size:12px;white-space:pre-wrap;color:var(--gray)">Click Generate for an AI-powered read on the last 14 days.</div></div>
   <div class="charts">
     <div class="chartbox"><h4>Owner funnel (live deals by stage)</h4><canvas id="chFunnel"></canvas></div>
@@ -1953,7 +1954,7 @@ function renderThreads(){
     let h='<div class="th-row'+pc+(done?' done':'')+'">'
       +'<input type="checkbox" title="'+(done?'Ticked on '+esc(S.threadsDone[t.id]):'Tick off')+'" onclick="thToggle(\''+t.id+'\',event)"'+(done?' checked':'')+'>'
       +'<div class="th-bd"><div class="th-head"><span class="th-nm" onclick="thOpen(\''+t.id+'\',event)">'+esc(t.name)+'</span>'
-      +(t.contact&&t.contact!==t.name?'<span class="muted">'+esc(t.contact)+'</span>':'')
+      +(function(){const _r=findRec(t.id);const _c=(_r&&_r.kind!=='person'&&_r.contact)?_r.contact:t.contact;return _c&&_c!==t.name?'<span class="muted">'+esc(fixUml(_c))+'</span>':''})()
       +pill(TH_CLS[v],TH_V[v])+(t.p&&t.p!=='Niedrig'?pill(t.p.toLowerCase(),t.p):'')
       +(still!=null&&still<9999?pill('lite',still+' days quiet'):'')
       +(t.auto?pill('lite','new since snapshot'):'')
@@ -2611,6 +2612,7 @@ function cleanCity(s){
   return s;
 }
 function recCity(r){return cleanCity(r.city||r.location||'')}
+function locFocus(c){const g=cityLL(c);if(!g||!locMap){toast('Kein Geocode für '+c);return}locMap.setView(g,12);document.getElementById('locMap').scrollIntoView({behavior:'smooth',block:'start'})}
 function cityLL(c){return (S.geoCache||{})[(c||'').toLowerCase()]||null}
 function addrKey(r){if(!r)return null;const a=(r.address||'').trim();if(!a||!/\d/.test(a))return null;const c=cleanCity(r.city||r.location||'');return ('addr:'+a+(c&&!a.toLowerCase().includes(c.toLowerCase())?', '+c:'')).toLowerCase().replace(/[.#$\/\[\]]/g,'_')}
 function addrQuery(r){let a=(r.address||'').split(/[;|]|\.\s*Weitere|\s+Weitere Standorte/i)[0].replace(/\(.*?\)/g,'').trim();const city=cleanCity(r.city||r.location||'');if(city&&!a.toLowerCase().includes(city.toLowerCase()))a+=', '+city;const ctry=(r.geo&&r.geo!=='DE')?({CH:'Switzerland',AT:'Austria',UK:'United Kingdom',FR:'France',NL:'Netherlands',LU:'Luxembourg',US:'USA'}[r.geo]||''):'Germany';return a+(ctry?', '+ctry:'')}
@@ -2801,7 +2803,7 @@ function renderLocations(){
     +'<select onchange="setLocRadius(this.value)">'+[50,75,100,150,200].map(v=>'<option value="'+v+'"'+(km===v?' selected':'')+'>'+v+' km</option>').join('')+'</select>'
     +' <span class="muted">'+groups.length+' regions from '+Object.keys(byCity).length+' places</span></div>';
   const catOrder=g=>g.cat[0]==='Target'?0:g.cat[0]==='Contact'?9:1;
-  document.getElementById('locList').innerHTML=ctl+(groups.map(g=>'<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b>'+esc(g.head)+'</b> <span class="muted">('+g.recs.length+')</span>'+(g.cities.length>1?' <span class="muted" style="font-size:10px">incl. '+esc(g.cities.filter(c=>c!==g.head).join(', '))+'</span>':'')+'<br>'+g.recs.slice().sort((a,b)=>catOrder(a)-catOrder(b)||a.name.localeCompare(b.name)).map(groupChip).join(' ')+'</div>').join('')||'<p class="muted" style="padding:12px">No records with a city yet.</p>');
+  document.getElementById('locList').innerHTML=ctl+(groups.map(g=>'<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b style="cursor:pointer;text-decoration:underline dotted" title="Auf der Karte zeigen" onclick="locFocus(\''+esc(g.head).replace(/'/g,"\\'")+'\')">'+esc(g.head)+'</b> <span class="muted">('+g.recs.length+')</span>'+(g.cities.length>1?' <span class="muted" style="font-size:10px">incl. '+esc(g.cities.filter(c=>c!==g.head).join(', '))+'</span>':'')+'<br>'+g.recs.slice().sort((a,b)=>catOrder(a)-catOrder(b)||a.name.localeCompare(b.name)).map(groupChip).join(' ')+'</div>').join('')||'<p class="muted" style="padding:12px">No records with a city yet.</p>');
   if(typeof L==='undefined')return;
   if(!locMap){locMap=L.map('locMap').setView([51.1,10.3],6);locMap.setMaxBounds([[46.5,4.5],[55.5,16.5]]);locMap.setMinZoom(5);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(locMap)}
   if(locLayer)locLayer.remove();locLayer=L.layerGroup().addTo(locMap);
@@ -2819,7 +2821,7 @@ function renderLocations(){
       const ex=addrLL(gr.rec);const pos=ex?ex:[g[0]+off*Math.sin(ang),g[1]+off*Math.cos(ang)];
       const m=L.circleMarker(pos,{radius:ex?7:8,color:ex?'#000':'#fff',weight:1.5,fillColor:col,fillOpacity:0.92}).addTo(locLayer);
       const ppl=gr.people.map(p=>fixUml(p.name)).join(', ')||fixUml(gr.contact||'');
-      m.bindPopup('<b>'+esc(gr.name)+'</b><br><span style="color:'+col+';font-weight:700">'+lbl+'</span> · '+esc(c)+(ppl?'<br>'+esc(ppl):'')+(ex?'<br><span style="font-size:10px">'+esc(gr.rec.address||'')+'</span>':'')+'<br><a href="#" onclick="openProfile(findRec(\''+gr.rec.id+'\'));return false">Open profile →</a>');
+      m.bindPopup('<b>'+esc(gr.name)+'</b><br><span style="color:'+col+';font-weight:700">'+lbl+'</span> · '+esc(c)+(ppl?'<br>'+esc(ppl):'')+(ex?'<br><span style="font-size:10px">'+esc(gr.rec.address||'')+'</span>':'<br><span style="font-size:10px;color:#595959">nur Ort bekannt, keine Straßenadresse im CRM</span>')+'<br><a href="#" onclick="openProfile(findRec(\''+gr.rec.id+'\'));return false">Open profile →</a>');
     });
   });
   if(!locMap._legend){
