@@ -19,7 +19,7 @@
 :root{color-scheme:light;--navy:#2E3C65;--navy2:#434F80;--deep:#112149;--red:#C00000;--amber:#FFC000;--lav:#A9A4C6;--sub:#CFD1E2;--gray:#595959;--lgray:#D3D3D2;--bg:#F8F8FA;--green:#2E7D32}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:Arial,sans-serif;background:var(--bg);color:#000;font-size:13px;line-height:1.45}
-.wrap{max-width:none;margin:0 auto;padding:12px 18px}
+.wrap{max-width:1340px;margin:0 auto;padding:12px 18px}
 .gchip{display:inline-block;font-size:10px;color:#fff;padding:0 6px;border-radius:3px}
 table.ovt th{font-size:11px;color:#595959;text-align:left;border-bottom:1px solid #D3D3D2;padding:4px 6px}
 table.ovt td{vertical-align:top}
@@ -424,7 +424,7 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
   <div class="kpis" id="pipeKpis"></div>
   <div class="filterbar">
     <button class="sm vbtn" data-v="board" onclick="setPipeView('board')">Board</button><button class="sm vbtn" data-v="focus" onclick="setPipeView('focus')">Liste</button><button class="sm vbtn" data-v="channel" onclick="setPipeView('channel')">Kanäle</button>
-    <input id="fSearch" placeholder="Firma suchen..." oninput="renderPipeline()">
+    <input id="fSearch" placeholder="Firma suchen (Name, Ort, Kontakt)..." oninput="renderPipeline()" style="flex:1;min-width:360px;font-size:14px;padding:6px 10px">
     <select id="fChan" onchange="renderPipeline()"><option value="">Alle Kanäle</option></select>
     <label style="font-size:12px"><input type="checkbox" id="fFav" onchange="renderPipeline()"> Nur markierte</label>
     <button class="sm" onclick="toggleWide()" id="wideBtn">Breite Ansicht</button>
@@ -1634,14 +1634,14 @@ function bCard(c){
     '<div style="margin-top:3px">'+dueDe(c.nextDate,c.id)+' <span class="mini" onclick="shiftDue(\''+c.id+'\',7,event)" title="eine Woche später">+1W</span><span class="mini" onclick="shiftDue(\''+c.id+'\',30,event)" title="einen Monat später">+1M</span>'+staleTxt(c)+'</div></div>'
 }
 function renderPipeline(){
-  if(!pipeView){try{pipeView=localStorage.getItem('kxPipeView')||'board'}catch(e){pipeView='board'}try{if(localStorage.getItem('kxWide')==='1'&&!document.body.classList.contains('wide'))toggleWide()}catch(e){}}
+  if(!pipeView){try{pipeView=localStorage.getItem('kxPipeView')||'board'}catch(e){pipeView='board'}}
   document.querySelectorAll('#p-pipeline .vbtn').forEach(b=>b.classList.toggle('on',b.dataset.v===pipeView));
   const cs=(S.companies||[]).filter(c=>c.kind!=='advisor'&&!c.archived);
   const fc=document.getElementById('fChan');if(fc&&fc.options.length<2)fc.innerHTML='<option value="">Alle Kanäle</option>'+CHANNELS.filter(Boolean).map(c=>'<option value="'+c+'">'+(CH_DE[c]||c)+'</option>').join('');
   const q=(document.getElementById('fSearch').value||'').toLowerCase(),fch=fc?fc.value:'',onlyFav=!!(document.getElementById('fFav')||{}).checked;
   const t=today(),ws=weekStart(t);
   const LIVE=ACTIVE_STAGES;
-  const base=cs.filter(c=>(!q||(c.name||'').toLowerCase().includes(q)||(c.location||'').toLowerCase().includes(q))&&(!fch||chanOf(c)===fch)&&(!onlyFav||c.fav));
+  const base=cs.filter(c=>(!q||(c.name||'').toLowerCase().includes(q)||(c.location||'').toLowerCase().includes(q)||(c.contact||'').toLowerCase().includes(q)||(c.channelVia||'').toLowerCase().includes(q))&&(!fch||chanOf(c)===fch)&&(!onlyFav||c.fav));
   const isReady=c=>c.stage==='Identified'&&(c.letterStatus==='ready'||c.letterStatus==='planned'||c.fav);
   const lettersWeek=cs.reduce((n,c)=>n+touchList(c).filter(x=>tType(x)==='Letter'&&x.dir!=='in'&&(x.date||'').slice(0,10)>=ws).length,0);
   const kdef=[
@@ -1677,7 +1677,7 @@ function renderPipeline(){
     revisit:{k:'revisit',t:'Wiedervorlage',v:c=>c.revisitDate||'9999',h:c=>c.revisitDate?fmtDe(c.revisitDate):'-',muted:1},
     when:{k:'when',t:'Datum',v:c=>{const l=(c.stageLog||[]).slice(-1)[0];return l?l.date:''},h:c=>{const l=(c.stageLog||[]).slice(-1)[0];return l?fmtDe(l.date):'-'},muted:1}
   };
-  const sec=(id,title,items,cols,limit,open)=>'<details class="psec"'+(open||pipeExpand[id]?' open':'')+' ontoggle="pipeExpand[\''+id+'\']=this.open"><summary>'+title+' <span style="font-weight:400">('+items.length+')</span></summary>'+(items.length?pTable(id,cols,items,limit):'<p class="muted" style="padding:6px 10px">Keine.</p>')+'</details>';
+  const sec=(id,title,items,cols,limit,open)=>'<details class="psec"'+(open||pipeExpand[id]||(q&&items.length)?' open':'')+' ontoggle="pipeExpand[\''+id+'\']=this.open"><summary>'+title+' <span style="font-weight:400">('+items.length+')</span></summary>'+(items.length?pTable(id,cols,items,limit):'<p class="muted" style="padding:6px 10px">Keine.</p>')+'</details>';
   const idl=list.filter(c=>c.stage==='Identified'&&!isReady(c)),hold=list.filter(c=>c.stage==='On hold'),dead=list.filter(c=>c.stage==='Dead'),closed=list.filter(c=>c.stage==='Closed');
   const lower=sec('idl','Identifiziert, noch nicht angesprochen',idl,[C.name,C.loc,C.rev,C.ebit,C.score,C.verdict,C.ls,C.next],50)+
     sec('hold','Zurückgestellt',hold,[C.name,C.loc,C.ebit,C.chan,C.reason,C.revisit,C.when],50)+
@@ -2873,7 +2873,7 @@ async function geocodeMissing(){
   }
   save();renderLocations();toast('Geocoding done');
 }
-function renderAll(){if(!S)return;try{const dt=document.getElementById('dataTab');if(dt&&(/[?#]data/.test(location.href)||localStorage.getItem('kxShowData')==='1'))dt.style.display=''}catch(e){}_shareIdx=null;_threadsCache=null;try{migrateStages()}catch(e){}try{migratePrevClean()}catch(e){}try{migrateChannels()}catch(e){}renderOverview();renderYield();renderQueue();renderGlobalSearch();renderOrgs();renderPeople();renderPipeline();renderFollowups();renderThreads();renderInbox();renderReports();renderData();try{dashRefresh()}catch(e){console.warn('dashboard',e)}if(document.getElementById('p-locations').classList.contains('active'))renderLocations()}
+function renderAll(){if(!S)return;try{if(!document.body.dataset.winit){document.body.dataset.winit='1';const w=localStorage.getItem('kxWide');if(w===null||w==='1'){document.body.classList.add('wide');const b=document.getElementById('wideBtn');if(b)b.textContent='Normale Breite'}}}catch(e){}try{const dt=document.getElementById('dataTab');if(dt&&(/[?#]data/.test(location.href)||localStorage.getItem('kxShowData')==='1'))dt.style.display=''}catch(e){}_shareIdx=null;_threadsCache=null;try{migrateStages()}catch(e){}try{migratePrevClean()}catch(e){}try{migrateChannels()}catch(e){}renderOverview();renderYield();renderQueue();renderGlobalSearch();renderOrgs();renderPeople();renderPipeline();renderFollowups();renderThreads();renderInbox();renderReports();renderData();try{dashRefresh()}catch(e){console.warn('dashboard',e)}if(document.getElementById('p-locations').classList.contains('active'))renderLocations()}
 
 
 // ═══════════════════════════════════════════════════════════════
