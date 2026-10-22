@@ -46,10 +46,10 @@ python tools/harness/serve.py 8765
 
 Then open http://localhost:8765/_harness.html?mode=sharded (new layout) or ?mode=blob (old layout). The data copy under tools/harness/data and the generated _harness*.html files are gitignored.
 
-## Decisions still open
+## Decisions
 
-1. Store layout as built (crm replaced in place, crm_legacy copy, dash split under crm/dash). Built on the assumption that this is approved.
-2. Tommy's address: `ALLOWED_EMAILS` in `src/config.js` carries tommy@kinetix-industries.com, the address that was in the app. If the Google account is tommybennett012@gmail.com, change that one line, run `python tools/rules.py` (it regenerates `database.rules.json` from `ALLOWED_EMAILS` and `ADMIN_EMAILS`), then publish the rules.
+1. Store layout as built (crm replaced in place, crm_legacy copy, dash split under crm/dash): approved 22.10.2026, with the condition that the live migration waits for Leif's merge and push.
+2. Settled: Tommy signs in with tommy@kinetix-industries.com (Leif, 22.10.2026). `ALLOWED_EMAILS` in `src/config.js` carries exactly the three addresses; `python tools/rules.py` generates `database.rules.json` from it (verified Google accounts read and write crm; crm-config and crm_legacy belong to leif.berger26@gmail.com only). The file equals the rules file on main plus the crm_legacy node the migration page needs.
 
 ## Cut-over
 
