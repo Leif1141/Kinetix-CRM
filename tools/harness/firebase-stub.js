@@ -71,11 +71,10 @@
   const seedPath=new URLSearchParams(location.search).get('data');
   fetch(seedPath||DATA_URL).then(r=>r.ok?r.json():Promise.reject(new Error(r.status+' '+r.url))).then(d=>{
     const mode=new URLSearchParams(location.search).get('mode')||'blob';
-    if(mode==='blob')root={crm:prune(encKeys(d))};         // today's layout: the backup is the blob
-    else if(mode==='empty')root={};
-    else root={crm:prune(d)};                                // caller supplies an already sharded tree
-    ready=true;waiters.splice(0).forEach(fn=>fn());
-    console.log('[harness] data ready, mode='+mode);
+    const done=()=>{ready=true;waiters.splice(0).forEach(fn=>fn());console.log('[harness] data ready, mode='+mode)};
+    if(mode==='blob'){root={crm:prune(encKeys(d))};done()}          // today's layout: the backup is the blob
+    else if(mode==='empty'){root={};done()}
+    else return import('/src/store/shards.js').then(m=>{root={crm:prune(m.encodeKeys(m.shard(d)))};done()}); // phase 1 layout
   }).catch(e=>{console.error('[harness] data load failed',e);ready=true;waiters.splice(0).forEach(fn=>fn())});
   // MSAL and Google Identity are absent in the harness; the app treats both as not connected.
   window.msal=window.msal||{};

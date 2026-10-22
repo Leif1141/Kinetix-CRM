@@ -1,12 +1,25 @@
 {
   "rules": {
+    ".read": false,
+    ".write": false,
     "crm": {
-      ".read": "auth != null && auth.token.email_verified == true && (auth.token.email == 'leif.berger26@gmail.com' || auth.token.email == 'leif@kinetixcap.com' || auth.token.email == 'tommy@kinetix-industries.com')",
-      ".write": "auth != null && auth.token.email_verified == true && (auth.token.email == 'leif.berger26@gmail.com' || auth.token.email == 'leif@kinetixcap.com' || auth.token.email == 'tommy@kinetix-industries.com')"
+      ".read": "auth != null && (auth.token.email === 'leif.berger26@gmail.com' || auth.token.email === 'leif@kinetixcap.com' || auth.token.email === 'tommy@kinetix-industries.com')",
+      "companies": { ".write": "auth != null && (auth.token.email === 'leif.berger26@gmail.com' || auth.token.email === 'leif@kinetixcap.com' || auth.token.email === 'tommy@kinetix-industries.com')" },
+      "advisors":  { ".write": "auth != null && (auth.token.email === 'leif.berger26@gmail.com' || auth.token.email === 'leif@kinetixcap.com' || auth.token.email === 'tommy@kinetix-industries.com')" },
+      "people":    { ".write": "auth != null && (auth.token.email === 'leif.berger26@gmail.com' || auth.token.email === 'leif@kinetixcap.com' || auth.token.email === 'tommy@kinetix-industries.com')" },
+      "touches":   { ".write": "auth != null && (auth.token.email === 'leif.berger26@gmail.com' || auth.token.email === 'leif@kinetixcap.com' || auth.token.email === 'tommy@kinetix-industries.com')" },
+      "threads":   { ".write": "auth != null && (auth.token.email === 'leif.berger26@gmail.com' || auth.token.email === 'leif@kinetixcap.com' || auth.token.email === 'tommy@kinetix-industries.com')" },
+      "inbox":     { ".write": "auth != null && (auth.token.email === 'leif.berger26@gmail.com' || auth.token.email === 'leif@kinetixcap.com' || auth.token.email === 'tommy@kinetix-industries.com')" },
+      "meta":      { ".write": "auth != null && (auth.token.email === 'leif.berger26@gmail.com' || auth.token.email === 'leif@kinetixcap.com' || auth.token.email === 'tommy@kinetix-industries.com')" },
+      "dash":      { ".write": "auth != null && (auth.token.email === 'leif.berger26@gmail.com' || auth.token.email === 'leif@kinetixcap.com')" }
+    },
+    "crm_legacy": {
+      ".read": "auth != null && (auth.token.email === 'leif.berger26@gmail.com' || auth.token.email === 'leif@kinetixcap.com')",
+      ".write": "auth != null && (auth.token.email === 'leif.berger26@gmail.com' || auth.token.email === 'leif@kinetixcap.com')"
     },
     "crm-config": {
-      ".read": "auth != null && auth.token.email == 'leif.berger26@gmail.com'",
-      ".write": "auth != null && auth.token.email == 'leif.berger26@gmail.com'"
+      ".read": "auth != null && (auth.token.email === 'leif.berger26@gmail.com' || auth.token.email === 'leif@kinetixcap.com')",
+      ".write": "auth != null && (auth.token.email === 'leif.berger26@gmail.com' || auth.token.email === 'leif@kinetixcap.com')"
     }
   }
 }

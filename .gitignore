@@ -1,3 +1,3 @@
-_harness.html
+_harness*.html
 tools/harness/data/
 __pycache__/

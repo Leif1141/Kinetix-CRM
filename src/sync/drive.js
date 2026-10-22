@@ -1,3 +1,4 @@
+import {legacyExport} from '../store/shards.js';
 import {S} from '../state.js';
 import {applyPatchObj} from './patch.js';
 import {db, save} from '../store/firebase.js';
@@ -65,7 +66,7 @@ export async function autoDriveBackup(){
     try{
       const wk=isoWeekKey(new Date());
       const snap=S._lastSnapshotWeek!==wk;
-      const r=await driveCall('backup',{snapshot:snap},{data:S});
+      const r=await driveCall('backup',{snapshot:snap},{data:legacyExport(S)});
       if(snap&&r.snapshot)S._lastSnapshotWeek=wk;
       S.lastDriveBackup=new Date().toISOString();save();
       console.log('Drive auto-backup via proxy: '+r.bytes+' bytes'+(r.snapshot?', snapshot '+r.snapshot:''));
@@ -81,12 +82,12 @@ export async function autoDriveBackup(){
     let res;
     if(ex){
       res=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+ex.id+'?uploadType=media',
-        {method:'PATCH',headers:{Authorization:'Bearer '+gmailToken,'Content-Type':'application/json'},body:JSON.stringify(S)});
+        {method:'PATCH',headers:{Authorization:'Bearer '+gmailToken,'Content-Type':'application/json'},body:JSON.stringify(legacyExport(S))});
     }else{
       const meta={name:name,parents:[DRIVE_CRM_FOLDER],mimeType:'application/json'};
       const boundary='kinetix'+Date.now();
       const body='--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify(meta)+
-        '\r\n--'+boundary+'\r\nContent-Type: application/json\r\n\r\n'+JSON.stringify(S)+'\r\n--'+boundary+'--';
+        '\r\n--'+boundary+'\r\nContent-Type: application/json\r\n\r\n'+JSON.stringify(legacyExport(S))+'\r\n--'+boundary+'--';
       res=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{Authorization:'Bearer '+gmailToken,'Content-Type':'multipart/related; boundary='+boundary},body:body});
     }
     if(!res.ok)throw new Error('upload '+res.status);
@@ -100,7 +101,7 @@ export async function autoDriveBackup(){
         await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',
           headers:{Authorization:'Bearer '+gmailToken,'Content-Type':'multipart/related; boundary='+sb},
           body:'--'+sb+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify(sm)+
-               '\r\n--'+sb+'\r\nContent-Type: application/json\r\n\r\n'+JSON.stringify(S)+'\r\n--'+sb+'--'});
+               '\r\n--'+sb+'\r\nContent-Type: application/json\r\n\r\n'+JSON.stringify(legacyExport(S))+'\r\n--'+sb+'--'});
         S._lastSnapshotWeek=wk;
       }catch(e){console.warn('weekly snapshot failed',e)}
     }

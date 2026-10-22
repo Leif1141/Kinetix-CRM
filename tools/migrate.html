@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KinetixCRM store migration</title>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<style>
+body{font-family:Arial,sans-serif;font-size:13px;color:#000;background:#F8F8FA;margin:0;padding:18px;max-width:900px}
+h1{font-size:18px;color:#112149;margin:0 0 6px}
+p{margin:6px 0}
+button{font-family:Arial;font-size:12px;padding:6px 14px;border:1px solid #2E3C65;background:#fff;color:#2E3C65;border-radius:4px;cursor:pointer;margin:4px 6px 4px 0}
+button.primary{background:#2E3C65;color:#fff}
+button:disabled{opacity:.45;cursor:default}
+pre{background:#fff;border:1px solid #D3D3D2;border-radius:4px;padding:10px;white-space:pre-wrap;font-size:12px;min-height:120px}
+.step{background:#fff;border:1px solid #D3D3D2;border-radius:4px;padding:10px 12px;margin:10px 0}
+.step h2{font-size:13px;margin:0 0 6px;color:#112149}
+</style>
+</head>
+<body>
+<h1>KinetixCRM store migration</h1>
+<p>Moves the database from the single <code>crm</code> blob to the per-record layout. Run once, signed in as Leif, after the rules in <code>database.rules.json</code> are published. Every other browser tab with the CRM should be closed while this runs.</p>
+<div class="step"><h2>0. Sign in</h2><button id="bSign" class="primary">Sign in with Google</button> <span id="who"></span></div>
+<div class="step"><h2>1. Read the current database</h2><button id="bRead" disabled>Read crm</button> <span id="readInfo"></span></div>
+<div class="step"><h2>2. Keep a copy of the old blob</h2><button id="bCopy" disabled>Copy crm to crm_legacy</button> <span id="copyInfo"></span></div>
+<div class="step"><h2>3. Write the new layout</h2><button id="bWrite" disabled class="primary">Replace crm with the per-record layout</button> <span id="writeInfo"></span></div>
+<div class="step"><h2>4. Verify</h2><button id="bVerify" disabled>Read back and compare</button> <span id="verifyInfo"></span></div>
+<pre id="log"></pre>
+<script type="module">
+import {FIREBASE_CONFIG} from '../src/config.js';
+import {shard, unshard, encodeKeys, decodeKeys, isLegacyBlob, legacyExport, stableStringify, ensureDefaults} from '../src/store/shards.js';
+const $=id=>document.getElementById(id);
+const log=m=>{$('log').textContent+=m+'\n';console.log(m)};
+firebase.initializeApp(FIREBASE_CONFIG);
+const db=firebase.database(),auth=firebase.auth();
+let blob=null,S=null,tree=null;
+$('bSign').onclick=()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>log('sign-in failed: '+e.message));
+auth.onAuthStateChanged(u=>{$('who').textContent=u?('signed in as '+u.email):'';$('bRead').disabled=!u;if(!u)return;$('bSign').disabled=true});
+const counts=s=>`companies ${s.companies.length}, advisors ${s.advisors.length}, people ${s.people.length}, touches ${[...s.companies,...s.advisors,...s.people].reduce((n,r)=>n+Object.keys(r.touches||{}).length,0)}, threads ${(s.threads||[]).length}, unmatched ${(s.unmatched||[]).length}, dash todos ${((s.dash||{}).todos||[]).length}, progress ${((s.dash||{}).progress||[]).length}, decisions ${((s.dash||{}).decisions||[]).length}, senderMap ${Object.keys(s.senderMap||{}).length}, geoCache ${Object.keys(s.geoCache||{}).length}, appliedPatchTitles ${Object.keys(s.appliedPatchTitles||{}).length}`;
+$('bRead').onclick=async()=>{
+  $('bRead').disabled=true;
+  const snap=await db.ref('crm').once('value');blob=snap.val();
+  if(!blob){log('crm is empty: nothing to migrate');return}
+  if(!isLegacyBlob(blob)){log('crm is already in the per-record layout: '+counts(ensureDefaults(unshard(decodeKeys(blob)))));$('bVerify').disabled=false;return}
+  S=ensureDefaults(decodeKeys(blob));
+  const bytes=JSON.stringify(blob).length;
+  $('readInfo').textContent=(bytes/1e6).toFixed(2)+' MB blob';
+  log('read blob: '+counts(S));
+  tree=shard(S);
+  const back=ensureDefaults(unshard(tree));
+  const same=stableStringify(normalise(legacyExport(back)))===stableStringify(normalise(legacyExport(S)));
+  log('shard and unshard round trip in memory: '+(same?'identical':'DIFFERENT, stop here')+'; tree top-level keys: '+Object.keys(tree).join(', '));
+  if(same)$('bCopy').disabled=false;
+};
+function normalise(s){ // record arrays compare as sets keyed by id; the per-record layout does not keep array order
+  const byId=a=>Object.fromEntries((a||[]).map(r=>[r.id,r]));
+  const o={...s};o.companies=byId(s.companies);o.advisors=byId(s.advisors);o.people=byId(s.people);
+  o.unmatched=Object.fromEntries((s.unmatched||[]).map(u=>[u.key,u]));
+  return JSON.parse(JSON.stringify(o)); // drops undefined like Firebase does
+}
+$('bCopy').onclick=async()=>{
+  $('bCopy').disabled=true;
+  await db.ref('crm_legacy').set(blob);
+  const chk=(await db.ref('crm_legacy').once('value')).val();
+  const ok=stableStringify(chk)===stableStringify(blob);
+  $('copyInfo').textContent=ok?'copied and verified':'copy differs';
+  log('crm_legacy written: '+(ok?'verified identical':'MISMATCH, stop here'));
+  if(ok)$('bWrite').disabled=false;
+};
+$('bWrite').onclick=async()=>{
+  if(!confirm('Replace crm with the per-record layout now? The old blob stays in crm_legacy.'))return;
+  $('bWrite').disabled=true;
+  await db.ref('crm').set(encodeKeys(tree));
+  $('writeInfo').textContent='written';
+  log('crm replaced with the per-record layout');
+  $('bVerify').disabled=false;
+};
+$('bVerify').onclick=async()=>{
+  const data=(await db.ref('crm').once('value')).val();
+  if(isLegacyBlob(data)){log('crm is still the old blob');return}
+  const back=ensureDefaults(unshard(decodeKeys(data)));
+  log('read back: '+counts(back));
+  if(S){
+    const same=stableStringify(normalise(legacyExport(back)))===stableStringify(normalise(legacyExport(S)));
+    $('verifyInfo').textContent=same?'identical to the blob that was read':'differs from the blob';
+    log('comparison with the blob read in step 1: '+(same?'identical (records as sets, dash and threads in order)':'DIFFERENT, restore from crm_legacy and report'));
+    if(!same){ // name the first differing top-level key
+      const a=normalise(legacyExport(back)),b=normalise(legacyExport(S));
+      for(const k of new Set([...Object.keys(a),...Object.keys(b)]))if(stableStringify(a[k])!==stableStringify(b[k]))log('  differs: '+k);
+    }
+  }else{$('verifyInfo').textContent='read back ok'}
+};
+</script>
+</body>
+</html>

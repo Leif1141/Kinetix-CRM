@@ -1,6 +1,6 @@
 import {S, allOrgs, buildInitialState, isArch, liveOnly, rawRecs, setS} from '../state.js';
 import {renderAll} from '../main.js';
-import {save, stateRef} from '../store/firebase.js';
+import {save, stateRef, legacyMode} from '../store/firebase.js';
 import {toast} from '../util.js';
 
 
@@ -10,7 +10,7 @@ import {toast} from '../util.js';
 export function renderData(){
   const el=document.getElementById('dataInfo');
   const arch=rawRecs().filter(isArch);
-  if(el)el.textContent=allOrgs().filter(o=>o.kind==='target').length+' companies · '+allOrgs().filter(o=>o.kind==='advisor').length+' advisors · '+liveOnly(S.people||[]).length+' people · '+(S.unmatched||[]).length+' unmatched · last sync: '+(S.lastSync?new Date(S.lastSync).toLocaleString('en-GB'):'never')+' · Firebase: '+(stateRef?'connected':'not configured');
+  if(el)el.textContent=allOrgs().filter(o=>o.kind==='target').length+' companies · '+allOrgs().filter(o=>o.kind==='advisor').length+' advisors · '+liveOnly(S.people||[]).length+' people · '+(S.unmatched||[]).length+' unmatched · last sync: '+(S.lastSync?new Date(S.lastSync).toLocaleString('en-GB'):'never')+' · Firebase: '+(stateRef?(legacyMode?'old layout, read-only':'per-record store'):'not configured');
   const ael=document.getElementById('archInfo');
   // Deliberately says nothing about what is archived or why: this screen is visible to everyone with access.
   if(ael)ael.innerHTML=S.showArchived
