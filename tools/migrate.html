@@ -36,7 +36,8 @@ const log=m=>{$('log').textContent+=m+'\n';console.log(m)};
 firebase.initializeApp(FIREBASE_CONFIG);
 const db=firebase.database(),auth=firebase.auth();
 let blob=null,S=null,tree=null;
-$('bSign').onclick=()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>log('sign-in failed: '+e.message));
+$('bSign').onclick=()=>{const p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:'select_account'});auth.signInWithPopup(p).catch(e=>{if(/popup/.test(e.code||'')){log('popup blocked, using redirect');auth.signInWithRedirect(p)}else log('sign-in failed: '+e.message)})};
+auth.getRedirectResult().catch(e=>log('redirect sign-in failed: '+e.message));
 auth.onAuthStateChanged(u=>{$('who').textContent=u?('signed in as '+u.email):'';$('bRead').disabled=!u;if(!u)return;$('bSign').disabled=true});
 const counts=s=>`companies ${s.companies.length}, advisors ${s.advisors.length}, people ${s.people.length}, touches ${[...s.companies,...s.advisors,...s.people].reduce((n,r)=>n+Object.keys(r.touches||{}).length,0)}, threads ${(s.threads||[]).length}, unmatched ${(s.unmatched||[]).length}, dash todos ${((s.dash||{}).todos||[]).length}, progress ${((s.dash||{}).progress||[]).length}, decisions ${((s.dash||{}).decisions||[]).length}, senderMap ${Object.keys(s.senderMap||{}).length}, geoCache ${Object.keys(s.geoCache||{}).length}, appliedPatchTitles ${Object.keys(s.appliedPatchTitles||{}).length}`;
 $('bRead').onclick=async()=>{
