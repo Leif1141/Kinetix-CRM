@@ -1,7 +1,7 @@
 import {invalidateThreads} from '../views/threads.js';
 import {ACT_TYPES, ADV_CATS, ADV_STATUS, CHANNELS, DEADREASONS, PRIORITIES, PTYPES, STAGES, VERDICTS} from '../constants.js';
 import {S, addTouch, chanOf, deadCatOf, dispName, findRec, fixUml, isSysNote, newPerson, orgPeople, personOrg, splitPhones, tType, touchList, lastTouch} from '../state.js';
-import {addDays, cleanPrev, esc, fmtAgo, fmtD, normName, toast, today, uid} from '../util.js';
+import {addDays, cleanPrev, esc, fmtAgo, fmtD, fmtDe, normName, toast, today, uid} from '../util.js';
 import {fld, gv, n1, selFld, starHtml, stagePill} from './ui.js';
 import {letterBox} from './pipeline.js';
 import {renderAll} from '../main.js';
@@ -44,7 +44,7 @@ const getVal=(r,s)=>s.get?s.get(r):r[s.key];
 function display(r,s){
   const v=getVal(r,s);
   if(v===null||v===undefined||v==='')return '<span class="muted">–</span>';
-  if(s.type==='date')return esc(fmtD(v))+' <span class="muted">'+esc(v)+'</span>';
+  if(s.type==='date')return esc(fmtDe(v));
   if(s.type==='number')return esc(n1(v)===''?String(v):n1(v));
   if(s.key==='stage')return stagePill(v);
   if(s.key==='domain'||s.key==='linkedin'){const u=/^https?:/.test(v)?v:'https://'+v;return '<a href="'+esc(u)+'" target="_blank" onclick="event.stopPropagation()">'+esc(v)+'</a>'}
