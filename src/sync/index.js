@@ -4,7 +4,6 @@ import {backfillPersonTouches, reconcileDraftActions, retriageUnmatched} from '.
 import {reconcileStatuses} from '../views/orgs.js';
 import {renderAll} from '../main.js';
 import {save} from '../store/firebase.js';
-import {syncGmailEmails} from './google.js';
 import {syncGranolaCalls} from './granola.js';
 import {syncOutlookEmails} from './outlook.js';
 import {toast} from '../util.js';
@@ -14,8 +13,8 @@ export async function syncEmails(){
   const st=document.getElementById('syncStatus');
   let total=0;
   try{
-    const [ol,gm,gr]=await Promise.all([syncOutlookEmails(),syncGmailEmails(),syncGranolaCalls()]);
-    total=ol+gm+gr;
+    const [ol,gr]=await Promise.all([syncOutlookEmails(),syncGranolaCalls()]);
+    total=ol+gr;
     try{await checkDriveUpdates(true)}catch(e){}
     backfillPersonTouches();
     const _rt=retriageUnmatched();if(_rt.assigned||_rt.dropped)toast('Inbox triage: '+_rt.assigned+' auto-assigned, '+_rt.dropped+' cleared');
@@ -24,7 +23,7 @@ export async function syncEmails(){
     S.lastSync=new Date().toISOString();
     save();
     st.textContent='Synced '+new Date().toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+' · '+total+' new';
-    toast('Sync done — '+total+' new activities');
+    toast('Sync done: '+total+' new activities');
   }catch(e){
     st.textContent='Sync error';
     toast('Sync failed: '+e.message);

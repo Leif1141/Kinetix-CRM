@@ -1,3 +1,4 @@
+import {registerActions, initEvents, helperActions} from './events.js';
 import {invalidateShares} from './shares.js';
 import {ALLOWED_EMAILS} from './config.js';
 import {S, migrateChannels, migrateStages, withRenderCache} from './state.js';
@@ -49,14 +50,14 @@ import * as _m29 from './sync/patch.js';
 import * as _m30 from './sync/drive.js';
 import * as _m31 from './views/map.js';
 import * as _m32 from './views/dash.js';
-// Compatibility layer: the markup still uses inline onclick handlers, so every module export is reachable as a
-// window property (live getter, read-only). New views use addEventListener and do not need this.
-const _mods=[_m0, _m2, _m3, _m4, _m5, _m6, _m7, _m8, _m9, _m10, _m11, _m12, _m13, _m14, _m15, _m16, _m17, _m18, _m19, _m20, _m21, _m22, _m23, _m25, _m26, _m27, _m28, _m29, _m30, _m31, _m32];
-function _expose(ns){for(const k of Object.keys(ns)){try{Object.defineProperty(window,k,{get:()=>ns[k],configurable:true})}catch(e){console.warn('expose',k,e)}}}
-_mods.forEach(_expose);
-_expose({goTab,renderAll,renderView,updateBadges,viewIsStale,activeView});
-// inline filter fields call these renderers directly; run them inside the render cache too
-{const C=fn=>(...a)=>withRenderCache(()=>fn(...a));_expose({renderOrgs:C(renderOrgs),renderPeople:C(renderPeople),renderPipeline:C(renderPipeline),renderThreads:C(renderThreads),renderGlobalSearch:C(renderGlobalSearch),renderLocations:C(renderLocations),renderHome:C(renderHome)})}
+// Actions for the data-click, data-change, data-input, data-enter, data-toggle and drag attributes
+// (src/events.js). Module exports are registered by name; nothing is put on window.
+[['config',_m0], ['constants',_m2], ['state',_m3], ['store/firebase',_m4], ['views/record',_m5], ['views/reports',_m6], ['views/orgs',_m7], ['views/people',_m8], ['sync/google',_m9], ['sync/outlook',_m10], ['util',_m11], ['sync/match',_m12], ['sync/triage',_m13], ['sync/granola',_m14], ['sync/index',_m15], ['views/ui',_m16], ['views/home',_m17], ['views/home',_m18], ['shares',_m19], ['views/search',_m20], ['views/lists',_m21], ['views/pipeline',_m22], ['views/actions',_m23], ['views/threads',_m25], ['views/inbox',_m26], ['views/data',_m27], ['store/export',_m28], ['sync/patch',_m29], ['sync/drive',_m30], ['views/map',_m31], ['views/dash',_m32]].forEach(([src,ns])=>registerActions(ns,src));
+registerActions({goTab,renderAll,renderView,updateBadges,viewIsStale,activeView},'main');
+registerActions(helperActions,'events');
+// filter fields call these renderers directly; run them inside the render cache
+{const C=fn=>(...a)=>withRenderCache(()=>fn(...a));registerActions({renderOrgs:C(renderOrgs),renderPeople:C(renderPeople),renderPipeline:C(renderPipeline),renderThreads:C(renderThreads),renderGlobalSearch:C(renderGlobalSearch),renderLocations:C(renderLocations),renderHome:C(renderHome)},'main (render cache)',true)}
+initEvents();
 
 
 export function goTab(t){if(t==='followups'||t==='overview')t='home';document.querySelector('.tab[data-t="'+t+'"]')?.click()}

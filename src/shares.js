@@ -59,12 +59,12 @@ export function shareHtml(rec){
     const warn=sh.length>1?'<div style="font-size:11px;margin-bottom:4px"><b>'+sh.length+' parties have this name.</b> Check before you promise exclusivity.</div>':'';
     return warn+sh.map(e=>{
       const r=findRec(e.recId);
-      return '<div style="font-size:11px;margin-bottom:2px">'+(e.date?'<span class="muted">'+fmtD(e.date)+'</span> ':'')+'<b style="cursor:pointer" onclick="openProfile(findRec(\''+e.recId+'\'))">'+esc(fixUml(r?dispName(r):e.recId))+'</b>'+(e.auto?'':' <span class="chip">by hand</span>')+(e.subject?' <span class="muted">'+esc(fixUml(e.subject.slice(0,70)))+'</span>':'')+'</div>';
+      return '<div style="font-size:11px;margin-bottom:2px">'+(e.date?'<span class="muted">'+fmtD(e.date)+'</span> ':'')+'<b style="cursor:pointer" data-click="openRec|'+e.recId+'|$e">'+esc(fixUml(r?dispName(r):e.recId))+'</b>'+(e.auto?'':' <span class="chip">by hand</span>')+(e.subject?' <span class="muted">'+esc(fixUml(e.subject.slice(0,70)))+'</span>':'')+'</div>';
     }).join('');
   }
   const names=sharedByRec(rec);
   if(!names.length)return '<div class="muted" style="font-size:11px">You have not given them any names yet.</div>';
-  return names.map(x=>'<div style="font-size:11px;margin-bottom:2px">'+(x.e.date?'<span class="muted">'+fmtD(x.e.date)+'</span> ':'')+'<b style="cursor:pointer" onclick="openProfile(findRec(\''+x.c.id+'\'))">'+esc(fixUml(dispName(x.c)))+'</b> <span class="muted">'+esc(x.c.stage||'')+'</span>'+(sharesFor(x.c).length>1?' <span class="chip" style="background:#C6943E;color:#fff">also with '+(sharesFor(x.c).length-1)+'</span>':'')+'</div>').join('');
+  return names.map(x=>'<div style="font-size:11px;margin-bottom:2px">'+(x.e.date?'<span class="muted">'+fmtD(x.e.date)+'</span> ':'')+'<b style="cursor:pointer" data-click="openRec|'+x.c.id+'|$e">'+esc(fixUml(dispName(x.c)))+'</b> <span class="muted">'+esc(x.c.stage||'')+'</span>'+(sharesFor(x.c).length>1?' <span class="chip" style="background:#C6943E;color:#fff">also with '+(sharesFor(x.c).length-1)+'</span>':'')+'</div>').join('');
 }
 export async function addShare(){
   const rec=profRec;if(!rec||rec.kind!=='target')return;

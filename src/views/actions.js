@@ -57,5 +57,5 @@ export function sugAct(kind,id,key,ev){if(ev)ev.stopPropagation();const r=findRe
   S.snoozeUntil=S.snoozeUntil||{};const until=addDays(today(),days);sugKeysOf(id).forEach(k=>S.snoozeUntil[k]=until);
   save();renderAll();toast('Pushed to '+fmtDe(until));
 }
-export function actBtns(id,key){key=key||('due_'+id);return '<span style="white-space:nowrap"><button class="sm primary" onclick="sugAct(\'done\',\''+id+'\',\''+key+'\',event)" title="Log as done">Done</button> <button class="sm" onclick="sugAct(\'1w\',\''+id+'\',\''+key+'\',event)">+1w</button> <button class="sm" onclick="sugAct(\'1m\',\''+id+'\',\''+key+'\',event)">+1m</button> <button class="sm" onclick="sugAct(\'ignore\',\''+id+'\',\''+key+'\',event)" title="Hide until there is new activity">Ignore</button></span>'}
+export function actBtns(id,key){key=key||('due_'+id);return '<span style="white-space:nowrap"><button class="sm primary" data-click="sugAct|done|'+id+'|'+key+'|$e" title="Log as done">Done</button> <button class="sm" data-click="sugAct|1w|'+id+'|'+key+'|$e">+1w</button> <button class="sm" data-click="sugAct|1m|'+id+'|'+key+'|$e">+1m</button> <button class="sm" data-click="sugAct|ignore|'+id+'|'+key+'|$e" title="Hide until there is new activity">Ignore</button></span>'}
 export function snoozeSugg(k,ev){if(ev)ev.stopPropagation();dismissSugg(k)}

@@ -70,7 +70,7 @@ export async function autoDriveBackup(){
       if(snap&&r.snapshot)S._lastSnapshotWeek=wk;
       S.lastDriveBackup=new Date().toISOString();save();
       console.log('Drive auto-backup via proxy: '+r.bytes+' bytes'+(r.snapshot?', snapshot '+r.snapshot:''));
-    }catch(e){toast('⚠ Drive backup FAILED: '+e.message+' — data is safe in Firebase, but weekly briefings go stale');console.warn('Drive backup failed:',e)}
+    }catch(e){toast('⚠ Drive backup FAILED: '+e.message+'. Data is safe in Firebase, but weekly briefings go stale');console.warn('Drive backup failed:',e)}
     return;
   }
   try{
@@ -107,7 +107,7 @@ export async function autoDriveBackup(){
     }
     S.lastDriveBackup=new Date().toISOString();save();
     console.log('Drive auto-backup: '+name);
-  }catch(e){toast('⚠ Drive backup FAILED: '+e.message+' — data is safe in Firebase, but weekly briefings go stale');console.warn('Drive backup failed:',e)}
+  }catch(e){toast('⚠ Drive backup FAILED: '+e.message+'. Data is safe in Firebase, but weekly briefings go stale');console.warn('Drive backup failed:',e)}
 }
 export async function checkDriveUpdates(auto){
   if(!driveReady()){if(!auto){toast('Drive proxy not configured (crm-config/driveProxy in Firebase) and no Google token');}return}
@@ -141,5 +141,5 @@ export async function checkDriveUpdates(auto){
     setTimeout(async()=>{const missing=[];for(const f of files){if(bad.some(b=>b.startsWith(f.name)))continue;try{if(await serverGet('meta/appliedPatchTitles/'+f.name)===undefined)missing.push(f.name)}catch(e){}}
       if(missing.length){console.error('patch not confirmed on server',missing);toast('⚠ Not confirmed on the server: '+missing.join(', ')+'. Sending again.');save()}},4000);
     autoDriveBackup();
-  }catch(e){toast('⚠ Claude-update check FAILED: '+e.message+(String(e.message).includes('403')?' — is the Drive API enabled in the Google Cloud project?':''))}
+  }catch(e){toast('⚠ Claude-update check FAILED: '+e.message+(String(e.message).includes('403')?'. Is the Drive API enabled in the Google Cloud project?':''))}
 }

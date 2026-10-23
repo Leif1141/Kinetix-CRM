@@ -105,7 +105,7 @@ export function renderThreads(){
   const ticked=cnt(t=>thDone(t.id)), closed=cnt(t=>thV(t)==='CLOSED'), dead=cnt(t=>thV(t)==='DEAD'), unclear=cnt(t=>thV(t)==='UNCLEAR');
   const badge=document.getElementById('thBadge');badge.style.display=leif?'inline-block':'none';badge.textContent=leif;
   document.getElementById('thKpis').innerHTML=[[leif,'My move','leif',leif>0],[them,'Their move','them'],[hoch,'Open, high priority','hoch'],[ticked,'Ticked off','ticked'],[closed,'Done','closed'],[dead,'Dead','dead'],[unclear,'Unclear','unclear']]
-    .map(k=>'<div class="kpi'+(k[3]?' warn':'')+(thFilt===k[2]?' th-on':'')+'" onclick="thGo(\''+k[2]+'\')"><div class="v">'+k[0]+'</div><div class="l">'+k[1]+'</div></div>').join('');
+    .map(k=>'<div class="kpi'+(k[3]?' warn':'')+(thFilt===k[2]?' th-on':'')+'" data-click="thGo|'+k[2]+'"><div class="v">'+k[0]+'</div><div class="l">'+k[1]+'</div></div>').join('');
   document.querySelectorAll('.th-f').forEach(x=>x.classList.toggle('on',x.dataset.f===thFilt));
   const groups={};TH_ORDER.forEach(v=>groups[v]=[]);let shown=0;
   THREADS_LIVE().forEach(t=>{if(!thShow(t,q,cat))return;shown++;(groups[thV(t)]||(groups[thV(t)]=[])).push(t)});
@@ -116,8 +116,8 @@ export function renderThreads(){
     const more=thOpenIds.has(t.id), draft=thDraftIds.has(t.id);
     const pc=t.p==='Hoch'?' p-hoch':(t.p==='Mittel'?' p-mittel':'');
     let h='<div class="th-row'+pc+(done?' done':'')+'">'
-      +'<input type="checkbox" title="'+(done?'Ticked on '+esc(S.threadsDone[t.id]):'Tick off')+'" onclick="thToggle(\''+t.id+'\',event)"'+(done?' checked':'')+'>'
-      +'<div class="th-bd"><div class="th-head"><span class="th-nm" onclick="thOpen(\''+t.id+'\',event)">'+esc(t.name)+'</span>'
+      +'<input type="checkbox" title="'+(done?'Ticked on '+esc(S.threadsDone[t.id]):'Tick off')+'" data-click="thToggle|'+t.id+'|$e"'+(done?' checked':'')+'>'
+      +'<div class="th-bd"><div class="th-head"><span class="th-nm" data-click="thOpen|'+t.id+'|$e">'+esc(t.name)+'</span>'
       +(function(){const _r=findRec(t.id);const _c=(_r&&_r.kind!=='person'&&_r.contact)?_r.contact:t.contact;return _c&&_c!==t.name?'<span class="muted">'+esc(fixUml(_c))+'</span>':''})()
       +pill(TH_CLS[v],TH_V[v])+(t.p&&t.p!=='Niedrig'?pill(t.p.toLowerCase(),({Hoch:'High',Mittel:'Medium'})[t.p]||t.p):'')
       +(still!=null&&still<9999?pill('lite',still+' days quiet'):'')
@@ -139,16 +139,16 @@ export function renderThreads(){
       h+='<div class="th-draft"><div style="font-size:11px;font-weight:700;margin-bottom:4px">'+(t.dr?'Draft (editable)':'Call guide')+'</div>'
         +'<textarea id="thta_'+t.id+'" rows="'+Math.min(18,Math.max(4,txt.split('\n').length+1))+'">'+esc(txt)+'</textarea>'
         +(t.att?'<div class="att">Attachment still to add: '+esc(t.att)+'</div>':'')
-        +'<div style="margin-top:6px"><button class="sm" onclick="thCopy(\''+t.id+'\',\''+(t.dr?'dr':'cs')+'\')">Copy</button> '
-        +(t.dr&&t.email?'<button class="sm primary" onclick="thMail(\''+t.id+'\')">Open in mail client</button>':'')+'</div></div>'}
+        +'<div style="margin-top:6px"><button class="sm" data-click="thCopy|'+t.id+'|'+(t.dr?'dr':'cs')+'">Copy</button> '
+        +(t.dr&&t.email?'<button class="sm primary" data-click="thMail|'+t.id+'">Open in mail client</button>':'')+'</div></div>'}
     h+='<div class="th-acts">'
-      +'<button class="sm" onclick="thMore(\''+t.id+'\')">'+(more?'Less':'Details')+'</button>'
-      +((t.dr||t.cs)?'<button class="sm'+(draft?' primary':'')+'" onclick="thDraft(\''+t.id+'\')">'+(t.dr?'Draft':'Call guide')+'</button>':'')
-      +(r&&t.a?'<button class="sm" onclick="thAdopt(\''+t.id+'\',event)" title="Copy the next action and date into the CRM record">Adopt into CRM</button>':'')
-      +(r?'<button class="sm" onclick="quickSetAction(\''+r.id+'\',event)">Own action</button>':'')
-      +'<button class="sm" onclick="thNote(\''+t.id+'\')">Note</button>'
-      +'<button class="sm" onclick="thOpen(\''+t.id+'\',event)">Open record</button>'
-      +'<span class="sp"></span><select onchange="thSetV(\''+t.id+'\',this.value)">'+TH_ORDER.map(x=>'<option value="'+x+'"'+(x===v?' selected':'')+'>'+TH_V[x]+'</option>').join('')+'</select>'
+      +'<button class="sm" data-click="thMore|'+t.id+'">'+(more?'Less':'Details')+'</button>'
+      +((t.dr||t.cs)?'<button class="sm'+(draft?' primary':'')+'" data-click="thDraft|'+t.id+'">'+(t.dr?'Draft':'Call guide')+'</button>':'')
+      +(r&&t.a?'<button class="sm" data-click="thAdopt|'+t.id+'|$e" title="Copy the next action and date into the CRM record">Adopt into CRM</button>':'')
+      +(r?'<button class="sm" data-click="quickSetAction|'+r.id+'|$e">Own action</button>':'')
+      +'<button class="sm" data-click="thNote|'+t.id+'">Note</button>'
+      +'<button class="sm" data-click="thOpen|'+t.id+'|$e">Open record</button>'
+      +'<span class="sp"></span><select data-change="thSetV|'+t.id+'|$v">'+TH_ORDER.map(x=>'<option value="'+x+'"'+(x===v?' selected':'')+'>'+TH_V[x]+'</option>').join('')+'</select>'
       +'</div></div></div>';
     return h;
   };

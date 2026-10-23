@@ -65,10 +65,10 @@ export function nearbyBriefing(){
     g[k].forEach(x=>{
       const age=x.lt?daysAgo(x.lt)+' Tage her':'kein Kontakt';
       const na=(x.r.nextAction&&x.r.nextAction.trim())||(x.g.people.map(p=>p.nextAction||'').find(s=>s.trim()))||'';
-      const ppl=x.g.people.map(p=>'<span style="cursor:pointer" onclick="openProfile(findRec(\''+p.id+'\'))">'+esc(fixUml(p.name))+(p.title?' <span class="muted">('+esc(fixUml(p.title))+')</span>':'')+'</span>').join(', ');
+      const ppl=x.g.people.map(p=>'<span style="cursor:pointer" data-click="openRec|'+p.id+'|$e">'+esc(fixUml(p.name))+(p.title?' <span class="muted">('+esc(fixUml(p.title))+')</span>':'')+'</span>').join(', ');
       const who=ppl||(x.g.contact?'<span class="muted">'+esc(fixUml(x.g.contact))+'</span>':'');
       html+='<div style="padding:7px 12px;border-bottom:1px solid #F2F2F5;border-left:4px solid '+x.g.cat[1]+'">'
-        +'<span style="cursor:pointer;font-weight:600" onclick="openProfile(findRec(\''+x.r.id+'\'))">'+esc(x.g.name)+'</span>'
+        +'<span style="cursor:pointer;font-weight:600" data-click="openRec|'+x.r.id+'|$e">'+esc(x.g.name)+'</span>'
         +' <span class="chip" style="background:'+x.g.cat[1]+';color:#fff">'+esc(x.g.cat[0])+'</span>'
         +(who?' '+who:'')
         +' <span class="chip">'+esc(x.city)+' · '+x.km+' km</span>'
@@ -104,7 +104,7 @@ export function renderClusters(){
     '<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b>'+esc(x.c)+'</b> '
     +'<span class="chip" style="background:#C00000;color:#fff">'+x.t.length+' targets</span> '
     +'<span class="chip">'+x.a.length+' contacts</span> '
-    +'<button class="sm" onclick="document.getElementById(\'locNear\').value=\''+esc(x.c).replace(/'/g,"")+'\';nearbyBriefing();">Briefing</button>'
+    +'<button class="sm" data-click="nearbyFor|'+esc(x.c)+'">Briefing</button>'
     +'<div class="muted" style="font-size:12px;margin-top:3px">'+x.t.slice(0,6).map(y=>esc(dispName(y.r))).join(' · ')+(x.t.length>6?' …':'')+'</div></div>'
   ).join(''):'<p class="muted" style="padding:12px">No region with three or more targets within '+km+' km yet.</p>';
 }
@@ -156,7 +156,7 @@ export function locGroups(kindFilter){
   return order.map(k=>groups[k]);
 }
 export function groupLabel(g){const who=g.contact?fixUml(g.contact):'';return who&&who!==g.name?fixUml(g.name)+' · '+who:fixUml(g.name)}
-export function groupChip(g){return '<span class="chip" title="'+esc(g.cat[0])+'" style="cursor:pointer;background:'+g.cat[1]+';color:#fff" onclick="openProfile(findRec(\''+g.rec.id+'\'))">'+esc(groupLabel(g))+'</span>'}
+export function groupChip(g){return '<span class="chip" title="'+esc(g.cat[0])+'" style="cursor:pointer;background:'+g.cat[1]+';color:#fff" data-click="openRec|'+g.rec.id+'|$e">'+esc(groupLabel(g))+'</span>'}
 
 // One label for every record: the person and the organisation they belong to.
 export function recLabel(r){
@@ -198,10 +198,10 @@ export function renderLocations(){
   const km=S.locRadius||100;
   const groups=clusterCities(byCity,km);
   const ctl='<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC;font-size:11px">Region size '
-    +'<select onchange="setLocRadius(this.value)">'+[50,75,100,150,200].map(v=>'<option value="'+v+'"'+(km===v?' selected':'')+'>'+v+' km</option>').join('')+'</select>'
+    +'<select data-change="setLocRadius|$v">'+[50,75,100,150,200].map(v=>'<option value="'+v+'"'+(km===v?' selected':'')+'>'+v+' km</option>').join('')+'</select>'
     +' <span class="muted">'+groups.length+' regions from '+Object.keys(byCity).length+' places</span></div>';
   const catOrder=g=>g.cat[0]==='Target'?0:g.cat[0]==='Contact'?9:1;
-  document.getElementById('locList').innerHTML=ctl+(groups.map(g=>'<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b style="cursor:pointer;text-decoration:underline dotted" title="Auf der Karte zeigen" onclick="locFocus(\''+esc(g.head).replace(/'/g,"\\'")+'\')">'+esc(g.head)+'</b> <span class="muted">('+g.recs.length+')</span>'+(g.cities.length>1?' <span class="muted" style="font-size:10px">incl. '+esc(g.cities.filter(c=>c!==g.head).join(', '))+'</span>':'')+'<br>'+g.recs.slice().sort((a,b)=>catOrder(a)-catOrder(b)||a.name.localeCompare(b.name)).map(groupChip).join(' ')+'</div>').join('')||'<p class="muted" style="padding:12px">No records with a city yet.</p>');
+  document.getElementById('locList').innerHTML=ctl+(groups.map(g=>'<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b style="cursor:pointer;text-decoration:underline dotted" title="Auf der Karte zeigen" data-click="locFocus|'+esc(g.head)+'">'+esc(g.head)+'</b> <span class="muted">('+g.recs.length+')</span>'+(g.cities.length>1?' <span class="muted" style="font-size:10px">incl. '+esc(g.cities.filter(c=>c!==g.head).join(', '))+'</span>':'')+'<br>'+g.recs.slice().sort((a,b)=>catOrder(a)-catOrder(b)||a.name.localeCompare(b.name)).map(groupChip).join(' ')+'</div>').join('')||'<p class="muted" style="padding:12px">No records with a city yet.</p>');
   if(typeof L==='undefined')return;
   if(!locMap){locMap=L.map('locMap').setView([51.1,10.3],6);locMap.setMaxBounds([[46.5,4.5],[55.5,16.5]]);locMap.setMinZoom(5);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(locMap)}
   if(locLayer)locLayer.remove();locLayer=L.layerGroup().addTo(locMap);
@@ -219,7 +219,7 @@ export function renderLocations(){
       const ex=addrLL(gr.rec);const pos=ex?ex:[g[0]+off*Math.sin(ang),g[1]+off*Math.cos(ang)];
       const m=L.circleMarker(pos,{radius:ex?7:8,color:ex?'#000':'#fff',weight:1.5,fillColor:col,fillOpacity:0.92}).addTo(locLayer);
       const ppl=gr.people.map(p=>fixUml(p.name)).join(', ')||fixUml(gr.contact||'');
-      m.bindPopup('<b>'+esc(gr.name)+'</b><br><span style="color:'+col+';font-weight:700">'+lbl+'</span> · '+esc(c)+(ppl?'<br>'+esc(ppl):'')+(ex?'<br><span style="font-size:10px">'+esc(gr.rec.address||'')+'</span>':'<br><span style="font-size:10px;color:#595959">nur Ort bekannt, keine Straßenadresse im CRM</span>')+'<br><a href="#" onclick="openProfile(findRec(\''+gr.rec.id+'\'));return false">Open profile →</a>');
+      m.bindPopup('<b>'+esc(gr.name)+'</b><br><span style="color:'+col+';font-weight:700">'+lbl+'</span> · '+esc(c)+(ppl?'<br>'+esc(ppl):'')+(ex?'<br><span style="font-size:10px">'+esc(gr.rec.address||'')+'</span>':'<br><span style="font-size:10px;color:#595959">nur Ort bekannt, keine Straßenadresse im CRM</span>')+'<br><a href="#" data-click="openRec|'+gr.rec.id+'|$e">Open profile →</a>');
     });
   });
   if(!locMap._legend){
@@ -256,3 +256,4 @@ export async function geocodeMissing(){
   }
   save();renderLocations();toast('Geocoding done');
 }
+export function nearbyFor(city){const el=document.getElementById('locNear');if(el)el.value=city;nearbyBriefing()}

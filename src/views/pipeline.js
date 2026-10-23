@@ -11,7 +11,7 @@ export function chDe(c){return CH_DE[chanOf(c)]||chanOf(c)||'(no channel)'}
 export function cadChip(c){const cd=cadenceOf(c);if(!cd)return '';if(cd.replied)return '<span class="chch" style="background:#E3F1E4;color:#2E7D32">Reply received</span>';if(!cd.next)return '<span class="chch">Cadence complete</span>';const od=cd.next.due<=today();return '<span class="chch" title="Letter of '+fmtDe(cd.sent)+'" style="'+(od?'background:#FBE3D6;color:#9A3B12':'')+'">'+cd.next.label+' by '+fmtDe(cd.next.due)+'</span>'}
 export function lsChip(c){if(c.letterSent)return '';const v=c.letterStatus;if(!v||!LS_DE[v])return '';return '<span class="chch" style="'+(v==='ready'?'background:#E3F1E4;color:#2E7D32':'')+'">'+LS_DE[v]+'</span>'}
 export function dueDe(d,id){
-  const edit=id?' onclick="event.stopPropagation();editDue(\''+id+'\',this)" title="Click to change"':'';
+  const edit=id?' data-click="!editDue|'+id+'|$el" title="Click to change"':'';
   if(!d)return id?'<span class="duechip" style="background:#EEF0F5;color:#595959"'+edit+'>no date</span>':'';
   const n=-daysAgo(d);const t=n<0?Math.abs(n)+'d overdue':n===0?'due today':'in '+n+'d';const c=n<0?'var(--red)':n===0?'#C6943E':'#2E7D32';
   return '<span class="duechip" style="background:'+c+'22;color:'+c+'"'+edit+'>'+t+' · '+fmtDe(d)+'</span>'
@@ -30,9 +30,9 @@ export function letterBox(rec){
   const cd=cadenceOf(rec);
   const st=cd?('Letter sent on '+fmtDe(cd.sent)+(cd.via?' via '+esc(cd.via):'')+' · '+(cd.replied?'Reply received, cadence ended':cd.next?'next step: '+cd.next.label+' by '+fmtDe(cd.next.due):'Cadence complete')):(LS_DE[rec.letterStatus]||'No letter yet');
   const steps=cd?'<div style="font-size:11px;margin-top:4px">'+cd.steps.map(s=>(s.done?'&#10003; ':'&#9675; ')+s.label+' '+fmtDe(s.due)).join(' &nbsp; ')+'</div>':'';
-  const b=(v,t)=>'<button class="sm'+(rec.letterStatus===v?' vbtn on':'')+'" onclick="setLetterStatus(\''+rec.id+'\',\''+v+'\')">'+t+'</button> ';
+  const b=(v,t)=>'<button class="sm'+(rec.letterStatus===v?' vbtn on':'')+'" data-click="setLetterStatus|'+rec.id+'|'+v+'">'+t+'</button> ';
   return '<div style="margin-top:8px;padding:8px;border:1px solid #E3E5EC;border-radius:5px"><label style="margin:0">Letter and cadence</label><div style="font-size:12px">'+st+'</div>'+steps+
-    '<div style="margin-top:6px">'+(cd?'':b('planned','Letter planned')+b('ready','Letter drafted'))+'<button class="sm" onclick="markLetterSent(\''+rec.id+'\')">Letter sent...</button></div></div>';
+    '<div style="margin-top:6px">'+(cd?'':b('planned','Letter planned')+b('ready','Letter drafted'))+'<button class="sm" data-click="markLetterSent|'+rec.id+'">Letter sent...</button></div></div>';
 }
 export function setLetterStatus(id,v){const r=findRec(id);if(!r)return;r.letterStatus=r.letterStatus===v?'':v;save();if(profRec&&profRec.id===id)renderRecordPage();renderAll()}
 export function toggleLetterReady(id){setLetterStatus(id,'ready')}
@@ -74,20 +74,20 @@ export function pTable(tid,cols,items,limit){
   const st=pipeSort[tid];
   if(st){const col=cols.find(c=>c.k===st.k);if(col)items=[...items].sort((a,b)=>{const x=col.v(a),y=col.v(b);return (x==null||x==='')-(y==null||y==='')||(typeof x==='number'&&typeof y==='number'?x-y:String(x).localeCompare(String(y)))*st.d})}
   const shown=limit&&!pipeMore[tid]?items.slice(0,limit):items;
-  return '<table class="ps"><tr>'+cols.map(c=>'<th style="'+(c.w?'width:'+c.w+';':'')+(c.num?'text-align:right':'')+'" onclick="pipeSortClick(\''+tid+'\',\''+c.k+'\')">'+c.t+(st&&st.k===c.k?(st.d>0?' &#9650;':' &#9660;'):'')+'</th>').join('')+'</tr>'+
-    shown.map(r=>'<tr class="rowlink" onclick="openProfile(findRec(\''+r.id+'\'))">'+cols.map(c=>'<td'+(c.num?' style="text-align:right"':'')+(c.muted?' class="muted"':'')+'>'+c.h(r)+'</td>').join('')+'</tr>').join('')+'</table>'+
-    (limit&&items.length>limit?'<div style="padding:6px 10px"><button class="sm" onclick="pipeMore[\''+tid+'\']=!pipeMore[\''+tid+'\'];renderPipeline()">'+(pipeMore[tid]?'Show fewer':'Show all '+items.length)+'</button></div>':'');
+  return '<table class="ps"><tr>'+cols.map(c=>'<th style="'+(c.w?'width:'+c.w+';':'')+(c.num?'text-align:right':'')+'" data-click="pipeSortClick|'+tid+'|'+c.k+'">'+c.t+(st&&st.k===c.k?(st.d>0?' &#9650;':' &#9660;'):'')+'</th>').join('')+'</tr>'+
+    shown.map(r=>'<tr class="rowlink" data-click="openRec|'+r.id+'|$e">'+cols.map(c=>'<td'+(c.num?' style="text-align:right"':'')+(c.muted?' class="muted"':'')+'>'+c.h(r)+'</td>').join('')+'</tr>').join('')+'</table>'+
+    (limit&&items.length>limit?'<div style="padding:6px 10px"><button class="sm" data-click="togglePipeMore|'+tid+'">'+(pipeMore[tid]?'Show fewer':'Show all '+items.length)+'</button></div>':'');
 }
 export function cardSort(a,b){const od=x=>isDue(x)?0:1;return od(a)-od(b)||(b.fav?1:0)-(a.fav?1:0)||(a.nextDate||'9').localeCompare(b.nextDate||'9')||dispName(a).localeCompare(dispName(b))}
 export function staleTxt(c){const lt=lastTouch(c);if(!lt)return '';const n=daysAgo(lt);return n>30?'<span class="muted" style="font-size:10px"> · letzter Kontakt vor '+n+' T</span>':''}
 export function bCard(c){
   const ch=chanOf(c);
-  return '<div class="bcard'+(isDue(c)?' due':'')+'" draggable="true" ondragstart="pipeDragStart(event,\''+c.id+'\')" onclick="openProfile(findRec(\''+c.id+'\'))">'+
-    '<div class="nm"><span class="star'+(c.fav?' on':'')+'" onclick="toggleFav(\''+c.id+'\',event)" title="Markieren">&#9733;</span> '+esc(fixUml(dispName(c)))+'</div>'+
+  return '<div class="bcard'+(isDue(c)?' due':'')+'" draggable="true" data-dragstart="pipeDragStart|$e|'+c.id+'" data-click="openRec|'+c.id+'|$e">'+
+    '<div class="nm"><span class="star'+(c.fav?' on':'')+'" data-click="toggleFav|'+c.id+'|$e" title="Markieren">&#9733;</span> '+esc(fixUml(dispName(c)))+'</div>'+
     '<div class="muted">'+(c.ebit!=null&&c.ebit!==''?'EBIT '+fmtM(c.ebit):'')+(c.revenue?' · Revenue '+fmtM(c.revenue):'')+(c.location?' · '+esc(c.location):'')+'</div>'+
     (ch?'<span class="chch">'+esc(chDe(c))+(c.channelVia&&(ch==='Partner letter'||ch==='M&A house / advisor'||ch==='Tax adviser / auditor'||ch==='Trade fair')?': '+esc(c.channelVia.split(/[ (]/)[0]):'')+'</span> ':'')+lsChip(c)+cadChip(c)+
     (c.nextAction?'<div class="na">'+esc(c.nextAction)+'</div>':(['Contacted','Replied','Meeting','NDA','LOI','Diligence'].includes(c.stage)&&!cadenceOf(c)?'<div class="na" style="color:#9A3B12">No next step recorded</div>':''))+
-    '<div style="margin-top:3px">'+dueDe(c.nextDate,c.id)+' <span class="mini" onclick="shiftDue(\''+c.id+'\',7,event)" title="one week later">+1W</span><span class="mini" onclick="shiftDue(\''+c.id+'\',30,event)" title="one month later">+1M</span>'+staleTxt(c)+'</div></div>'
+    '<div style="margin-top:3px">'+dueDe(c.nextDate,c.id)+' <span class="mini" data-click="shiftDue|'+c.id+'|#7|$e" title="one week later">+1W</span><span class="mini" data-click="shiftDue|'+c.id+'|#30|$e" title="one month later">+1M</span>'+staleTxt(c)+'</div></div>'
 }
 export function renderPipeline(){
   if(!pipeView){try{pipeView=localStorage.getItem('kxPipeView')||'board'}catch(e){pipeView='board'}}
@@ -108,15 +108,15 @@ export function renderPipeline(){
     {k:'ready',t:'To contact',f:isReady},
     {k:'letters',t:'Letters this week',v:lettersWeek+' / '+LETTER_TARGET_WEEK,f:c=>touchList(c).some(x=>tType(x)==='Letter'&&x.dir!=='in'&&(x.date||'').slice(0,10)>=ws)}
   ];
-  document.getElementById('pipeKpis').innerHTML=kdef.map(x=>{const n=base.filter(x.f).length;return '<div class="kpi'+(x.warn&&n?' warn':'')+(pipeKpi===x.k?' on':'')+'" onclick="setPipeKpi(\''+x.k+'\')" title="Click to filter the view"><div class="v">'+(x.v||n)+'</div><div class="l">'+x.t+'</div></div>'}).join('');
+  document.getElementById('pipeKpis').innerHTML=kdef.map(x=>{const n=base.filter(x.f).length;return '<div class="kpi'+(x.warn&&n?' warn':'')+(pipeKpi===x.k?' on':'')+'" data-click="setPipeKpi|'+x.k+'" title="Click to filter the view"><div class="v">'+(x.v||n)+'</div><div class="l">'+x.t+'</div></div>'}).join('');
   const kf=kdef.find(x=>x.k===pipeKpi);
   const list=kf?base.filter(kf.f):base;
   const active=list.filter(c=>LIVE.includes(c.stage));
   const ready=list.filter(isReady);
-  const stageSel=c=>'<select class="stagesel" onclick="event.stopPropagation()" onchange="pipeSetStage(\''+c.id+'\',this.value)">'+STAGES.map(s=>'<option value="'+s+'"'+(s===c.stage?' selected':'')+'>'+(ST_DE[s]||s)+'</option>').join('')+'</select>';
-  const lsSel=c=>'<select class="stagesel" onclick="event.stopPropagation()" onchange="setLetterStatus(\''+c.id+'\',this.value)"><option value="">no letter</option><option value="planned"'+(c.letterStatus==='planned'?' selected':'')+'>planned</option><option value="ready"'+(c.letterStatus==='ready'?' selected':'')+'>drafted</option></select>';
+  const stageSel=c=>'<select class="stagesel" data-click="!" data-change="pipeSetStage|'+c.id+'|$v">'+STAGES.map(s=>'<option value="'+s+'"'+(s===c.stage?' selected':'')+'>'+(ST_DE[s]||s)+'</option>').join('')+'</select>';
+  const lsSel=c=>'<select class="stagesel" data-click="!" data-change="setLetterStatus|'+c.id+'|$v"><option value="">no letter</option><option value="planned"'+(c.letterStatus==='planned'?' selected':'')+'>planned</option><option value="ready"'+(c.letterStatus==='ready'?' selected':'')+'>drafted</option></select>';
   const C={
-    name:{k:'name',t:'Company',w:'22%',v:c=>dispName(c),h:c=>'<span class="star'+(c.fav?' on':'')+'" onclick="toggleFav(\''+c.id+'\',event)">&#9733;</span> <b>'+esc(fixUml(dispName(c)))+'</b>'},
+    name:{k:'name',t:'Company',w:'22%',v:c=>dispName(c),h:c=>'<span class="star'+(c.fav?' on':'')+'" data-click="toggleFav|'+c.id+'|$e">&#9733;</span> <b>'+esc(fixUml(dispName(c)))+'</b>'},
     loc:{k:'loc',t:'Location',v:c=>c.location||'',h:c=>esc(c.location||''),muted:1},
     ebit:{k:'ebit',t:'EBIT',num:1,v:c=>c.ebit==null||c.ebit===''?null:+c.ebit,h:c=>fmtM(c.ebit),muted:1},
     rev:{k:'rev',t:'Revenue',num:1,v:c=>c.revenue==null||c.revenue===''?null:+c.revenue,h:c=>fmtM(c.revenue),muted:1},
@@ -133,7 +133,7 @@ export function renderPipeline(){
     revisit:{k:'revisit',t:'Revisit',v:c=>c.revisitDate||'9999',h:c=>c.revisitDate?fmtDe(c.revisitDate):'-',muted:1},
     when:{k:'when',t:'Date',v:c=>{const l=(c.stageLog||[]).slice(-1)[0];return l?l.date:''},h:c=>{const l=(c.stageLog||[]).slice(-1)[0];return l?fmtDe(l.date):'-'},muted:1}
   };
-  const sec=(id,title,items,cols,limit,open)=>'<details class="psec"'+(open||pipeExpand[id]||(q&&items.length)?' open':'')+' ontoggle="pipeExpand[\''+id+'\']=this.open"><summary>'+title+' <span style="font-weight:400">('+items.length+')</span></summary>'+(items.length?pTable(id,cols,items,limit):'<p class="muted" style="padding:6px 10px">None.</p>')+'</details>';
+  const sec=(id,title,items,cols,limit,open)=>'<details class="psec"'+(open||pipeExpand[id]||(q&&items.length)?' open':'')+' data-toggle="setPipeExpand|'+id+'|$el"><summary>'+title+' <span style="font-weight:400">('+items.length+')</span></summary>'+(items.length?pTable(id,cols,items,limit):'<p class="muted" style="padding:6px 10px">None.</p>')+'</details>';
   const idl=list.filter(c=>c.stage==='Identified'&&!isReady(c)),hold=list.filter(c=>c.stage==='On hold'),dead=list.filter(c=>c.stage==='Dead'),closed=list.filter(c=>c.stage==='Closed');
   const lower=sec('idl','Identified, not yet approached',idl,[C.name,C.loc,C.rev,C.ebit,C.score,C.verdict,C.ls,C.next],50)+
     sec('hold','On hold',hold,[C.name,C.loc,C.ebit,C.chan,C.reason,C.revisit,C.when],50)+
@@ -145,11 +145,11 @@ export function renderPipeline(){
     body='<div class="section">'+pTable('focus',[C.name,C.stage,C.chan,C.ebit,C.next,C.due,C.last,C.days],fl,0)+'</div>'+lower;
   }else if(pipeView==='channel'){
     const rows=CHANNELS.filter(Boolean).concat(['']).map(ch=>{const g=list.filter(c=>(chanOf(c)||'')===ch&&c.stage!=='Identified');const rep=g.filter(c=>['Replied','Meeting','NDA','LOI','Diligence','Closed'].includes(c.stage)||(c.stageLog||[]).some(l=>['Replied','Meeting','NDA','LOI'].includes(l.stage))).length;return {ch,g,appr:g.length,rep,meet:g.filter(c=>(c.stageLog||[]).some(l=>['Meeting','NDA','LOI','Diligence','Closed'].includes(l.stage))).length,pass:g.filter(c=>c.stage==='Dead').length,hold:g.filter(c=>c.stage==='On hold').length}}).filter(x=>x.appr);
-    body='<div class="section"><table class="ps"><tr><th>Channel</th><th style="text-align:right">Approached</th><th style="text-align:right">Replied</th><th style="text-align:right">Rate</th><th style="text-align:right">Meeting+</th><th style="text-align:right">On hold</th><th style="text-align:right">Passed</th><th>Companies</th></tr>'+rows.map(x=>'<tr><td><b>'+esc(CH_DE[x.ch]||x.ch)+'</b></td><td style="text-align:right">'+x.appr+'</td><td style="text-align:right">'+x.rep+'</td><td style="text-align:right">'+(x.appr?Math.round(100*x.rep/x.appr)+'%':'-')+'</td><td style="text-align:right">'+x.meet+'</td><td style="text-align:right">'+x.hold+'</td><td style="text-align:right">'+x.pass+'</td><td style="font-size:11px">'+x.g.slice(0,60).map(c=>'<a href="#" onclick="openProfile(findRec(\''+c.id+'\'));return false">'+esc(fixUml(dispName(c)))+'</a> <span class="muted">('+(ST_DE[c.stage]||c.stage)+')</span>').join(', ')+'</td></tr>').join('')+'</table></div>'+lower;
+    body='<div class="section"><table class="ps"><tr><th>Channel</th><th style="text-align:right">Approached</th><th style="text-align:right">Replied</th><th style="text-align:right">Rate</th><th style="text-align:right">Meeting+</th><th style="text-align:right">On hold</th><th style="text-align:right">Passed</th><th>Companies</th></tr>'+rows.map(x=>'<tr><td><b>'+esc(CH_DE[x.ch]||x.ch)+'</b></td><td style="text-align:right">'+x.appr+'</td><td style="text-align:right">'+x.rep+'</td><td style="text-align:right">'+(x.appr?Math.round(100*x.rep/x.appr)+'%':'-')+'</td><td style="text-align:right">'+x.meet+'</td><td style="text-align:right">'+x.hold+'</td><td style="text-align:right">'+x.pass+'</td><td style="font-size:11px">'+x.g.slice(0,60).map(c=>'<a href="#" data-click="openRec|'+c.id+'|$e">'+esc(fixUml(dispName(c)))+'</a> <span class="muted">('+(ST_DE[c.stage]||c.stage)+')</span>').join(', ')+'</td></tr>').join('')+'</table></div>'+lower;
   }else{
     const colItems=k=>k==='ready'?ready:list.filter(c=>c.stage===k);
-    body='<div class="board">'+BOARD_COLS.map(col=>{const its=colItems(col.k).sort(cardSort);const lim=pipeExpand['b_'+col.k]?its.length:8;return '<div class="bcol" ondragover="pipeDragOver(event,this)" ondragleave="this.classList.remove(\'dragover\')" ondrop="pipeDrop(event,this,\''+col.k+'\')"><h5>'+col.t+' <span style="font-weight:400;color:#595959">'+its.length+'</span></h5>'+its.slice(0,lim).map(bCard).join('')+(its.length>8?'<button class="sm" style="width:100%" onclick="pipeExpand[\'b_'+col.k+'\']=!pipeExpand[\'b_'+col.k+'\'];renderPipeline()">'+(pipeExpand['b_'+col.k]?'Show fewer':'+'+(its.length-8)+' more')+'</button>':'')+'</div>'}).join('')+'</div>'+
-      '<div class="dropbar"><div class="dropz" ondragover="pipeDragOver(event,this)" ondragleave="this.classList.remove(\'dragover\')" ondrop="pipeDrop(event,this,\'On hold\')">Drop a card here: put on hold (with reason and revisit date)</div><div class="dropz" ondragover="pipeDragOver(event,this)" ondragleave="this.classList.remove(\'dragover\')" ondrop="pipeDrop(event,this,\'Dead\')">Drop a card here: pass (with reason)</div></div>'+lower;
+    body='<div class="board">'+BOARD_COLS.map(col=>{const its=colItems(col.k).sort(cardSort);const lim=pipeExpand['b_'+col.k]?its.length:8;return '<div class="bcol" data-dragover="pipeDragOver|$e|$el" data-dragleave="removeClass|$el|dragover" data-drop="pipeDrop|$e|$el|'+col.k+'"><h5>'+col.t+' <span style="font-weight:400;color:#595959">'+its.length+'</span></h5>'+its.slice(0,lim).map(bCard).join('')+(its.length>8?'<button class="sm" style="width:100%" data-click="togglePipeExpand|b_'+col.k+'">'+(pipeExpand['b_'+col.k]?'Show fewer':'+'+(its.length-8)+' more')+'</button>':'')+'</div>'}).join('')+'</div>'+
+      '<div class="dropbar"><div class="dropz" data-dragover="pipeDragOver|$e|$el" data-dragleave="removeClass|$el|dragover" data-drop="pipeDrop|$e|$el|On hold">Drop a card here: put on hold (with reason and revisit date)</div><div class="dropz" data-dragover="pipeDragOver|$e|$el" data-dragleave="removeClass|$el|dragover" data-drop="pipeDrop|$e|$el|Dead">Drop a card here: pass (with reason)</div></div>'+lower;
   }
   document.getElementById('pipeBody').innerHTML=body;
 }
@@ -160,3 +160,6 @@ export function dropCard(ev,colEl){
   const ns=colEl.dataset.stage;
   if(ns!==c.stage){c.stageLog=c.stageLog||[];c.stageLog.push({stage:ns,date:today()});c.stage=ns;save();renderAll()}
 }
+export function togglePipeMore(tid){pipeMore[tid]=!pipeMore[tid];renderPipeline()}
+export function togglePipeExpand(key){pipeExpand[key]=!pipeExpand[key];renderPipeline()}
+export function setPipeExpand(id,el){pipeExpand[id]=el.open}

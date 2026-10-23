@@ -9,7 +9,7 @@ import {daysAgo, esc} from '../util.js';
 export function stagePill(s){const col={'Identified':'#8C97B8','Contacted':'#434F80','Replied':'#C6943E','Meeting':'#C6943E','NDA':'#2E7D32','LOI':'#1565C0','Diligence':'#1565C0','Closed':'#2E7D32','Dead':'#999'};return '<span class="pill" style="background:'+(col[s]||'#888')+';color:#fff">'+esc(s)+'</span>'}
 export function prioChip(r){return r.priority?'<span class="pill" style="background:'+(PRIO_COL[r.priority]||'#8C97B8')+';color:#fff" title="'+(PRIO_DEF[r.priority]||'')+'">'+r.priority+'</span>':''}
 export function dueChip(d){if(!d)return '';const n=-daysAgo(d);const t=n<0?Math.abs(n)+'d overdue':n===0?'due today':'due in '+n+'d';const c=n<0?'var(--red)':n===0?'#C6943E':'#2E7D32';return '<span class="duechip" style="background:'+c+'22;color:'+c+'">'+t+'</span>'}
-export function starHtml(r){return '<span class="star'+(r.fav?' on':'')+'" onclick="toggleFav(event,\''+r.id+'\')" title="Favorite">★</span>'}
+export function starHtml(r){return '<span class="star'+(r.fav?' on':'')+'" data-click="toggleFav|$e|'+r.id+'" title="Favorite">★</span>'}
 export function statusOf(r){return r.kind==='target'?r.stage:r.status}
 export function grpChip(r){const g=GRP_DEF.find(x=>x.k===grpOf(r))||GRP_DEF[5];const sub=r.kind==='person'?(r.ptype||''):(r.category||r.ptype||'');return '<span class="gchip" style="background:'+g.c+'">'+g.t+'</span>'+(sub?'<div class="muted" style="font-size:10px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(sub)+'</div>':'')}
 

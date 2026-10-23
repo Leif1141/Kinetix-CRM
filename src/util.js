@@ -10,8 +10,8 @@ export function addDays(d,n){const x=new Date((d||today())+'T12:00:00Z');x.setUT
 export function daysAgo(d){if(!d)return 9999;return Math.floor((Date.now()-new Date(d).getTime())/864e5)}
 export function esc(s){return (s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 export function fmtM(v){return (v===''||v===null||v===undefined||isNaN(v))?'-':Number(v).toFixed(1)}
-export function fmtD(d){if(!d)return '—';return new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}
-export function fmtAgo(d){if(!d)return '—';const n=daysAgo(d);return n===0?'today':n===1?'1 day ago':n<31?n+' days ago':n<365?Math.floor(n/30)+'mo ago':Math.floor(n/365)+'y ago'}
+export function fmtD(d){if(!d)return '-';return new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}
+export function fmtAgo(d){if(!d)return '-';const n=daysAgo(d);return n===0?'today':n===1?'1 day ago':n<31?n+' days ago':n<365?Math.floor(n/30)+'mo ago':Math.floor(n/365)+'y ago'}
 export function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2800)}
 // pure, so the result is memoised per input string (bounded)
 const _nn=new Map();

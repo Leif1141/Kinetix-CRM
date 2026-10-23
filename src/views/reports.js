@@ -27,7 +27,7 @@ export function renderYield(){
   const el=document.getElementById('yieldBody');if(!el)return;
   const D=90;
   const stats=liveOnly(S.advisors||[]).map(partnerStats);
-  const link=x=>'<b style="cursor:pointer" onclick="openProfile(findRec(\''+x.a.id+'\'))">'+esc(fixUml(dispName(x.a)))+'</b>';
+  const link=x=>'<b style="cursor:pointer" data-click="openRec|'+x.a.id+'|$e">'+esc(fixUml(dispName(x.a)))+'</b>';
   const hdr=cols=>'<tr>'+cols.map((c,i)=>'<th'+(i?' style="text-align:right"':'')+'>'+c+'</th>').join('')+'</tr>';
   const sub=t=>'<div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959;margin:10px 0 4px">'+t+'</div>';
   const none=(n,msg)=>'<tr><td colspan="'+n+'" class="muted">'+msg+'</td></tr>';
@@ -35,20 +35,20 @@ export function renderYield(){
   // A. partners who have actually put a name in front of you
   const producing=stats.filter(x=>x.sourced.length).sort((a,b)=>b.sourced.length-a.sourced.length);
   const prodRows=producing.length?producing.map(x=>
-    '<tr class="rowlink" onclick="openProfile(findRec(\''+x.a.id+'\'))"><td>'+link(x)+'</td><td class="muted">'+esc(catOf(x.a)||'')+'</td><td style="text-align:right">'+x.sourced.length+'</td><td style="text-align:right">'+x.tot+'</td><td class="muted" style="text-align:right">'+esc(x.sourced.map(c=>fixUml(dispName(c))).join(', ').slice(0,60))+'</td></tr>').join('')
+    '<tr class="rowlink" data-click="openRec|'+x.a.id+'|$e"><td>'+link(x)+'</td><td class="muted">'+esc(catOf(x.a)||'')+'</td><td style="text-align:right">'+x.sourced.length+'</td><td style="text-align:right">'+x.tot+'</td><td class="muted" style="text-align:right">'+esc(x.sourced.map(c=>fixUml(dispName(c))).join(', ').slice(0,60))+'</td></tr>').join('')
     :none(5,'No target yet names a partner in Via. Fill in Via on a target and this table starts working.');
 
   // B. long two-way conversations that have produced nothing
   const talk=stats.filter(x=>x.tot>=10&&x.inn>=3&&x.age>=90&&!x.sourced.length)
     .sort((a,b)=>b.tot-a.tot).slice(0,12);
   const talkRows=talk.length?talk.map(x=>
-    '<tr class="rowlink" onclick="openProfile(findRec(\''+x.a.id+'\'))"><td>'+link(x)+'</td><td class="muted">'+esc(catOf(x.a)||'')+'</td><td style="text-align:right">'+x.tot+'</td><td style="text-align:right">'+Math.round(x.age/30)+'m</td><td style="text-align:right">'+x.given.length+'</td><td class="muted">'+fmtAgo(lastTouch(x.a))+'</td></tr>').join('')
+    '<tr class="rowlink" data-click="openRec|'+x.a.id+'|$e"><td>'+link(x)+'</td><td class="muted">'+esc(catOf(x.a)||'')+'</td><td style="text-align:right">'+x.tot+'</td><td style="text-align:right">'+Math.round(x.age/30)+'m</td><td style="text-align:right">'+x.given.length+'</td><td class="muted">'+fmtAgo(lastTouch(x.a))+'</td></tr>').join('')
     :none(6,'Nothing here.');
 
   // C. approached, no answer - a channel problem, not a write-off
   const silent=stats.filter(x=>x.out>=3&&x.inn===0).sort((a,b)=>b.out-a.out).slice(0,12);
   const silRows=silent.length?silent.map(x=>
-    '<tr class="rowlink" onclick="openProfile(findRec(\''+x.a.id+'\'))"><td>'+link(x)+'</td><td class="muted">'+esc(catOf(x.a)||'')+'</td><td style="text-align:right">'+x.out+'</td><td class="muted">'+fmtAgo(lastTouch(x.a))+'</td><td class="muted">'+esc(x.a.phone?'phone on file':'no phone on file')+'</td></tr>').join('')
+    '<tr class="rowlink" data-click="openRec|'+x.a.id+'|$e"><td>'+link(x)+'</td><td class="muted">'+esc(catOf(x.a)||'')+'</td><td style="text-align:right">'+x.out+'</td><td class="muted">'+fmtAgo(lastTouch(x.a))+'</td><td class="muted">'+esc(x.a.phone?'phone on file':'no phone on file')+'</td></tr>').join('')
     :none(5,'Everyone you have written to more than twice has answered.');
 
   // headline
@@ -95,7 +95,7 @@ export function renderReports(){
   const dr=DEADREASONS.map(r=>(S.companies||[]).filter(c=>c.stage==='Dead'&&deadCatOf(c)===r).length);
   mk('chDead',{type:'bar',data:{labels:DEADREASONS,datasets:[{data:dr,backgroundColor:'#999'}]}});
   const tis=live.filter(c=>c.stage!=='Identified').map(c=>({c,d:daysAgo(stageDate(c))})).sort((a,b)=>b.d-a.d);
-  document.getElementById('tisTable').innerHTML='<tr><th>Company</th><th style="width:140px">Stage</th><th style="width:110px;text-align:right">Days in stage</th></tr>'+tis.map(x=>'<tr class="rowlink" onclick="openProfile(findRec(\''+x.c.id+'\'))"><td><b>'+esc(fixUml(x.c.name))+'</b></td><td>'+stagePill(x.c.stage)+'</td><td style="text-align:right">'+x.d+'</td></tr>').join('');
+  document.getElementById('tisTable').innerHTML='<tr><th>Company</th><th style="width:140px">Stage</th><th style="width:110px;text-align:right">Days in stage</th></tr>'+tis.map(x=>'<tr class="rowlink" data-click="openRec|'+x.c.id+'|$e"><td><b>'+esc(fixUml(x.c.name))+'</b></td><td>'+stagePill(x.c.stage)+'</td><td style="text-align:right">'+x.d+'</td></tr>').join('');
 }
 export async function weeklyDigest(){
   const D=14,t0=Date.now()-D*864e5;const inWin=t=>t&&t.date&&new Date(t.date).getTime()>=t0;

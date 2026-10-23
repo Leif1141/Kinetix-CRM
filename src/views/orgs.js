@@ -28,7 +28,7 @@ export function renderOrgs(){
   const val=o=>{switch(sortK){case 'name':return dispName(o).toLowerCase();case 'status':return statusOf(o)||'';case 'lastc':return lastTouch(o)||'';case 'geo':return o.geo||'';default:return ''}};
   rows.sort((a,b)=>{const va=val(a),vb=val(b);return va<vb?-sortD:va>vb?sortD:0});
   document.getElementById('oCount').textContent=rows.length+' of '+allOrgs().length;
-  const hdr=(k,label)=>'<th onclick="sortOrgs(\''+k+'\')">'+label+(sortK===k?' <span class="arr">'+(sortD>0?'▲':'▼')+'</span>':'')+'</th>';
+  const hdr=(k,label)=>'<th data-click="sortOrgs|'+k+'">'+label+(sortK===k?' <span class="arr">'+(sortD>0?'▲':'▼')+'</span>':'')+'</th>';
   const geoDisp=g=>({'DE':'Germany','UK':'United Kingdom','EU':'','US':'United States','CH':'Switzerland','AT':'Austria','FR':'France','NL':'Netherlands','LU':'Luxembourg'}[g]||g||'');
   const typeShort=o=>o.kind==='target'?'Target':({'M&A sourcing intermediaries':'M&A / Sourcing','Financing partners':'Financing','DD advisors':'DD advisor','Investors & family office':'Investor / FO','HR, universities & interns':'HR / Talent','Admin & infrastructure':'Admin / Infra','Personal network':'Network'}[o.category]||o.category||'Advisor');
   const detailCell=o=>{
@@ -38,9 +38,9 @@ export function renderOrgs(){
   const statusSel=o=>{
     const opts=o.kind==='target'?STAGES:ADV_STATUS;
     const cur=statusOf(o)||'';
-    return '<select class="stagesel" onclick="event.stopPropagation()" onchange="setStatusInline(\''+o.id+'\',this.value)">'+opts.map(s=>'<option'+(s===cur?' selected':'')+'>'+esc(s)+'</option>').join('')+(opts.includes(cur)?'':'<option selected>'+esc(cur||'—')+'</option>')+'</select>';
+    return '<select class="stagesel" data-click="!" data-change="setStatusInline|'+o.id+'|$v">'+opts.map(s=>'<option'+(s===cur?' selected':'')+'>'+esc(s)+'</option>').join('')+(opts.includes(cur)?'':'<option selected>'+esc(cur||'-')+'</option>')+'</select>';
   };
-  document.getElementById('orgTable').innerHTML='<table>'+hdr('name','Organization')+hdr('status','Stage / Status')+'<th>Type</th><th>Contact</th>'+hdr('lastc','Last contact')+'<th>Address</th><th>Detail</th><th style="text-align:right">Priority</th>'+rows.map(o=>'<tr class="rowlink" onclick="openProfile(findRec(\''+o.id+'\'))"><td>'+starHtml(o)+' <b>'+esc(dispName(o))+'</b></td><td>'+statusSel(o)+'</td><td class="muted">'+esc(typeShort(o))+'</td><td class="muted">'+esc(o.contact||orgPeople(o).map(p=>p.name).join(', ')||'—')+'</td><td class="muted">'+fmtAgo(lastTouch(o))+'</td><td class="muted" style="max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(shortLoc(o))+'</td><td class="muted" style="max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(detailCell(o))+'</td><td style="text-align:right">'+prioChip(o)+'</td></tr>').join('')+'</table>';
+  document.getElementById('orgTable').innerHTML='<table>'+hdr('name','Organization')+hdr('status','Stage / Status')+'<th>Type</th><th>Contact</th>'+hdr('lastc','Last contact')+'<th>Address</th><th>Detail</th><th style="text-align:right">Priority</th>'+rows.map(o=>'<tr class="rowlink" data-click="openRec|'+o.id+'|$e"><td>'+starHtml(o)+' <b>'+esc(dispName(o))+'</b></td><td>'+statusSel(o)+'</td><td class="muted">'+esc(typeShort(o))+'</td><td class="muted">'+esc(o.contact||orgPeople(o).map(p=>p.name).join(', ')||'-')+'</td><td class="muted">'+fmtAgo(lastTouch(o))+'</td><td class="muted" style="max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(shortLoc(o))+'</td><td class="muted" style="max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(detailCell(o))+'</td><td style="text-align:right">'+prioChip(o)+'</td></tr>').join('')+'</table>';
 }
 export function sortOrgs(k){if(sortK===k)sortD*=-1;else{sortK=k;sortD=k==='name'?1:-1}renderOrgs()}
 export function setStatusInline(id,val){

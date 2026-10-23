@@ -44,12 +44,12 @@ function fieldSpecs(r){
 const getVal=(r,s)=>s.get?s.get(r):r[s.key];
 function display(r,s){
   const v=getVal(r,s);
-  if(v===null||v===undefined||v==='')return '<span class="muted">–</span>';
+  if(v===null||v===undefined||v==='')return '<span class="muted">-</span>';
   if(s.type==='date')return esc(fmtDe(v));
   if(s.type==='number')return esc(n1(v)===''?String(v):n1(v));
   if(s.key==='stage')return stagePill(v);
-  if(s.key==='domain'||s.key==='linkedin'){const u=/^https?:/.test(v)?v:'https://'+v;return '<a href="'+esc(u)+'" target="_blank" onclick="event.stopPropagation()">'+esc(v)+'</a>'}
-  if(s.key==='email')return '<a href="mailto:'+esc(v)+'" onclick="event.stopPropagation()">'+esc(v)+'</a>';
+  if(s.key==='domain'||s.key==='linkedin'){const u=/^https?:/.test(v)?v:'https://'+v;return '<a href="'+esc(u)+'" target="_blank" data-click="!">'+esc(v)+'</a>'}
+  if(s.key==='email')return '<a href="mailto:'+esc(v)+'" data-click="!">'+esc(v)+'</a>';
   return esc(fixUml(String(v))).replace(/\n/g,'<br>');
 }
 function fieldHtml(r,s){return '<div class="rf" data-f="'+s.key+'"><label>'+esc(s.label)+'</label><div class="rfv" tabindex="0" title="Click to edit">'+display(r,s)+'</div></div>'}
@@ -116,20 +116,20 @@ export function renderRecordPage(){
     +details
     +(isT?'<div class="pbox"><h4>Letter and cadence</h4>'+letterBox(r)+'</div>':'')
     +'<div class="pbox"><h4>Lists</h4>'+listChips(r)+'</div>'
-    +(isP?'':'<div class="pbox"><h4>People <button class="sm" onclick="addPersonToOrg()">+ Add</button></h4>'+peopleBoxHtml(r,ppl)+'</div>')
-    +'<div class="pbox"><h4>Files <button class="sm" onclick="addLink()">+ Link</button></h4>'+filesHtml(r)+'</div>'
-    +(isT?'<details class="pbox"><summary style="font-size:11px;color:var(--deep);text-transform:uppercase;letter-spacing:.4px;cursor:pointer;font-weight:700">Deal maths</summary><div class="pgrid" style="margin-top:6px">'+fld('dm_e','EBITDA (€m)',r.ebitda,'number')+fld('dm_m','Multiple',6,'number')+fld('dm_d','Debt %',60,'number')+fld('dm_r','Interest rate %',5,'number')+fld('dm_t','Tenor (yrs)',7,'number')+'</div><button class="sm primary" onclick="calcMaths()" style="margin-top:6px">Calculate</button><div id="dm_out" style="margin-top:8px"></div></details>':'')
+    +(isP?'':'<div class="pbox"><h4>People <button class="sm" data-click="addPersonToOrg">+ Add</button></h4>'+peopleBoxHtml(r,ppl)+'</div>')
+    +'<div class="pbox"><h4>Files <button class="sm" data-click="addLink">+ Link</button></h4>'+filesHtml(r)+'</div>'
+    +(isT?'<details class="pbox"><summary style="font-size:11px;color:var(--deep);text-transform:uppercase;letter-spacing:.4px;cursor:pointer;font-weight:700">Deal maths</summary><div class="pgrid" style="margin-top:6px">'+fld('dm_e','EBITDA (€m)',r.ebitda,'number')+fld('dm_m','Multiple',6,'number')+fld('dm_d','Debt %',60,'number')+fld('dm_r','Interest rate %',5,'number')+fld('dm_t','Tenor (yrs)',7,'number')+'</div><button class="sm primary" data-click="calcMaths" style="margin-top:6px">Calculate</button><div id="dm_out" style="margin-top:8px"></div></details>':'')
     +'</div><div class="rec-r">'
     +promisesHtml(r)
     +wrapUpHtml(r)
-    +'<div class="pbox"><h4>'+(isT?'Shared with':'Names you gave them')+(isT?' <button class="sm" onclick="addShare()">+ Add</button>':'')+'</h4>'+shareHtml(r)+'</div>'
-    +'<div class="pbox"><h4>Log activity</h4><div class="inline">'+selFld('la_type','Type',ACT_TYPES,'Call')+fld('la_date','Date',today(),'date')+fld('la_txt','Subject','')+'</div><label>Note</label><textarea id="la_note" rows="2"></textarea><div class="inline" style="margin-top:4px">'+fld('la_owe','I promised (becomes an open promise)','')+fld('la_owe_by','By',addDays(today(),3),'date')+'</div><button class="sm primary" onclick="logActivity()" style="margin-top:4px">Log</button></div>'
+    +'<div class="pbox"><h4>'+(isT?'Shared with':'Names you gave them')+(isT?' <button class="sm" data-click="addShare">+ Add</button>':'')+'</h4>'+shareHtml(r)+'</div>'
+    +'<div class="pbox"><h4>Log activity</h4><div class="inline">'+selFld('la_type','Type',ACT_TYPES,'Call')+fld('la_date','Date',today(),'date')+fld('la_txt','Subject','')+'</div><label>Note</label><textarea id="la_note" rows="2"></textarea><div class="inline" style="margin-top:4px">'+fld('la_owe','I promised (becomes an open promise)','')+fld('la_owe_by','By',addDays(today(),3),'date')+'</div><button class="sm primary" data-click="logActivity" style="margin-top:4px">Log</button></div>'
     +'<div class="pbox"><h4>Activity timeline <span class="muted" style="font-weight:400">'+Object.keys(r.touches||{}).length+' activities</span></h4>'
-      +'<div class="tl-ctl">Period: <select onchange="setTlPeriod(+this.value)"><option value="13"'+(tlPeriod===13?' selected':'')+'>13 weeks</option><option value="26"'+(tlPeriod===26?' selected':'')+'>26 weeks</option><option value="52"'+(tlPeriod===52?' selected':'')+'>52 weeks</option></select> '
-      +Object.keys(tlTypes).map(ty=>'<label><input type="checkbox" '+(tlTypes[ty]?'checked':'')+' onchange="toggleTlType(\''+ty+'\',this.checked)"> '+ty+'</label>').join(' ')
+      +'<div class="tl-ctl">Period: <select data-change="setTlPeriod|$vn"><option value="13"'+(tlPeriod===13?' selected':'')+'>13 weeks</option><option value="26"'+(tlPeriod===26?' selected':'')+'>26 weeks</option><option value="52"'+(tlPeriod===52?' selected':'')+'>52 weeks</option></select> '
+      +Object.keys(tlTypes).map(ty=>'<label><input type="checkbox" '+(tlTypes[ty]?'checked':'')+' data-change="toggleTlType|'+ty+'|$c"> '+ty+'</label>').join(' ')
       +'</div><div style="height:160px"><canvas id="profTl"></canvas></div></div>'
     +'<div class="pbox"><h4>Contact history</h4>'+tlHtml(r)+'</div>'
-    +'<div class="pbox rec-danger"><h4>Danger zone</h4><button onclick="deleteRec()" style="border-color:var(--red);color:var(--red)">Delete this record</button></div>'
+    +'<div class="pbox rec-danger"><h4>Danger zone</h4><button data-click="deleteRec" style="border-color:var(--red);color:var(--red)">Delete this record</button></div>'
     +'</div></div>';
   drawTimeline(r);
 }
@@ -230,7 +230,7 @@ export function tlHtml(r){
   const legend='<div style="font-size:10px;color:#595959;margin-bottom:6px;line-height:1.6"><span style="color:#2E3C65">●</span> Email sent &nbsp;<span style="color:#C6943E">●</span> Email received &nbsp;<span style="color:#008A3E">●</span> Meeting/Granola &nbsp;<span style="color:#7030A0">●</span> Call &nbsp;<span style="color:#8C97B8">●</span> Note/other</div>';
   return legend+'<div class="timeline">'+ts.slice(0,30).map(t=>{
     const k=Object.keys(r.touches||{}).find(k=>(r.touches||{})[k]===t);
-    return '<div class="titem t'+tType(t)+(t.dir==='out'?' out':'')+'"><b>'+fmtD(t.date)+'</b> '+(t.link?'<a href="'+esc(t.link)+'" target="_blank" title="Open original">'+esc(fixUml(t.subject))+'</a>':esc(fixUml(t.subject)))+' <span class="chip">'+esc(srcLabel(t))+'</span>'+(t.who?' <span class="muted">— '+esc(fixUml(t.who))+'</span>':'')+(t.link?' <a href="'+esc(t.link)+'" target="_blank">↗</a>':'')+(k?'<br><button class="sm" onclick="editNote(\''+r.id+'\',\''+k+'\')">Note</button>':'')+(t.note?'<div class="tnote">'+esc(fixUml(t.note))+'</div>':(t.prev?'<div class="tnote">'+esc(fixUml(cleanPrev(t.prev,400)))+'</div>':''))+'</div>'
+    return '<div class="titem t'+tType(t)+(t.dir==='out'?' out':'')+'"><b>'+fmtD(t.date)+'</b> '+(t.link?'<a href="'+esc(t.link)+'" target="_blank" title="Open original">'+esc(fixUml(t.subject))+'</a>':esc(fixUml(t.subject)))+' <span class="chip">'+esc(srcLabel(t))+'</span>'+(t.who?' <span class="muted">- '+esc(fixUml(t.who))+'</span>':'')+(t.link?' <a href="'+esc(t.link)+'" target="_blank">↗</a>':'')+(k?'<br><button class="sm" data-click="editNote|'+r.id+'|'+k+'">Note</button>':'')+(t.note?'<div class="tnote">'+esc(fixUml(t.note))+'</div>':(t.prev?'<div class="tnote">'+esc(fixUml(cleanPrev(t.prev,400)))+'</div>':''))+'</div>'
   }).join('')+'</div>';
 }
 export async function editNote(recId,key){
@@ -240,7 +240,7 @@ export async function editNote(recId,key){
 }
 export function filesHtml(r){
   let h='';
-  (r.links||[]).forEach((l,i)=>{h+='<div style="margin-bottom:4px"><a href="'+esc(l.url)+'" target="_blank">'+esc(l.title)+'</a> <button class="sm" onclick="profRec.links.splice('+i+',1);save();renderRecordPage()">×</button></div>'});
+  (r.links||[]).forEach((l,i)=>{h+='<div style="margin-bottom:4px"><a href="'+esc(l.url)+'" target="_blank">'+esc(l.title)+'</a> <button class="sm" data-click="removeLink|#'+i+'">×</button></div>'});
   (r.driveFiles||[]).forEach(f=>{h+='<div style="margin-bottom:4px"><a href="'+esc(f.link)+'" target="_blank">'+esc(f.name)+'</a> <span class="muted">'+esc(f.type||'')+'</span></div>'});
   const _seen=new Set();
   touchList(r).forEach(t=>{(t.att||[]).forEach(n=>{if(_seen.has(n))return;_seen.add(n);h+='<div style="margin-bottom:4px">📎 '+esc(n)+' <span class="muted">'+fmtD(t.date)+(t.dir==='out'?' · sent':' · received')+'</span>'+(t.link?' <a href="'+esc(t.link)+'" target="_blank">↗</a>':'')+'</div>'})});
@@ -251,7 +251,7 @@ export function filesHtml(r){
   return h||'<span class="muted">No files linked</span>';
 }
 export async function addLink(){const v=await openDialog({title:'Add a link',fields:[{key:'t',label:'Title',required:true},{key:'u',label:'URL',placeholder:'https://',required:true}],ok:'Add'});if(!v)return;const t=v.t.trim(),u=v.u.trim();profRec.links=profRec.links||[];profRec.links.push({title:t,url:u});ensureInState(profRec);save();renderRecordPage()}
-export function listChips(r){return '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px;align-items:start">'+(S.customLists||[]).map(l=>'<label style="font-size:11px;display:flex;align-items:flex-start;gap:5px;text-transform:none;margin:0;line-height:1.3"><input type="checkbox" style="margin:0" '+(((r.lists||[]).includes(l))?'checked':'')+' onchange="toggleList(\''+r.id+'\',\''+esc(l)+'\',this.checked)"> '+esc(l)+'</label>').join('')+'</div>'}
+export function listChips(r){return '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px;align-items:start">'+(S.customLists||[]).map(l=>'<label style="font-size:11px;display:flex;align-items:flex-start;gap:5px;text-transform:none;margin:0;line-height:1.3"><input type="checkbox" style="margin:0" '+(((r.lists||[]).includes(l))?'checked':'')+' data-change="toggleList|'+r.id+'|'+esc(l)+'|$c"> '+esc(l)+'</label>').join('')+'</div>'}
 export function toggleList(id,l,on){const r=findRec(id)||profRec;if(!r)return;r.lists=r.lists||[];if(on&&!r.lists.includes(l))r.lists.push(l);if(!on)r.lists=r.lists.filter(x=>x!==l);ensureInState(r);save()}
 
 export let tlPeriod=13,tlTypes={Email:true,Meeting:true,Call:true,Note:true,Letter:true};
@@ -320,9 +320,9 @@ export function peopleBoxHtml(rec,ppl){
   const rest=ppl.filter(p=>p!==prim);
   let out='';
   if(prim){
-    out+='<div style="margin-bottom:6px;cursor:pointer" onclick="openProfile(findRec(\''+prim.id+'\'))"><b>'+esc(fixUml(prim.name))+'</b> <span class="chip">primary</span>'
+    out+='<div style="margin-bottom:6px;cursor:pointer" data-click="openRec|'+prim.id+'|$e"><b>'+esc(fixUml(prim.name))+'</b> <span class="chip">primary</span>'
       +(prim.title?'<div class="muted" style="font-size:11px">'+esc(prim.title)+'</div>':'')
-      +(prim.email?'<div style="font-size:11px"><a href="mailto:'+esc(prim.email)+'" onclick="event.stopPropagation()">'+esc(prim.email)+'</a></div>':'')
+      +(prim.email?'<div style="font-size:11px"><a href="mailto:'+esc(prim.email)+'" data-click="!">'+esc(prim.email)+'</a></div>':'')
       +(prim.phone?'<div class="muted" style="font-size:11px">'+esc(prim.phone)+'</div>':'')+'</div>';
   } else if(rec.contact){
     out+='<div style="margin-bottom:6px"><b>'+esc(fixUml(rec.contact))+'</b> <span class="chip">primary</span>'
@@ -332,7 +332,7 @@ export function peopleBoxHtml(rec,ppl){
   if(rest.length){
     out+=(out?'<div style="border-top:1px solid #E8E8EC;margin:6px 0 5px"></div>':'')
       +'<div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959;margin-bottom:3px">Also here ('+rest.length+')</div>'
-      +rest.map(p=>'<div style="font-size:11px;margin-bottom:2px;cursor:pointer" onclick="openProfile(findRec(\''+p.id+'\'))"><b>'+esc(fixUml(p.name))+'</b>'+(p.email?' <span class="muted">'+esc(p.email)+'</span>':'')+(p.title?' <span class="muted">'+esc(p.title.slice(0,40))+'</span>':'')+'</div>').join('');
+      +rest.map(p=>'<div style="font-size:11px;margin-bottom:2px;cursor:pointer" data-click="openRec|'+p.id+'|$e"><b>'+esc(fixUml(p.name))+'</b>'+(p.email?' <span class="muted">'+esc(p.email)+'</span>':'')+(p.title?' <span class="muted">'+esc(p.title.slice(0,40))+'</span>':'')+'</div>').join('');
   }
   return out||'<span class="muted">No people linked</span>';
 }
@@ -361,3 +361,4 @@ export function calcMaths(){
   const col=dscr>=1.5?'var(--green)':dscr>=1.2?'#8a6d00':'var(--red)';
   el.innerHTML='<div class="dm-kpi"><b>€'+ev.toFixed(1)+'m</b><span>Enterprise value</span></div><div class="dm-kpi"><b>€'+eq.toFixed(1)+'m</b><span>Equity check</span></div><div class="dm-kpi"><b>€'+debt.toFixed(1)+'m</b><span>Debt</span></div><div class="dm-kpi"><b>€'+svc.toFixed(2)+'m/yr</b><span>Debt service</span></div><div class="dm-kpi"><b style="color:'+col+'">'+dscr.toFixed(2)+'x</b><span>DSCR</span></div>';
 }
+export function removeLink(i){if(!profRec||!profRec.links)return;profRec.links.splice(i,1);save();renderRecordPage()}

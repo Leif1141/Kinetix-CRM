@@ -23,7 +23,7 @@
   <div class="auth-box">
     <h1>Kinetix Deal CRM</h1>
     <p>Sign in to access the shared deal pipeline</p>
-    <button class="primary" onclick="signIn()" id="signInBtn">Sign in with Google</button>
+    <button class="primary" data-click="signIn" id="signInBtn">Sign in with Google</button>
     <p class="muted" style="font-size:11px;margin-top:16px" id="authError"></p>
   </div>
 </div>
@@ -32,24 +32,24 @@
 <div class="wrap">
 <header>
   <h1>Kinetix Deal CRM</h1>
-  <button class="sm hdr-menu" id="hdrMenu" onclick="document.body.classList.toggle('hdr-open')">Menu</button>
+  <button class="sm hdr-menu" id="hdrMenu" data-click="toggleBodyClass|hdr-open">Menu</button>
   <div class="hdr-right">
     <span id="userName" class="muted"></span>
     <span id="syncStatus" class="muted">Not synced yet</span>
-    <button id="undoBtn" onclick="undoLast()" style="display:none" title="Undo last change (Ctrl+Z)">Undo</button>
-    <button class="primary" id="btnSync" onclick="syncEmails()">Sync</button>
-    <button id="btnUpd" onclick="checkDriveUpdates(false)">Updates</button>
-    <button class="conn-toggle" onclick="document.body.classList.toggle('show-conn')">Connections</button>
-    <button onclick="signOut()" style="border-color:var(--gray);color:var(--gray)">Sign out</button>
+    <button id="undoBtn" data-click="undoLast" style="display:none" title="Undo last change (Ctrl+Z)">Undo</button>
+    <button class="primary" id="btnSync" data-click="syncEmails">Sync</button>
+    <button id="btnUpd" data-click="checkDriveUpdates|#0">Updates</button>
+    <button class="conn-toggle" data-click="toggleBodyClass|show-conn">Connections</button>
+    <button data-click="signOut" style="border-color:var(--gray);color:var(--gray)">Sign out</button>
   </div>
 </header>
 
 <div class="settings-bar" id="connBar">
   <span style="font-weight:600;color:var(--deep)">Connections:</span>
   <span id="outlookConn" class="conn-status off">Outlook: not connected</span>
-  <button class="sm" onclick="connectOutlook()">Connect Outlook</button>
+  <button class="sm" data-click="connectOutlook">Connect Outlook</button>
   <span id="gmailConn" class="conn-status off">Drive: not connected</span>
-  <button class="sm" onclick="connectGmail()">Connect Drive</button>
+  <button class="sm" data-click="connectGmail">Connect Drive</button>
 </div>
 
 <div class="tabs" id="tabs">
@@ -67,8 +67,8 @@
 
 <div class="panel active" id="p-home">
   <div class="filterbar" style="margin-bottom:10px">
-    <input id="gSearch" placeholder="Search everything: organisations, people, contacts, emails (Ctrl+K)" oninput="renderGlobalSearch()" style="flex:1;min-width:260px">
-    <button class="sm" onclick="document.getElementById('gSearch').value='';renderGlobalSearch()">Clear</button>
+    <input id="gSearch" placeholder="Search everything: organisations, people, contacts, emails (Ctrl+K)" data-input="renderGlobalSearch" style="flex:1;min-width:260px">
+    <button class="sm" data-click="clearField|gSearch|renderGlobalSearch">Clear</button>
   </div>
   <div class="section" id="gSearchWrap" style="display:none"><div class="section-hdr">Search results <span id="gCount" style="font-weight:400;font-size:11px"></span></div><div id="gSearchBody"></div></div>
   <div class="home-grid">
@@ -85,11 +85,11 @@
 
 <div class="panel" id="p-orgs">
   <div class="filterbar">
-    <input id="oSearch" placeholder="Search organizations..." oninput="renderOrgs()">
-    <select id="oKind" onchange="renderOrgs()"><option value="">All kinds</option><option value="target">Targets</option><option value="advisor">Advisors / network</option></select>
-    <select id="oStage" onchange="renderOrgs()"><option value="">All stages / statuses</option></select>
-    <select id="oList" onchange="renderOrgs()"><option value="">All lists</option><option value="__fav">★ Favorites</option></select>
-    <select class="sm" onchange="if(this.value==='t')openProfile(newCompany());else if(this.value==='a')openProfile(newAdvisor());this.value=''"><option value="">+ Add…</option><option value="t">Target company</option><option value="a">Advisor / partner</option></select>
+    <input id="oSearch" placeholder="Search organizations..." data-input="renderOrgs">
+    <select id="oKind" data-change="renderOrgs"><option value="">All kinds</option><option value="target">Targets</option><option value="advisor">Advisors / network</option></select>
+    <select id="oStage" data-change="renderOrgs"><option value="">All stages / statuses</option></select>
+    <select id="oList" data-change="renderOrgs"><option value="">All lists</option><option value="__fav">★ Favorites</option></select>
+    <select class="sm" data-change="newFromSelect|$el"><option value="">+ Add…</option><option value="t">Target company</option><option value="a">Advisor / partner</option></select>
     <span class="muted" id="oCount"></span>
   </div>
   <div class="section" id="orgTable"></div>
@@ -97,11 +97,11 @@
 
 <div class="panel" id="p-people">
   <div class="filterbar">
-    <input id="pSearch" placeholder="Search people..." oninput="renderPeople()">
+    <input id="pSearch" placeholder="Search people..." data-input="renderPeople">
     <span id="pGroups" style="display:flex;gap:4px;flex-wrap:wrap"></span>
-    <select id="pType" onchange="renderPeople()"><option value="">All types</option></select>
-    <select id="pHas" onchange="renderPeople()"><option value="">Any</option><option value="email">Has email</option><option value="linkedin">Has LinkedIn</option><option value="path">Has network path</option><option value="touch">Has contact history</option></select>
-    <button class="sm" onclick="openProfile(newPerson())">+ Person</button>
+    <select id="pType" data-change="renderPeople"><option value="">All types</option></select>
+    <select id="pHas" data-change="renderPeople"><option value="">Any</option><option value="email">Has email</option><option value="linkedin">Has LinkedIn</option><option value="path">Has network path</option><option value="touch">Has contact history</option></select>
+    <button class="sm" data-click="newRecord|person">+ Person</button>
     <span class="muted" id="pCount"></span>
   </div>
   <div class="section" id="peopleTable"></div>
@@ -110,11 +110,11 @@
 <div class="panel" id="p-pipeline">
   <div class="kpis" id="pipeKpis"></div>
   <div class="filterbar">
-    <button class="sm vbtn" data-v="board" onclick="setPipeView('board')">Board</button><button class="sm vbtn" data-v="focus" onclick="setPipeView('focus')">List</button><button class="sm vbtn" data-v="channel" onclick="setPipeView('channel')">Channels</button>
-    <input id="fSearch" placeholder="Search companies (name, location, contact)..." oninput="renderPipeline()" style="flex:1;min-width:360px;font-size:14px;padding:6px 10px">
-    <select id="fChan" onchange="renderPipeline()"><option value="">All channels</option></select>
-    <label style="font-size:12px"><input type="checkbox" id="fFav" onchange="renderPipeline()"> Starred only</label>
-    <button class="sm" onclick="toggleWide()" id="wideBtn">Wide view</button>
+    <button class="sm vbtn" data-v="board" data-click="setPipeView|board">Board</button><button class="sm vbtn" data-v="focus" data-click="setPipeView|focus">List</button><button class="sm vbtn" data-v="channel" data-click="setPipeView|channel">Channels</button>
+    <input id="fSearch" placeholder="Search companies (name, location, contact)..." data-input="renderPipeline" style="flex:1;min-width:360px;font-size:14px;padding:6px 10px">
+    <select id="fChan" data-change="renderPipeline"><option value="">All channels</option></select>
+    <label style="font-size:12px"><input type="checkbox" id="fFav" data-change="renderPipeline"> Starred only</label>
+    <button class="sm" data-click="toggleWide" id="wideBtn">Wide view</button>
   </div>
   <div id="pipeBody"></div>
 </div>
@@ -124,16 +124,16 @@
 <div class="panel" id="p-threads">
   <div class="kpis" id="thKpis"></div>
   <div class="filterbar">
-    <button class="sm th-f on" data-f="open" onclick="thGo('open')">All open</button>
-    <button class="sm th-f" data-f="leif" onclick="thGo('leif')">My move</button>
-    <button class="sm th-f" data-f="them" onclick="thGo('them')">Their move</button>
-    <button class="sm th-f" data-f="hoch" onclick="thGo('hoch')">High priority only</button>
-    <button class="sm th-f" data-f="all" onclick="thGo('all')">All</button>
-    <input id="thSearch" placeholder="Search..." oninput="renderThreads()" style="flex:1;min-width:160px">
-    <select id="thCat" onchange="renderThreads()"><option value="">All categories</option></select>
-    <label style="font-size:12px"><input type="checkbox" id="thHideDone" onchange="renderThreads()"> Hide ticked</label>
-    <label style="font-size:12px" title="Items whose CRM record already carries a next-action date are on the Today tab"><input type="checkbox" id="thHideSched" checked onchange="renderThreads()"> Hide items scheduled on Today</label>
-    <button class="sm" onclick="thToggleAll()" id="thAllBtn">All details</button>
+    <button class="sm th-f on" data-f="open" data-click="thGo|open">All open</button>
+    <button class="sm th-f" data-f="leif" data-click="thGo|leif">My move</button>
+    <button class="sm th-f" data-f="them" data-click="thGo|them">Their move</button>
+    <button class="sm th-f" data-f="hoch" data-click="thGo|hoch">High priority only</button>
+    <button class="sm th-f" data-f="all" data-click="thGo|all">All</button>
+    <input id="thSearch" placeholder="Search..." data-input="renderThreads" style="flex:1;min-width:160px">
+    <select id="thCat" data-change="renderThreads"><option value="">All categories</option></select>
+    <label style="font-size:12px"><input type="checkbox" id="thHideDone" data-change="renderThreads"> Hide ticked</label>
+    <label style="font-size:12px" title="Items whose CRM record already carries a next-action date are on the Today tab"><input type="checkbox" id="thHideSched" checked data-change="renderThreads"> Hide items scheduled on Today</label>
+    <button class="sm" data-click="thToggleAll" id="thAllBtn">All details</button>
     <span class="muted" id="thCount"></span>
   </div>
   <div class="note muted" style="padding:0 2px 8px;font-size:11px">Mail threads from the CRM, snapshot of 15.09.2026 (187 counterparties). Click a tile or a filter. Recommendation and draft were prepared by Claude; status, ticks and notes are saved in the CRM.</div>
@@ -141,14 +141,14 @@
 </div>
 
 <div class="panel" id="p-inbox">
-  <div class="note muted" style="padding:8px 2px">Emails (Outlook + Gmail) pulled on sync. Matched items log automatically to the person AND their organization. Assign unmatched senders once — future items auto-match.</div>
+  <div class="note muted" style="padding:8px 2px">Outlook emails and Granola call notes are pulled on sync. Matched items log automatically to the person and their organization. Assign an unmatched sender once and later items match on their own.</div>
   <div id="inboxBody"></div>
 </div>
 
 <div class="panel" id="p-reports">
   <div class="kpis" id="repKpis"></div>
   <div class="section"><div class="section-hdr">Where the time is paying off <span style="font-weight:400;font-size:11px">last 90 days &middot; sourcing yield by channel and by partner</span></div><div id="yieldBody"></div></div>
-  <div class="section"><div class="section-hdr">Weekly digest<button class="sm" style="background:#fff" id="dig_btn" onclick="weeklyDigest()">Generate</button></div><div id="dig_out" style="padding:10px 12px;font-size:12px;white-space:pre-wrap;color:var(--gray)">Click Generate for a summary of the last 14 days, computed from the CRM.</div></div>
+  <div class="section"><div class="section-hdr">Weekly digest<button class="sm" style="background:#fff" id="dig_btn" data-click="weeklyDigest">Generate</button></div><div id="dig_out" style="padding:10px 12px;font-size:12px;white-space:pre-wrap;color:var(--gray)">Click Generate for a summary of the last 14 days, computed from the CRM.</div></div>
   <div class="charts">
     <div class="chartbox"><h4>Owner funnel (live deals by stage)</h4><canvas id="chFunnel"></canvas></div>
     <div class="chartbox"><h4>Targets approached per week <span class="muted" style="font-weight:400">(first outbound contact, target line 10)</span></h4><canvas id="chActivity"></canvas></div>
@@ -160,17 +160,17 @@
 
 <div class="panel" id="p-locations">
   <div class="filterbar">
-    <select id="locKind" onchange="renderLocations()"><option value="">Everyone</option><option value="advisor">Advisors</option><option value="person">Contacts without firm record</option><option value="target">Targets</option></select>
-    <button class="sm" onclick="geocodeMissing()">Geocode new cities</button>
+    <select id="locKind" data-change="renderLocations"><option value="">Everyone</option><option value="advisor">Advisors</option><option value="person">Contacts without firm record</option><option value="target">Targets</option></select>
+    <button class="sm" data-click="geocodeMissing">Geocode new cities</button>
     <span class="muted" id="locCount"></span>
   </div>
   <div id="locMap" style="height:440px;border:1px solid var(--lgray);border-radius:5px;margin-bottom:14px"></div>
   <div class="section" style="margin-bottom:14px"><div class="section-hdr">Nearby: who sits within reach</div>
     <div style="padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <span>Place</span><input id="locNear" placeholder="e.g. Bonn" style="width:170px" onkeydown="if(event.key==='Enter')nearbyBriefing()">
+      <span>Place</span><input id="locNear" placeholder="e.g. Bonn" style="width:170px" data-enter="nearbyBriefing">
       <span>Radius</span><input id="locKm" type="number" value="75" style="width:64px"> <span>km</span>
-      <button class="sm" onclick="nearbyBriefing()">Show</button>
-      <button class="sm" onclick="copyBriefing()">Copy as text</button>
+      <button class="sm" data-click="nearbyBriefing">Show</button>
+      <button class="sm" data-click="copyBriefing">Copy as text</button>
       <label style="font-size:12px"><input type="checkbox" id="locOnlyOpen"> only with an open item</label>
     </div>
     <div id="locNearOut"></div>
@@ -190,11 +190,11 @@
     <div style="padding:12px">
       <p id="dataInfo" class="muted" style="margin-bottom:8px"></p>
       <div id="archInfo" style="margin-bottom:10px;padding:8px;background:#F4F5F9;border:1px solid var(--lgray);border-radius:4px"></div>
-      <button onclick="exportJSON()">Export full state (.json)</button>
-      <button id="importBtn" style="display:none" onclick="document.getElementById('importFile2').click()" title="Replaces the whole CRM for both users">Import (.json)</button>
-      <input type="file" id="importFile2" accept=".json" style="display:none" onchange="importJSON(event)">
-      <button onclick="document.getElementById('patchFile').click()">Apply Claude patch (.json)</button>
-      <input type="file" id="patchFile" accept=".json" style="display:none" onchange="applyPatchFile(event)">
+      <button data-click="exportJSON">Export full state (.json)</button>
+      <button id="importBtn" style="display:none" data-click="clickEl|importFile2" title="Replaces the whole CRM for both users">Import (.json)</button>
+      <input type="file" id="importFile2" accept=".json" style="display:none" data-change="importJSON|$e">
+      <button data-click="clickEl|patchFile">Apply Claude patch (.json)</button>
+      <input type="file" id="patchFile" accept=".json" style="display:none" data-change="applyPatchFile|$e">
     </div>
   </div>
 </div>

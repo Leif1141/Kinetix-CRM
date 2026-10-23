@@ -16,6 +16,6 @@ export function renderData(){
   const ael=document.getElementById('archInfo');
   // Deliberately says nothing about what is archived or why: this screen is visible to everyone with access.
   if(ael)ael.innerHTML=S.showArchived
-    ? '<label style="font-size:11px;display:inline-flex;align-items:center;gap:5px;text-transform:none"><input type="checkbox" checked onchange="toggleArchived(this.checked)"> Archive visible</label> <button class="sm" onclick="restoreArchived()">Restore all</button>'
-    : '<label style="font-size:11px;display:inline-flex;align-items:center;gap:5px;text-transform:none"><input type="checkbox" onchange="toggleArchived(this.checked)"> Archive visible</label>';
+    ? '<label style="font-size:11px;display:inline-flex;align-items:center;gap:5px;text-transform:none"><input type="checkbox" checked data-change="toggleArchived|$c"> Archive visible</label> <button class="sm" data-click="restoreArchived">Restore all</button>'
+    : '<label style="font-size:11px;display:inline-flex;align-items:center;gap:5px;text-transform:none"><input type="checkbox" data-change="toggleArchived|$c"> Archive visible</label>';
 }
