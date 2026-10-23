@@ -6,6 +6,15 @@ if(params.get('check')==='1')window.addEventListener('load',()=>setTimeout(run,1
 
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 async function until(fn,ms=8000){const t0=Date.now();while(Date.now()-t0<ms){try{if(fn())return true}catch(e){}await wait(50)}return false}
+// Fill the open in-page dialog (by data-key) and press its OK button, or Cancel when values is null.
+async function answerDialog(values,ms=3000){
+  const t0=Date.now();let el;
+  while(!(el=document.getElementById('kxDialog'))&&Date.now()-t0<ms)await wait(20);
+  if(!el)throw new Error('no dialog appeared');
+  if(values===null){el.querySelector('[data-dlg="cancel"]').click();return}
+  for(const [k,v] of Object.entries(values||{})){const x=el.querySelector('[data-key="'+k+'"]');if(!x)throw new Error('dialog has no field '+k);x.value=v}
+  el.querySelector('[data-dlg="ok"]').click();
+}
 function median(fn,n=5){const ts=[];for(let i=0;i<n;i++){const t0=performance.now();fn();ts.push(performance.now()-t0)}ts.sort((a,b)=>a-b);return ts[Math.floor(n/2)]}
 
 async function run(){
@@ -44,11 +53,20 @@ async function run(){
   // step 2: no reset, import gated
   await t('Reset to seed is gone',()=>{if(typeof window.resetData!=='undefined')return 'resetData still defined';return ![...document.querySelectorAll('#p-data button')].some(b=>/reset/i.test(b.textContent))||'reset button still on the Data tab'});
   await t('Import only for the owner',async()=>{const ex=await import('/src/store/export.js');if(ex.canImport('tommy@kinetix-industries.com')||ex.canImport('leif@kinetixcap.com'))return 'others may import';if(!ex.canImport('leif.berger26@gmail.com'))return 'owner may not import';await tab('data');const vis=document.getElementById('importBtn').style.display!=='none';await tab('home');return vis===ex.canImport(currentUser.email)||'button visibility wrong for '+currentUser.email});
-  await t('Import without REPLACE changes nothing',async()=>{const ex=await import('/src/store/export.js');const clicks=[];const oc=HTMLAnchorElement.prototype.click;HTMLAnchorElement.prototype.click=function(){clicks.push(this.download)};const op=window.prompt;window.prompt=()=>'replace';const n0=window.__writes.length;const c0=S.companies.length;let r;try{r=ex.importParsed({companies:[],advisors:[],people:[]},'empty.json')}finally{window.prompt=op;HTMLAnchorElement.prototype.click=oc}if(r!==false)return 'import went ahead';if(S.companies.length!==c0||window.__writes.length!==n0)return 'state or store changed';return clicks.length===1||'expected one backup download, got '+clicks.length});
-  await t('Import refuses a file without the CRM shape',async()=>{const ex=await import('/src/store/export.js');const op=window.prompt;let asked=false;window.prompt=()=>{asked=true;return 'REPLACE'};let r;try{r=ex.importParsed({foo:1},'x.json')}finally{window.prompt=op}return (r===false&&!asked)||'accepted or asked'});
   // step 3: seed data loads on demand
   await t('seed modules are not loaded with live data',()=>{const r=performance.getEntriesByType('resource').filter(e=>/\/src\/(seed|data\/threads-seed)\.js/.test(e.name));return !r.length||'loaded: '+r.map(e=>e.name.split('/src/')[1]).join(', ')});
   await t('JavaScript loaded at start under 330 KB',()=>{const kb=performance.getEntriesByType('resource').filter(e=>/\/src\/.*\.js/.test(e.name)&&!/seed/.test(e.name)).reduce((n,e)=>n+(e.decodedBodySize||0),0)/1024;return kb<330||Math.round(kb)+' KB'});
+  await t('Import without REPLACE changes nothing',async()=>{const ex=await import('/src/store/export.js');const clicks=[];const oc=HTMLAnchorElement.prototype.click;HTMLAnchorElement.prototype.click=function(){clicks.push(this.download)};const n0=window.__writes.length;const c0=S.companies.length;let r;try{const pr=ex.importParsed({companies:[],advisors:[],people:[]},'empty.json');await answerDialog({word:'replace'});r=await pr}finally{HTMLAnchorElement.prototype.click=oc}if(r!==false)return 'import went ahead';if(S.companies.length!==c0||window.__writes.length!==n0)return 'state or store changed';return clicks.length===1||'expected one backup download, got '+clicks.length});
+  await t('Import refuses a file without the CRM shape',async()=>{const ex=await import('/src/store/export.js');const r=await ex.importParsed({foo:1},'x.json');return (r===false&&!document.getElementById('kxDialog'))||'accepted or asked'});
+  // step 4: in-page dialog instead of prompt() and confirm()
+  await t('no prompt() or confirm() left in the loaded modules',async()=>{const urls=[...new Set(performance.getEntriesByType('resource').map(e=>e.name).filter(n=>/\/src\/.*\.js/.test(n)))];const bad=[];for(const u of urls){const txt=await (await fetch(u)).text();const code=txt.replace(/\/\/[^\n]*/g,'');if(/(^|[^\w.])(prompt|confirm)\(/.test(code))bad.push(u.split('/src/')[1])}return !bad.length||'found in '+bad.join(', ')});
+  await t('dialog: Set action from a row',async()=>{const r=allRecs().find(x=>x.nextDate);const p=quickSetAction(r.id);await answerDialog({a:'Harness next step',d:'2026-11-20'});await p;return (r.nextAction==='Harness next step'&&r.nextDate==='2026-11-20')||'got '+r.nextAction+' / '+r.nextDate});
+  await t('dialog: required field blocks saving',async()=>{const r=allRecs().find(x=>x.nextDate);const before=r.nextAction;const p=quickSetAction(r.id);await answerDialog({a:'  '});await wait(50);const el=document.getElementById('kxDialog');const msg=el&&el.querySelector('.dlg-err').textContent;el&&el.querySelector('[data-dlg="cancel"]').click();await p;return (msg&&/required/.test(msg)&&r.nextAction===before)||'no error shown or value changed'});
+  await t('dialog: put on hold sets reason and revisit date',async()=>{await tab('pipeline');const c=S.companies.find(x=>x.stage==='Contacted');const p=pipeSetStage(c.id,'On hold');await answerDialog({why:'Harness hold',rv:'2027-04-01'});await p;await tab('home');return (c.stage==='On hold'&&c.deadReason==='Harness hold'&&c.revisitDate==='2027-04-01')||c.stage+' / '+c.deadReason+' / '+c.revisitDate});
+  await t('dialog: cancelled pass keeps the stage',async()=>{const c=S.companies.find(x=>x.stage==='Contacted');const p=pipeSetStage(c.id,'Dead');await answerDialog(null);await p;return c.stage==='Contacted'||'stage is '+c.stage});
+  await t('dialog: letter sent records date and partner',async()=>{const c=S.companies.find(x=>x.stage==='Identified'&&!x.letterSent);const p=markLetterSent(c.id);await answerDialog({d:'2026-10-20',via:'Rettig Family Capital'});await p;return (c.letterSent==='2026-10-20'&&c.channelVia==='Rettig Family Capital'&&c.stage==='Contacted')||c.letterSent+' / '+c.channelVia+' / '+c.stage});
+  await t('dialog: Escape closes the dialog, not the record page',async()=>{const r=S.companies.find(x=>x.stage==='Contacted');openProfile(r);await wait(150);const p=deleteRec();await wait(50);const el=document.getElementById('kxDialog');el.querySelector('[data-dlg="ok"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await p;const open=document.body.classList.contains('rec-open'),still=!!findRec(r.id);closeProfile();await wait(50);return (open&&still&&!document.getElementById('kxDialog'))||'record page open '+open+', record kept '+still});
+  await t('dialog fits a 375 px screen',async()=>{const p=quickSetAction(allRecs()[0].id);await wait(50);const box=document.querySelector('#kxDialog .dlg-box');const css=getComputedStyle(box);const ok=css.maxWidth==='100%'&&box.getBoundingClientRect().width<=window.innerWidth;await answerDialog(null);await p;return ok||'box '+Math.round(box.getBoundingClientRect().width)+' px, max-width '+css.maxWidth});
   for(const fn of (window.__extraChecks||[]))await fn(t);
   finish();
 

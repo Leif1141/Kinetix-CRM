@@ -1,3 +1,4 @@
+import {openDialog, confirmDialog} from './dialog.js';
 import {invalidateThreads} from '../views/threads.js';
 import {ACT_TYPES, ADV_CATS, ADV_STATUS, CHANNELS, DEADREASONS, PRIORITIES, PTYPES, STAGES, VERDICTS} from '../constants.js';
 import {S, addTouch, chanOf, deadCatOf, dispName, findRec, fixUml, isSysNote, newPerson, orgPeople, personOrg, splitPhones, tType, touchList, lastTouch} from '../state.js';
@@ -232,10 +233,10 @@ export function tlHtml(r){
     return '<div class="titem t'+tType(t)+(t.dir==='out'?' out':'')+'"><b>'+fmtD(t.date)+'</b> '+(t.link?'<a href="'+esc(t.link)+'" target="_blank" title="Open original">'+esc(fixUml(t.subject))+'</a>':esc(fixUml(t.subject)))+' <span class="chip">'+esc(srcLabel(t))+'</span>'+(t.who?' <span class="muted">— '+esc(fixUml(t.who))+'</span>':'')+(t.link?' <a href="'+esc(t.link)+'" target="_blank">↗</a>':'')+(k?'<br><button class="sm" onclick="editNote(\''+r.id+'\',\''+k+'\')">Note</button>':'')+(t.note?'<div class="tnote">'+esc(fixUml(t.note))+'</div>':(t.prev?'<div class="tnote">'+esc(fixUml(cleanPrev(t.prev,400)))+'</div>':''))+'</div>'
   }).join('')+'</div>';
 }
-export function editNote(recId,key){
+export async function editNote(recId,key){
   const r=findRec(recId);const t=(r.touches||{})[key];if(!t)return;
-  const n=prompt('Note for: '+t.subject,t.note||'');
-  if(n!==null){t.note=n;save();if(profRec)renderRecordPage()}
+  const v=await openDialog({title:'Note',text:t.subject||'',fields:[{key:'n',label:'Note',type:'textarea',rows:4,value:t.note||''}]});
+  if(v){t.note=v.n;save();if(profRec)renderRecordPage()}
 }
 export function filesHtml(r){
   let h='';
@@ -249,7 +250,7 @@ export function filesHtml(r){
   }
   return h||'<span class="muted">No files linked</span>';
 }
-export function addLink(){const t=prompt('Link title:');if(!t)return;const u=prompt('URL:');if(!u)return;profRec.links=profRec.links||[];profRec.links.push({title:t,url:u});ensureInState(profRec);save();renderRecordPage()}
+export async function addLink(){const v=await openDialog({title:'Add a link',fields:[{key:'t',label:'Title',required:true},{key:'u',label:'URL',placeholder:'https://',required:true}],ok:'Add'});if(!v)return;const t=v.t.trim(),u=v.u.trim();profRec.links=profRec.links||[];profRec.links.push({title:t,url:u});ensureInState(profRec);save();renderRecordPage()}
 export function listChips(r){return '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px;align-items:start">'+(S.customLists||[]).map(l=>'<label style="font-size:11px;display:flex;align-items:flex-start;gap:5px;text-transform:none;margin:0;line-height:1.3"><input type="checkbox" style="margin:0" '+(((r.lists||[]).includes(l))?'checked':'')+' onchange="toggleList(\''+r.id+'\',\''+esc(l)+'\',this.checked)"> '+esc(l)+'</label>').join('')+'</div>'}
 export function toggleList(id,l,on){const r=findRec(id)||profRec;if(!r)return;r.lists=r.lists||[];if(on&&!r.lists.includes(l))r.lists.push(l);if(!on)r.lists=r.lists.filter(x=>x!==l);ensureInState(r);save()}
 
@@ -305,9 +306,9 @@ export function wrapUpHtml(r){
 }
 export function setTlPeriod(w){tlPeriod=w;drawTimeline(profRec)}
 export function toggleTlType(ty,on){tlTypes[ty]=on;drawTimeline(profRec)}
-export function deleteRec(){
+export async function deleteRec(){
   const r=profRec;if(!r)return;
-  if(!confirm('Delete '+dispName(r)+'?'))return;
+  if(!(await confirmDialog('The record and its contact history are removed for both users. Undo can bring it back.',{title:'Delete '+dispName(r)+'?',ok:'Delete',danger:true})))return;
   S.companies=(S.companies||[]).filter(c=>c.id!==r.id);
   S.advisors=(S.advisors||[]).filter(a=>a.id!==r.id);
   S.people=(S.people||[]).filter(p=>p.id!==r.id);

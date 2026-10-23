@@ -1,3 +1,4 @@
+import {openDialog, confirmDialog} from './dialog.js';
 import {CAD_LABEL} from '../constants.js';
 import {S, dismissSugg, dispName, findRec} from '../state.js';
 import {addDays, fmtDe, toast, today, uid} from '../util.js';
@@ -24,16 +25,14 @@ export function completeAction(id,ev){
   if(S.dismissed)delete S.dismissed['due_'+r.id];
   save();renderAll();toast('Logged as done');
 }
-export function quickSetAction(id,ev){
+export async function quickSetAction(id,ev){
   if(ev)ev.stopPropagation();
   const r=findRec(id);if(!r)return;
-  const a=prompt('Next action for '+dispName(r)+':',r.nextAction||'');
-  if(a===null||!a.trim())return;
-  const d=new Date();d.setDate(d.getDate()+7);const def=d.toISOString().slice(0,10);
-  const dt=prompt('Due date (YYYY-MM-DD):',def);
-  if(dt===null)return;
-  r.nextAction=a.trim();
-  r.nextDate=/^\d{4}-\d{2}-\d{2}$/.test((dt||'').trim())?dt.trim():def;
+  const def=addDays(today(),7);
+  const v=await openDialog({title:'Next action',text:dispName(r),fields:[{key:'a',label:'Next action',type:'textarea',value:r.nextAction||'',required:true},{key:'d',label:'Due',type:'date',value:r.nextDate||def}],ok:'Set'});
+  if(!v)return;
+  r.nextAction=v.a.trim();
+  r.nextDate=/^\d{4}-\d{2}-\d{2}$/.test((v.d||'').trim())?v.d.trim():def;
   r.nextSet=today();
   save();renderAll();
 }

@@ -398,3 +398,16 @@ details.pbox>summary::-webkit-details-marker{display:none}
   #locMap{height:300px}
   .inbox-item{flex-wrap:wrap}
 }
+
+/* ---- Dialog (replaces prompt and confirm) ---- */
+.dlg{position:fixed;inset:0;background:rgba(17,33,73,.35);z-index:6500;display:flex;align-items:flex-start;justify-content:center;padding:12vh 12px 12px}
+.dlg-box{width:440px;max-width:100%;background:#fff;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,.3);padding:14px 16px;box-sizing:border-box;max-height:80vh;overflow-y:auto}
+.dlg-title{font-size:14px;font-weight:700;color:var(--deep);margin-bottom:6px}
+.dlg-text{font-size:12px;white-space:pre-wrap;margin-bottom:8px}
+.dlg-fields label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.3px;color:#000;margin:8px 0 2px}
+.dlg-fields input,.dlg-fields select,.dlg-fields textarea{width:100%;box-sizing:border-box;font:13px Arial;padding:6px 8px;border:1px solid var(--lgray);border-radius:4px}
+.dlg-err{color:var(--red);font-size:11px;min-height:14px;margin-top:6px}
+.dlg-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+.dlg-btns button{padding:6px 14px;font-size:12px}
+button.dlg-danger{background:var(--red);border-color:var(--red)}
+@media(max-width:720px){.dlg{padding-top:6vh}.dlg-fields input,.dlg-fields select,.dlg-fields textarea{font-size:16px}}

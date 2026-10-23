@@ -1,3 +1,4 @@
+import {openDialog, confirmDialog} from './views/dialog.js';
 import {S, dispName, findRec, fixUml, isSysNote, liveOnly, touchList} from './state.js';
 import {esc, fmtD, foldSearch, normName, toast, today} from './util.js';
 import {openProfile, profRec, renderRecordPage} from './views/record.js';
@@ -65,16 +66,18 @@ export function shareHtml(rec){
   if(!names.length)return '<div class="muted" style="font-size:11px">You have not given them any names yet.</div>';
   return names.map(x=>'<div style="font-size:11px;margin-bottom:2px">'+(x.e.date?'<span class="muted">'+fmtD(x.e.date)+'</span> ':'')+'<b style="cursor:pointer" onclick="openProfile(findRec(\''+x.c.id+'\'))">'+esc(fixUml(dispName(x.c)))+'</b> <span class="muted">'+esc(x.c.stage||'')+'</span>'+(sharesFor(x.c).length>1?' <span class="chip" style="background:#C6943E;color:#fff">also with '+(sharesFor(x.c).length-1)+'</span>':'')+'</div>').join('');
 }
-export function addShare(){
+export async function addShare(){
   const rec=profRec;if(!rec||rec.kind!=='target')return;
-  const who=prompt('Which partner did you give '+dispName(rec)+' to? Type part of their name:');
-  if(!who)return;
-  const q=foldSearch(who);
-  const hits=[...(S.advisors||[]),...(S.people||[])].filter(r=>searchHay(r).includes(q));
+  const pool=[...(S.advisors||[]),...(S.people||[])];
+  const v=await openDialog({title:'Shared with a partner',text:'Who did you give '+dispName(rec)+' to?',fields:[{key:'who',label:'Partner (name or part of it)',list:pool.map(dispName).filter(Boolean),required:true},{key:'date',label:'Date shared',type:'date',value:today()}],ok:'Record'});
+  if(!v)return;
+  const who=v.who.trim(),q=foldSearch(who);
+  let hits=pool.filter(r=>foldSearch(dispName(r)||'')===q);if(!hits.length)hits=pool.filter(r=>searchHay(r).includes(q));
   if(!hits.length){toast('No match for "'+who+'"');return}
-  const pick=hits.length===1?hits[0]:hits[Math.max(0,(+prompt(hits.map((h,i)=>i+': '+dispName(h)).join('\n')+'\n\nNumber:','0')||0))];
+  let pick=hits[0];
+  if(hits.length>1){const w=await openDialog({title:'Several matches',text:hits.length+' records match "'+who+'".',fields:[{key:'i',label:'Partner',type:'select',options:hits.slice(0,60).map((h,i)=>({value:String(i),label:dispName(h)+(h.kind==='person'&&h.firm?' ('+h.firm+')':'')}))}],ok:'Use'});if(!w)return;pick=hits[+w.i]}
   if(!pick)return;
-  const d=prompt('Date shared (YYYY-MM-DD):',today())||today();
+  const d=/^\d{4}-\d{2}-\d{2}$/.test(v.date||'')?v.date:today();
   rec.sharedWith=rec.sharedWith||[];
   rec.sharedWith.push({recId:pick.id,date:d,note:'recorded by hand'});
   _shareIdx=null;save();renderRecordPage();

@@ -1,3 +1,4 @@
+import {openDialog, confirmDialog} from './dialog.js';
 import {S, allRecs, dispName, findRec, fixUml, lastTouch, orgTouches, rawRecs} from '../state.js';
 import {daysAgo, esc, fmtAgo, fmtD, toast, today} from '../util.js';
 import {dueChip, prioChip} from './ui.js';
@@ -60,7 +61,7 @@ export function thToggle(id,ev){
   save();renderThreads();
 }
 export function thSetV(id,v){S.threadsState=S.threadsState||{};const st=S.threadsState[id]||{};const t=THREADS_LIVE().find(x=>x.id===id);if(v===t.v)delete st.v;else st.v=v;S.threadsState[id]=st;save();renderThreads();toast('Status: '+TH_V[v])}
-export function thNote(id){S.threadsState=S.threadsState||{};const st=S.threadsState[id]||{};const n=prompt('Note on this thread:',st.note||'');if(n===null)return;if(n.trim()){st.note=n.trim();st.noteDate=today()}else{delete st.note;delete st.noteDate}S.threadsState[id]=st;save();renderThreads()}
+export async function thNote(id){S.threadsState=S.threadsState||{};const st=S.threadsState[id]||{};const v=await openDialog({title:'Note on this item',fields:[{key:'n',label:'Note',type:'textarea',rows:4,value:st.note||''}]});if(!v)return;const n=v.n;if(n.trim()){st.note=n.trim();st.noteDate=today()}else{delete st.note;delete st.noteDate}S.threadsState[id]=st;save();renderThreads()}
 export function thAdopt(id,ev){if(ev)ev.stopPropagation();const t=THREADS_LIVE().find(x=>x.id===id);const r=t&&thRec(t);if(!r||!t.a)return;
   r.nextAction=t.a;if(t.due){const m=/^(\d\d)\.(\d\d)\.(\d\d)$/.exec(t.due);if(m)r.nextDate='20'+m[3]+'-'+m[2]+'-'+m[1]}
   r.priority=t.p==='Hoch'?'High':(t.p==='Mittel'?'Medium':(r.priority||''));r.nextSet=today();

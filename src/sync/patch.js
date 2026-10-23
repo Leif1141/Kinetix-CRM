@@ -1,3 +1,4 @@
+import {openDialog, confirmDialog} from '../views/dialog.js';
 import {S, addTouch, allRecs, dispName, findRec, newAdvisor, newCompany, newPerson, splitPhones} from '../state.js';
 import {STAGES} from '../constants.js';
 import {autoThread, invalidateThreads, seedThreads} from '../views/threads.js';
@@ -111,11 +112,11 @@ export function applyPatchObj(p,name,force){
 export function applyPatchFile(ev){
   const f=ev.target.files[0];if(!f)return;
   const rd=new FileReader();
-  rd.onload=e=>{
+  rd.onload=async e=>{
     try{
       const p=JSON.parse(e.target.result);
       let force=true;
-      if((S.appliedPatchTitles||{})[f.name]){if(!confirm(f.name+' was already applied on '+S.appliedPatchTitles[f.name]+'. Apply again anyway?')){ev.target.value='';return}}
+      if((S.appliedPatchTitles||{})[f.name]&&!(await confirmDialog(f.name+' was already applied on '+S.appliedPatchTitles[f.name]+'.',{title:'Apply again?',ok:'Apply again'}))){ev.target.value='';return}
       const r=applyPatchObj(p,f.name,force);
       save();renderAll();
       toast(r.made+' updates applied from '+f.name+(r.skipped?' ('+r.skipped+' skipped)':''));

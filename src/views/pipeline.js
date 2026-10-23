@@ -1,3 +1,4 @@
+import {openDialog, confirmDialog} from './dialog.js';
 import {ACTIVE_STAGES, BOARD_COLS, CHANNELS, CH_DE, LETTER_TARGET_WEEK, LIVE, LS_DE, STAGES, ST_DE} from '../constants.js';
 import {S, addTouch, cadenceOf, chanOf, dispName, findRec, fixUml, isDue, lastTouch, tType, touchList} from '../state.js';
 import {addDays, daysAgo, daysBetween, esc, fmtDe, fmtM, toast, today, uid, weekStart} from '../util.js';
@@ -35,11 +36,12 @@ export function letterBox(rec){
 }
 export function setLetterStatus(id,v){const r=findRec(id);if(!r)return;r.letterStatus=r.letterStatus===v?'':v;save();if(profRec&&profRec.id===id)renderRecordPage();renderAll()}
 export function toggleLetterReady(id){setLetterStatus(id,'ready')}
-export function markLetterSent(id){
+export async function markLetterSent(id){
   const r=findRec(id);if(!r)return;
-  const d=prompt('Date the letter was sent (YYYY-MM-DD):',today());if(d===null)return;
-  const dt=/^\d{4}-\d{2}-\d{2}$/.test(d.trim())?d.trim():today();
-  const via=prompt('Sent via (leave empty for an own letter, otherwise e.g. Rettig Family Capital):',r.channel==='Partner letter'?(r.channelVia||''):'');if(via===null)return;
+  const v=await openDialog({title:'Letter sent',text:dispName(r),fields:[{key:'d',label:'Date sent',type:'date',value:today()},{key:'via',label:'Sent via (empty for an own letter)',placeholder:'e.g. Rettig Family Capital',value:r.channel==='Partner letter'?(r.channelVia||''):'',list:(S.advisors||[]).map(a=>a.firm).filter(Boolean)}],ok:'Record letter'});
+  if(!v)return;
+  const dt=/^\d{4}-\d{2}-\d{2}$/.test((v.d||'').trim())?v.d.trim():today();
+  const via=(v.via||'').trim();
   const first=!r.letterSent;
   addTouch(r,'letter_'+dt+'_'+uid(),{date:dt+'T12:00:00Z',dir:'out',src:'Letter',subject:(first?'Erstbrief':'Folgebrief')+(via?' über '+via:''),who:r.contact||'',note:''});
   if(first){r.letterSent=dt;if(!r.channel||!CHANNELS.includes(r.channel))r.channel=via?'Partner letter':'Own letter';if(via)r.channelVia=via}
@@ -48,10 +50,11 @@ export function markLetterSent(id){
   if(r.stage==='Identified'){r.stage='Contacted';r.stageLog=r.stageLog||[];r.stageLog.push({stage:'Contacted',date:dt})}
   save();if(profRec&&profRec.id===id)renderRecordPage();renderAll();toast('Letter recorded, cadence running');
 }
-export function pipeSetStage(id,ns){
+export async function pipeSetStage(id,ns){
   const r=findRec(id);if(!r||ns===r.stage)return;
-  if(ns==='Dead'){const why=prompt('Reason for passing (one sentence):',r.deadReason||'');if(why===null)return;r.deadReason=why.trim()}
-  if(ns==='On hold'){const why=prompt('Reason for putting on hold:',r.deadReason||'');if(why===null)return;r.deadReason=why.trim();const rv=prompt('Revisit date (YYYY-MM-DD):',r.revisitDate||addDays(today(),180));if(rv!==null&&/^\d{4}-\d{2}-\d{2}$/.test(rv.trim()))r.revisitDate=rv.trim()}
+  // a cancelled dialog re-renders, so a stage dropdown snaps back to the stored stage
+  if(ns==='Dead'){const v=await openDialog({title:'Pass on '+dispName(r),fields:[{key:'why',label:'Reason (one sentence)',type:'textarea',rows:2,value:r.deadReason||''}],ok:'Pass'});if(!v){renderAll();return}r.deadReason=v.why.trim()}
+  if(ns==='On hold'){const v=await openDialog({title:'Put '+dispName(r)+' on hold',fields:[{key:'why',label:'Reason',type:'textarea',rows:2,value:r.deadReason||''},{key:'rv',label:'Revisit date',type:'date',value:r.revisitDate||addDays(today(),180)}],ok:'Put on hold'});if(!v){renderAll();return}r.deadReason=v.why.trim();if(/^\d{4}-\d{2}-\d{2}$/.test((v.rv||'').trim()))r.revisitDate=v.rv.trim()}
   r.stage=ns;r.stageLog=r.stageLog||[];r.stageLog.push({stage:ns,date:today()});
   save();renderAll();toast(fixUml(dispName(r))+' → '+(ST_DE[ns]||ns));
 }

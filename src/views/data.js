@@ -1,4 +1,5 @@
-import {S, allOrgs, isArch, liveOnly, rawRecs} from '../state.js';
+import {openDialog, confirmDialog} from './dialog.js';
+import {S, allOrgs, isArch, liveOnly, rawRecs, unarchiveAll} from '../state.js';
 import {stateRef, legacyMode, currentUser} from '../store/firebase.js';
 import {canImport} from '../store/export.js';
 
@@ -6,6 +7,7 @@ import {canImport} from '../store/export.js';
 // ═══════════════════════════════════════════════════════════════
 // RENDER: DATA
 // ═══════════════════════════════════════════════════════════════
+export async function restoreArchived(){if(await confirmDialog('Every archived record becomes visible again in all views.',{title:'Restore all archived records?',ok:'Restore all'}))unarchiveAll()}
 export function renderData(){
   const el=document.getElementById('dataInfo');
   const arch=rawRecs().filter(isArch);
@@ -14,6 +16,6 @@ export function renderData(){
   const ael=document.getElementById('archInfo');
   // Deliberately says nothing about what is archived or why: this screen is visible to everyone with access.
   if(ael)ael.innerHTML=S.showArchived
-    ? '<label style="font-size:11px;display:inline-flex;align-items:center;gap:5px;text-transform:none"><input type="checkbox" checked onchange="toggleArchived(this.checked)"> Archive visible</label> <button class="sm" onclick="if(confirm(\'Restore everything currently archived?\'))unarchiveAll()">Restore all</button>'
+    ? '<label style="font-size:11px;display:inline-flex;align-items:center;gap:5px;text-transform:none"><input type="checkbox" checked onchange="toggleArchived(this.checked)"> Archive visible</label> <button class="sm" onclick="restoreArchived()">Restore all</button>'
     : '<label style="font-size:11px;display:inline-flex;align-items:center;gap:5px;text-transform:none"><input type="checkbox" onchange="toggleArchived(this.checked)"> Archive visible</label>';
 }
