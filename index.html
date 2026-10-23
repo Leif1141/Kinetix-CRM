@@ -191,11 +191,10 @@
       <p id="dataInfo" class="muted" style="margin-bottom:8px"></p>
       <div id="archInfo" style="margin-bottom:10px;padding:8px;background:#F4F5F9;border:1px solid var(--lgray);border-radius:4px"></div>
       <button onclick="exportJSON()">Export full state (.json)</button>
-      <button onclick="document.getElementById('importFile2').click()">Import (.json)</button>
+      <button id="importBtn" style="display:none" onclick="document.getElementById('importFile2').click()" title="Replaces the whole CRM for both users">Import (.json)</button>
       <input type="file" id="importFile2" accept=".json" style="display:none" onchange="importJSON(event)">
       <button onclick="document.getElementById('patchFile').click()">Apply Claude patch (.json)</button>
       <input type="file" id="patchFile" accept=".json" style="display:none" onchange="applyPatchFile(event)">
-      <button onclick="resetData()" style="border-color:var(--red);color:var(--red)">Reset to seed data</button>
     </div>
   </div>
 </div>
