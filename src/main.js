@@ -19,7 +19,6 @@ import {renderPeople} from './views/people.js';
 import {renderPipeline} from './views/pipeline.js';
 import {renderReports, renderYield} from './views/reports.js';
 import * as _m0 from './config.js';
-import * as _m1 from './seed.js';
 import * as _m2 from './constants.js';
 import * as _m3 from './state.js';
 import * as _m4 from './store/firebase.js';
@@ -42,7 +41,6 @@ import * as _m20 from './views/search.js';
 import * as _m21 from './views/lists.js';
 import * as _m22 from './views/pipeline.js';
 import * as _m23 from './views/actions.js';
-import * as _m24 from './data/threads-seed.js';
 import * as _m25 from './views/threads.js';
 import * as _m26 from './views/inbox.js';
 import * as _m27 from './views/data.js';
@@ -53,7 +51,7 @@ import * as _m31 from './views/map.js';
 import * as _m32 from './views/dash.js';
 // Compatibility layer: the markup still uses inline onclick handlers, so every module export is reachable as a
 // window property (live getter, read-only). New views use addEventListener and do not need this.
-const _mods=[_m0, _m1, _m2, _m3, _m4, _m5, _m6, _m7, _m8, _m9, _m10, _m11, _m12, _m13, _m14, _m15, _m16, _m17, _m18, _m19, _m20, _m21, _m22, _m23, _m24, _m25, _m26, _m27, _m28, _m29, _m30, _m31, _m32];
+const _mods=[_m0, _m2, _m3, _m4, _m5, _m6, _m7, _m8, _m9, _m10, _m11, _m12, _m13, _m14, _m15, _m16, _m17, _m18, _m19, _m20, _m21, _m22, _m23, _m25, _m26, _m27, _m28, _m29, _m30, _m31, _m32];
 function _expose(ns){for(const k of Object.keys(ns)){try{Object.defineProperty(window,k,{get:()=>ns[k],configurable:true})}catch(e){console.warn('expose',k,e)}}}
 _mods.forEach(_expose);
 _expose({goTab,renderAll,renderView,updateBadges,viewIsStale,activeView});

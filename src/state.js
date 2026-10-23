@@ -1,5 +1,4 @@
 import {CAD_STEPS, CHANNELS, CH_MAP, DEADREASONS, STAGE_ALIAS, STALE_DAYS, VERDICTS} from './constants.js';
-import {SEED} from './seed.js';
 import {addDays, daysAgo, daysBetween, normName, toast, today, uid} from './util.js';
 import {renderAll} from './main.js';
 import {save} from './store/firebase.js';
@@ -25,18 +24,20 @@ export function seedAdvisor(a){return {id:uid(),kind:'advisor',firm:a.firm,conta
 export function seedCompany(t){return {id:uid(),kind:'target',name:t.company,geo:t.geo,revenue:t.revenue_eurm?+t.revenue_eurm:null,ebitda:t.ebitda_eurm?+t.ebitda_eurm:null,ebit:t.ebit_eurm?+t.ebit_eurm:null,gm:t.gross_margin?+t.gross_margin:null,description:t.description||'',ownership:t.ownership||'',flag:t.flag||'',stage:t.status==='Dead'?'Dead':t.status==='Active'?'Contacted':'Identified',channel:'',deadReason:'',revisitDate:'',stageLog:[{stage:'Identified',date:today()}],fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:'',links:[],location:t.location||''}}
 export function seedPerson(p,orgId){return {id:uid(),kind:'person',name:p.name,title:p.title||'',firm:p.firm||'',orgId:orgId||'',email:p.email||'',phone:p.phone||'',mobile:p.mobile||'',linkedin:p.linkedin||'',city:p.city||'',market:p.market||'',ptype:p.ptype||p.source||'',angle:p.angle||'',networkPath:p.networkPath||'',fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:''}}
 export function orgByFirm(f){const nf=normName(f);if(!nf)return null;return S.companies.find(c=>normName(c.name)===nf||normName(c.description||'').includes(nf))||S.advisors.find(a=>normName(a.firm)===nf)}
-export function buildPeople(){
+export function buildPeople(SEED){
   const people=[];
   SEED.people.forEach(p=>{const org=orgByFirm(p.firm);people.push(seedPerson(p,org?org.id:''))});
   return people;
 }
 
-export function buildInitialState(){
+// Only for an empty database: the 165 KB seed module loads on demand.
+export async function buildInitialState(){
+  const {SEED}=await import('./seed.js');
   const companies=SEED.targets.map(seedCompany);
   const advisors=SEED.advisors.map(seedAdvisor);
   const st={seedVer:3,companies,advisors,people:[],unmatched:[],customLists:[],dismissed:{},senderMap:{},lastSync:null};
   S=st;
-  st.people=buildPeople();
+  st.people=buildPeople(SEED);
   return st;
 }
 

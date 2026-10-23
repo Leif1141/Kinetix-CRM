@@ -1,5 +1,4 @@
 import {S, allRecs, dispName, findRec, fixUml, lastTouch, orgTouches, rawRecs} from '../state.js';
-import {THREADS_SEED} from '../data/threads-seed.js';
 import {daysAgo, esc, fmtAgo, fmtD, toast, today} from '../util.js';
 import {dueChip, prioChip} from './ui.js';
 import {logDone} from './actions.js';
@@ -14,7 +13,11 @@ export const TH_HDR={OPEN_LEIF:'var(--navy)',OPEN_THEM:'#6B7AAF',CLOSED:'var(--g
 export let thFilt='open', thOpenIds=new Set(), thDraftIds=new Set(), thAllOpen=false;
 // Live thread list: the seeded snapshot (recommendations, drafts) plus every record with recent
 // activity that the snapshot does not know. Verdict and days-quiet come from the CRM, not the snapshot.
-export function seedThreads(){if(!S.threads||!Array.isArray(S.threads)||!S.threads.length){S.threads=JSON.parse(JSON.stringify(THREADS_SEED))}}
+// The thread snapshot of 15.09.2026 (128 KB) seeds an empty thread list. It loads on demand: ensureThreadSeed()
+// runs at start-up when the list is empty, so seedThreads() can stay synchronous for patches and renders.
+let THREADS_SEED=null;
+export async function ensureThreadSeed(){if(!THREADS_SEED)THREADS_SEED=(await import('../data/threads-seed.js')).THREADS_SEED;seedThreads()}
+export function seedThreads(){if(THREADS_SEED&&(!S.threads||!Array.isArray(S.threads)||!S.threads.length)){S.threads=JSON.parse(JSON.stringify(THREADS_SEED))}}
 export function autoThread(r){
   return {id:r.id,name:fixUml(dispName(r)),contact:r.kind==='person'?'':(r.contact||''),email:r.email||'',v:'',p:(r.priority==='Urgent'||r.priority==='High')?'Hoch':(r.priority==='Medium'?'Mittel':'Niedrig'),cat:r.kind==='target'?'Targets':(r.category||''),auto:true};
 }

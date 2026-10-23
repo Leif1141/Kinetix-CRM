@@ -4,7 +4,7 @@ import {S, buildInitialState, setS, findRec} from '../state.js';
 import {autoConnect, setGmailToken} from '../sync/google.js';
 import {renderAll} from '../main.js';
 import {toast} from '../util.js';
-import {invalidateThreads} from '../views/threads.js';
+import {invalidateThreads, ensureThreadSeed} from '../views/threads.js';
 import {shard, unshard, diffTree, encodeKeys, decodeKeys, encodePath, decodeKey, stableStringify, isLegacyBlob, ensureDefaults, REC_COLLS, DASH_LIST_NAMES, DASH_LISTS, META_MAPS, isObj, listFromKeyed} from './shards.js';
 
 // ═══════════════════════════════════════════════════════════════
@@ -69,7 +69,7 @@ export async function startListening(){
   let data;
   try{data=(await stateRef.once('value')).val()}catch(e){toast('Database read failed: '+e.message);console.error(e);return}
   if(!data){
-    setS(ensureDefaults(buildInitialState()));
+    setS(ensureDefaults(await buildInitialState()));
     lastTree=shard(S);
     await stateRef.set(encodeKeys(lastTree));
   }else if(isLegacyBlob(data)){
@@ -84,6 +84,7 @@ export async function startListening(){
     lastTree=decodeKeys(data);
     setS(ensureDefaults(unshard(clone(lastTree))));
   }
+  if(!S.threads||!S.threads.length){try{await ensureThreadSeed()}catch(e){console.warn('thread seed',e)}}
   renderAll();
   attachListeners();
 }
