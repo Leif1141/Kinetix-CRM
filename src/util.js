@@ -13,7 +13,9 @@ export function fmtM(v){return (v===''||v===null||v===undefined||isNaN(v))?'-':N
 export function fmtD(d){if(!d)return '—';return new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}
 export function fmtAgo(d){if(!d)return '—';const n=daysAgo(d);return n===0?'today':n===1?'1 day ago':n<31?n+' days ago':n<365?Math.floor(n/30)+'mo ago':Math.floor(n/365)+'y ago'}
 export function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2800)}
-export function normName(s){return (s||'').toLowerCase().replace(/[().,&\/\-–']/g,' ').replace(LEGAL,' ').replace(/\s+/g,' ').trim()}
+// pure, so the result is memoised per input string (bounded)
+const _nn=new Map();
+export function normName(s){s=s||'';let v=_nn.get(s);if(v===undefined){v=s.toLowerCase().replace(/[().,&\/\-–']/g,' ').replace(LEGAL,' ').replace(/\s+/g,' ').trim();if(_nn.size>20000)_nn.clear();_nn.set(s,v)}return v}
 export function nameTokens(s){return normName(s).split(' ').filter(w=>w.length>=4)}
 
 // ═══════════════════════════════════════════════════════════════

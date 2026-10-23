@@ -21,14 +21,15 @@ export function suggestions(){
   suggestionsRaw().filter(s=>!isDismissed(s.key)&&!isIgnoredRec(s.rec)).forEach(s=>{const g=byRec.get(s.rec.id);if(!g){s.also=[];byRec.set(s.rec.id,s)}else{g.also.push(s)}});
   return [...byRec.values()];
 }
-export function suggestionsRaw(){
+export function suggestionsRaw(only){
   const out=[];const t=today();
-  (S.companies||[]).forEach(c=>{const cd=cadenceOf(c);if(cd&&cd.next&&cd.next.due<=t)out.push({rec:c,why:'Letter of '+fmtDe(cd.sent)+': '+cd.next.label+' now'+(cd.via?' (via '+cd.via+')':''),tag:'Cadence',color:'#B86E1B',key:'cdz_'+c.id+'_'+cd.next.k})});
-  allRecs().filter(r=>r.nextDate&&r.nextDate<=t).forEach(r=>{out.push({rec:r,why:'Due: '+(r.nextAction||'follow up'),tag:'Due',color:'var(--red)',key:'due_'+r.id})});
-  S.companies.filter(c=>LIVE.includes(c.stage)&&c.stage!=='Identified'&&isStale(c)).forEach(c=>{out.push({rec:c,why:c.stage+' for '+daysAgo(lastTouch(c)||(c.stageLog?.slice(-1)[0]?.date)||null)+'d with no activity',tag:'Stale',color:'#C6943E',key:'stale_'+c.id})});
-  liveOnly(S.advisors||[]).filter(a=>{const lt=lastTouch(a);return lt&&daysAgo(lt)>(a.cadence||30)}).forEach(a=>{out.push({rec:a,why:'Last contact '+daysAgo(lastTouch(a))+' days ago (rhythm '+(a.cadence||30)+' days)',tag:'Check-in',color:'var(--navy)',key:'cad_'+a.id})});
-  S.companies.filter(c=>c.stage==='Dead'&&c.revisitDate&&c.revisitDate<=t).forEach(c=>{out.push({rec:c,why:'Revisit date reached: approach again or move the date',tag:'Revisit',color:'var(--green)',key:'rev_'+c.id})});
-  allRecs().filter(r=>r.nextAction&&r.nextSet&&lastTouch(r)&&lastTouch(r).slice(0,10)>r.nextSet).forEach(r=>{out.push({rec:r,why:'Next step may be overtaken, there has been activity since. Current: "'+r.nextAction+'"',tag:'Overtaken',color:'#7030A0',key:'ovt_'+r.id+'_'+lastTouch(r).slice(0,10)})});
+  const pick=a=>only?a.filter(r=>r===only):a;
+  pick(S.companies||[]).forEach(c=>{const cd=cadenceOf(c);if(cd&&cd.next&&cd.next.due<=t)out.push({rec:c,why:'Letter of '+fmtDe(cd.sent)+': '+cd.next.label+' now'+(cd.via?' (via '+cd.via+')':''),tag:'Cadence',color:'#B86E1B',key:'cdz_'+c.id+'_'+cd.next.k})});
+  pick(allRecs()).filter(r=>r.nextDate&&r.nextDate<=t).forEach(r=>{out.push({rec:r,why:'Due: '+(r.nextAction||'follow up'),tag:'Due',color:'var(--red)',key:'due_'+r.id})});
+  pick(S.companies).filter(c=>LIVE.includes(c.stage)&&c.stage!=='Identified'&&isStale(c)).forEach(c=>{out.push({rec:c,why:c.stage+' for '+daysAgo(lastTouch(c)||(c.stageLog?.slice(-1)[0]?.date)||null)+'d with no activity',tag:'Stale',color:'#C6943E',key:'stale_'+c.id})});
+  pick(liveOnly(S.advisors||[])).filter(a=>{const lt=lastTouch(a);return lt&&daysAgo(lt)>(a.cadence||30)}).forEach(a=>{out.push({rec:a,why:'Last contact '+daysAgo(lastTouch(a))+' days ago (rhythm '+(a.cadence||30)+' days)',tag:'Check-in',color:'var(--navy)',key:'cad_'+a.id})});
+  pick(S.companies).filter(c=>c.stage==='Dead'&&c.revisitDate&&c.revisitDate<=t).forEach(c=>{out.push({rec:c,why:'Revisit date reached: approach again or move the date',tag:'Revisit',color:'var(--green)',key:'rev_'+c.id})});
+  pick(allRecs()).filter(r=>r.nextAction&&r.nextSet&&lastTouch(r)&&lastTouch(r).slice(0,10)>r.nextSet).forEach(r=>{out.push({rec:r,why:'Next step may be overtaken, there has been activity since. Current: "'+r.nextAction+'"',tag:'Overtaken',color:'#7030A0',key:'ovt_'+r.id+'_'+lastTouch(r).slice(0,10)})});
   return out;
 }
 
@@ -122,6 +123,7 @@ function rowHtml(it){
     +'<div class="q-last muted">'+(lastTouch(r)?fmtDe(lastTouch(r)):'-')+'</div>'
     +'</div>';
 }
+export function homeUrgentCount(){return buildQueue().filter(i=>['overdue','promise','due','cadence'].includes(i.kind)).length}
 export function renderHome(){
   const body=document.getElementById('homeQueue');if(!body)return;
   homeQ=((document.getElementById('homeSearch')||{}).value||'').toLowerCase().trim();

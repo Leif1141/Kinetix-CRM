@@ -46,7 +46,7 @@ export function snoozeAction(id,ev,days){
 }
 export function ignoreRec(id,ev){if(ev)ev.stopPropagation();const r=findRec(id);if(!r)return;r.ignored=today();save();renderAll();toast('Ignored until the next activity')}
 export function unignoreRec(id,ev){if(ev)ev.stopPropagation();const r=findRec(id);if(!r)return;delete r.ignored;save();renderAll()}
-export function sugKeysOf(id){return suggestionsRaw().filter(s=>s.rec.id===id).map(s=>s.key)}
+export function sugKeysOf(id){const r=findRec(id);return r?suggestionsRaw(r).map(s=>s.key):[]}
 export function sugAct(kind,id,key,ev){if(ev)ev.stopPropagation();const r=findRec(id);if(!r)return;
   if(kind==='done'){
     if(key.startsWith('cdz_')){const step=key.split('_').pop();r.cadDone=r.cadDone||{};r.cadDone[step]=today();logDone(r,'Cadence: '+(CAD_LABEL[step]||step));save();renderAll();toast('Cadence step done');return}

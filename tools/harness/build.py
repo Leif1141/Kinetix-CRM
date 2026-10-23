@@ -7,6 +7,7 @@ gitignored: the Firebase, Google Identity and MSAL script tags are replaced by t
 Copies the backup JSON into tools/harness/data/ (gitignored) when a path is given. Serve the repo root with
 tools/harness/serve.py and open http://localhost:8765/_harness.html?mode=sharded (new layout), ?mode=blob
 (old layout) or _harness_migrate.html?mode=blob (migration against the old layout).
+Add &check=1 to _harness.html to run the view-level checks in tools/harness/checks.js.
 """
 import os, re, shutil, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -17,6 +18,9 @@ html = open(os.path.join(ROOT, 'index.html'), encoding='utf-8').read()
 html, n = DROP.subn('', html)
 html = html.replace('<link rel="stylesheet" href="styles.css">', STUB + '<link rel="stylesheet" href="styles.css">', 1)
 html = html.replace('<title>', '<title>[harness] ', 1)
+# view-level checks, active with ?check=1
+MAIN = '<script type="module" src="src/main.js"></script>'
+html = html.replace(MAIN, MAIN + '\n<script type="module" src="tools/harness/checks.js"></script>', 1)
 open(os.path.join(ROOT, '_harness.html'), 'w', encoding='utf-8', newline='\n').write(html)
 print('removed %d script tags, wrote _harness.html' % n)
 

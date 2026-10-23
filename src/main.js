@@ -1,13 +1,13 @@
 import {invalidateShares} from './shares.js';
 import {ALLOWED_EMAILS} from './config.js';
-import {S, migrateChannels, migrateStages} from './state.js';
+import {S, migrateChannels, migrateStages, withRenderCache} from './state.js';
 
-import {invalidateThreads, renderThreads} from './views/threads.js';
+import {invalidateThreads, renderThreads, threadsMyMoveCount} from './views/threads.js';
 import {auth, currentUser, initFirebase, showApp} from './store/firebase.js';
-import {dashRefresh} from './views/dash.js';
+import {dashRefresh, dashBadge} from './views/dash.js';
 import {migratePrevClean} from './sync/triage.js';
 import {renderData} from './views/data.js';
-import {renderHome, initHome} from './views/home.js';
+import {renderHome, initHome, homeUrgentCount} from './views/home.js';
 import {initRecordPage, refreshRecordPage} from './views/record.js';
 import {initPalette} from './views/palette.js';
 import {undoLast} from './store/firebase.js';
@@ -56,11 +56,44 @@ import * as _m32 from './views/dash.js';
 const _mods=[_m0, _m1, _m2, _m3, _m4, _m5, _m6, _m7, _m8, _m9, _m10, _m11, _m12, _m13, _m14, _m15, _m16, _m17, _m18, _m19, _m20, _m21, _m22, _m23, _m24, _m25, _m26, _m27, _m28, _m29, _m30, _m31, _m32];
 function _expose(ns){for(const k of Object.keys(ns)){try{Object.defineProperty(window,k,{get:()=>ns[k],configurable:true})}catch(e){console.warn('expose',k,e)}}}
 _mods.forEach(_expose);
-_expose({goTab,renderAll});
+_expose({goTab,renderAll,renderView,updateBadges,viewIsStale,activeView});
+// inline filter fields call these renderers directly; run them inside the render cache too
+{const C=fn=>(...a)=>withRenderCache(()=>fn(...a));_expose({renderOrgs:C(renderOrgs),renderPeople:C(renderPeople),renderPipeline:C(renderPipeline),renderThreads:C(renderThreads),renderGlobalSearch:C(renderGlobalSearch),renderLocations:C(renderLocations),renderHome:C(renderHome)})}
 
 
 export function goTab(t){if(t==='followups'||t==='overview')t='home';document.querySelector('.tab[data-t="'+t+'"]')?.click()}
-export function renderAll(){if(!S)return;try{if(!document.body.dataset.winit){document.body.dataset.winit='1';const w=localStorage.getItem('kxWide');if(w===null||w==='1'){document.body.classList.add('wide');const b=document.getElementById('wideBtn');if(b)b.textContent='Normal width'}}}catch(e){}try{const dt=document.getElementById('dataTab');if(dt&&(/[?#]data/.test(location.href)||localStorage.getItem('kxShowData')==='1'))dt.style.display=''}catch(e){}invalidateShares();invalidateThreads();try{migrateStages()}catch(e){}try{migratePrevClean()}catch(e){}try{migrateChannels()}catch(e){}initHome();initRecordPage();initPalette();renderHome();renderYield();renderGlobalSearch();renderOrgs();renderPeople();renderPipeline();renderThreads();renderInbox();renderReports();renderData();try{dashRefresh()}catch(e){console.warn('dashboard',e)}if(document.getElementById('p-locations').classList.contains('active'))renderLocations();try{refreshRecordPage()}catch(e){console.warn('record page',e)}}
+// Views by tab. A change marks every view stale; only the visible one renders at once, the others
+// render when their tab is opened. Badges are counted separately so hidden tabs stay current.
+export const VIEWS={
+  home:()=>{renderHome();renderGlobalSearch()},
+  orgs:renderOrgs, people:renderPeople, pipeline:renderPipeline, threads:renderThreads, inbox:renderInbox,
+  locations:renderLocations, reports:()=>{renderYield();renderReports()}, data:renderData, dash:dashRefresh
+};
+const _stale=new Set(Object.keys(VIEWS));
+export function activeView(){const t=document.querySelector('#tabs .tab.active');return t?t.dataset.t:'home'}
+export function viewIsStale(name){return _stale.has(name)}
+export function renderView(name){const fn=VIEWS[name];if(!fn)return;_stale.delete(name);withRenderCache(()=>{try{fn()}catch(e){console.error('render '+name,e)}})}
+function setBadge(id,n){const b=document.getElementById(id);if(!b)return;b.textContent=n;b.style.display=n?'inline-block':'none'}
+export function updateBadges(){
+  try{setBadge('homeBadge',homeUrgentCount())}catch(e){console.warn('home badge',e)}
+  try{setBadge('thBadge',threadsMyMoveCount())}catch(e){console.warn('threads badge',e)}
+  setBadge('inbBadge',(S.unmatched||[]).length);
+  try{dashBadge()}catch(e){console.warn('dashboard badge',e)}
+}
+export function renderAll(){
+  if(!S)return;
+  try{if(!document.body.dataset.winit){document.body.dataset.winit='1';const w=localStorage.getItem('kxWide');if(w===null||w==='1'){document.body.classList.add('wide');const b=document.getElementById('wideBtn');if(b)b.textContent='Normal width'}}}catch(e){}
+  try{const dt=document.getElementById('dataTab');if(dt&&(/[?#]data/.test(location.href)||localStorage.getItem('kxShowData')==='1'))dt.style.display=''}catch(e){}
+  invalidateShares();invalidateThreads();
+  try{migrateStages()}catch(e){}try{migratePrevClean()}catch(e){}try{migrateChannels()}catch(e){}
+  initHome();initRecordPage();initPalette();
+  Object.keys(VIEWS).forEach(v=>_stale.add(v));
+  withRenderCache(()=>{
+    updateBadges();
+    if(document.body.classList.contains('rec-open')){try{refreshRecordPage()}catch(e){console.warn('record page',e)}return}
+    renderView(activeView());
+  });
+}
 
 document.getElementById('tabs').addEventListener('click',e=>{
   const t=e.target.closest('.tab');if(!t)return;
@@ -75,8 +108,8 @@ document.getElementById('tabs').addEventListener('click',e=>{
   document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');
   document.getElementById('p-'+t.dataset.t).classList.add('active');
-  if(t.dataset.t==='locations')renderLocations();
-  if(t.dataset.t==='reports')renderReports();
+  // the map needs a visible container to size itself, so it always renders on opening
+  if(t.dataset.t==='locations'||_stale.has(t.dataset.t))renderView(t.dataset.t);
 });
 
 // BOOT

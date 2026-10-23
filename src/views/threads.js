@@ -85,6 +85,11 @@ export function thShow(t,q,cat){
   if(thFilt==='unclear')return v==='UNCLEAR';
   return true;
 }
+// Open items where the move is Leif's, for the tab badge (same filter as the 'My move' tile).
+export function threadsMyMoveCount(){
+  const hs=!!((document.getElementById('thHideSched')||{checked:true}).checked),sched=t=>{const r=thRec(t);return !!(r&&r.nextDate)};
+  return THREADS_LIVE().filter(t=>thV(t)==='OPEN_LEIF'&&!thDone(t.id)&&!(hs&&sched(t))).length;
+}
 export function renderThreads(){
   if(!document.getElementById('thBody'))return;
   const sel=document.getElementById('thCat');

@@ -113,14 +113,30 @@ export function unshard(tree){
 
 // Multi-location update: {path: value|null}. Records, touches, threads and dash items diff per field,
 // meta maps per key, dash meta per field, inbox items whole.
+// Same equality as comparing stableStringify() output, without building strings: undefined and null are
+// equal as values, object keys holding undefined are ignored, a null-valued key differs from a missing one.
+export function sameValue(a,b){
+  if(a===b)return true;
+  const nul=v=>v===undefined||v===null||(typeof v==='number'&&!isFinite(v)); // JSON writes all of these as null
+  const an=nul(a),bn=nul(b);
+  if(an||bn)return an&&bn;
+  if(typeof a!=='object'||typeof b!=='object')return false;
+  const aa=Array.isArray(a),ba=Array.isArray(b);if(aa!==ba)return false;
+  if(aa){if(a.length!==b.length)return false;for(let i=0;i<a.length;i++)if(!sameValue(a[i],b[i]))return false;return true}
+  let na=0,nb=0;
+  for(const k in a){if(a[k]===undefined)continue;na++;if(!(k in b)||b[k]===undefined)return false;if(!sameValue(a[k],b[k]))return false}
+  for(const k in b){if(b[k]!==undefined)nb++}
+  return na===nb;
+}
 const DEPTH={companies:3,advisors:3,people:3,touches:3,threads:3,inbox:2,dash:{todos:3,progress:3,decisions:3,meta:2},meta:3};
 export function diffTree(prev,next){
   const ops={};
   const walk=(a,b,path,limit)=>{
     if(limit===0||!isObj(a)&&!isObj(b)||(isObj(a)!==isObj(b))){
-      if(stableStringify(a)!==stableStringify(b))ops[path]=b===undefined?null:b;
+      if(!sameValue(a,b))ops[path]=b===undefined?null:b;
       return;
     }
+    if(isObj(a)&&isObj(b)&&sameValue(a,b))return;
     if(!isObj(a)||!isObj(b)){ // one side missing: emit children of the other
       const src=isObj(b)?b:a;
       for(const k of Object.keys(src))walk(isObj(a)?a[k]:undefined,isObj(b)?b[k]:undefined,path?path+'/'+k:k,typeof limit==='number'?limit-1:limit[k]);

@@ -16,13 +16,14 @@ pre{font-size:11px;background:#F4F5F9;padding:8px;border-radius:4px;white-space:
 <div id="out"></div>
 <pre id="log"></pre>
 <script type="module">
-import {shard, unshard, diffTree, legacyExport, ensureDefaults, isLegacyBlob, encodeKeys, decodeKeys, encodePath, stableStringify} from '../../src/store/shards.js';
+import {shard, unshard, diffTree, legacyExport, ensureDefaults, isLegacyBlob, encodeKeys, decodeKeys, encodePath, stableStringify, prune, sameValue} from '../../src/store/shards.js';
 const out=document.getElementById('out'), logEl=document.getElementById('log');
 const results=[];
 function t(name,fn){let ok=false,msg='';try{const r=fn();ok=r===true||r===undefined;if(typeof r==='string'){ok=false;msg=r}}catch(e){ok=false;msg=e.message}results.push({name,ok,msg});
   const d=document.createElement('div');d.className=ok?'ok':'fail';d.textContent=(ok?'PASS  ':'FAIL  ')+name+(msg?'  ('+msg+')':'');out.appendChild(d)}
 const byId=arr=>{const m={};(arr||[]).forEach(r=>{if(r&&r.id)m[r.id]=r});return m};
-const sameSets=(a,b)=>{const A=byId(a),B=byId(b);const ka=Object.keys(A),kb=Object.keys(B);if(ka.length!==kb.length)return 'count '+ka.length+' vs '+kb.length;for(const k of ka){if(stableStringify(A[k])!==stableStringify(B[k]))return 'record '+k+' differs'}return true};
+// the store drops empty arrays and objects (Firebase does), so compare without them
+const sameSets=(a,b)=>{const A=prune(byId(a))||{},B=prune(byId(b))||{};const ka=Object.keys(A),kb=Object.keys(B);if(ka.length!==kb.length)return 'count '+ka.length+' vs '+kb.length;for(const k of ka){if(stableStringify(A[k])!==stableStringify(B[k]))return 'record '+k+' differs'}return true};
 const strip=o=>JSON.parse(JSON.stringify(o,(k,v)=>k==='_ord'?undefined:v));
 
 const resp=await fetch('../../tools/harness/data/KinetixCRM Backup.json');
@@ -53,9 +54,22 @@ t('ensureDefaults is idempotent',()=>stableStringify(ensureDefaults(JSON.parse(J
 t('unshard shares objects with its input tree (the store must clone before unsharding)',()=>{const tr=shard(S0);const s=unshard(tr);const r=s.advisors.find(x=>x.touches&&Object.keys(x.touches).length);return (r&&r.touches===tr.touches[r.id])||'no longer shared; the clone in the store can go'});
 t('a touch added after unshard(clone(tree)) is seen by diffTree',()=>{const tr=shard(S0);const s=ensureDefaults(unshard(JSON.parse(JSON.stringify(tr))));const r=s.advisors.find(x=>x.touches&&Object.keys(x.touches).length);r.touches['test_first_touch']={date:'2026-10-22',dir:'out',src:'Note',subject:'t'};const ops=diffTree(tr,shard(s));return ('touches/'+r.id+'/test_first_touch' in ops)||'touch invisible to the diff: '+JSON.stringify(Object.keys(ops)).slice(0,100)});
 t('a touch added after unshard(tree) without clone is invisible to diffTree (documents the hazard)',()=>{const tr=shard(S0);const s=ensureDefaults(unshard(tr));const r=s.advisors.find(x=>x.touches&&Object.keys(x.touches).length);r.touches['test_first_touch']={date:'2026-10-22',dir:'out',src:'Note',subject:'t'};const ops=diffTree(tr,shard(s));return !('touches/'+r.id+'/test_first_touch' in ops)||'now visible; hazard gone'});
+t('sameValue agrees with stableStringify on every record pair and on edge values',()=>{const recs=[...S0.companies,...S0.advisors,...S0.people];for(let i=0;i<recs.length;i++){const a=recs[i],b=recs[(i+1)%recs.length],c=JSON.parse(JSON.stringify(a));if(!sameValue(a,c))return 'clone differs: '+a.id;if(sameValue(a,b)!==(stableStringify(a)===stableStringify(b)))return 'disagree on '+a.id}const E=[[null,undefined],[{x:1,y:undefined},{x:1}],[{x:null},{}],[[1,undefined],[1,null]],[NaN,null],[0,'0'],[[1,2],[2,1]],[{a:{b:[1,{c:2}]}},{a:{b:[1,{c:2}]}}],[{a:{b:[1,{c:2}]}},{a:{b:[1,{c:3}]}}]];for(const [a,b] of E)if(sameValue(a,b)!==(stableStringify(a)===stableStringify(b)))return 'disagree on '+stableStringify(a)+' vs '+stableStringify(b);return true});
 const fails=results.filter(r=>!r.ok).length;
 const sum=document.createElement('div');sum.style.marginTop='10px';sum.innerHTML='<b>'+(results.length-fails)+' of '+results.length+' passed</b>';out.appendChild(sum);
 window.__testResults=results;document.title=(fails?'FAIL ':'PASS ')+document.title;
+</script>
+<h1 style="margin-top:18px">View checks</h1>
+<p>The app itself against the same data, in the frame below (<code>_harness.html?mode=sharded&amp;check=1</code>). Build it first with <code>tools/harness/build.py</code>.</p>
+<div id="vout">running...</div>
+<iframe id="vframe" src="../../_harness.html?mode=sharded&amp;check=1" style="width:100%;height:420px;border:1px solid #D3D3D2;margin-top:8px"></iframe>
+<script>
+(function poll(n){const w=document.getElementById('vframe').contentWindow;const r=w&&w.__checkResults;const el=document.getElementById('vout');
+  if(!r){if(n<600)return setTimeout(()=>poll(n+1),100);el.textContent='view checks did not finish';return}
+  el.innerHTML='';r.forEach(x=>{const d=document.createElement('div');d.className=x.ok?'ok':'fail';d.textContent=(x.ok?'PASS  ':'FAIL  ')+x.name+(x.msg?'  ('+x.msg+')':'');el.appendChild(d)});
+  const f=r.filter(x=>!x.ok).length;const s=document.createElement('div');s.style.marginTop='10px';s.innerHTML='<b>'+(r.length-f)+' of '+r.length+' passed</b>';el.appendChild(s);
+  window.__viewResults=r;if(f&&!/^FAIL/.test(document.title))document.title='FAIL '+document.title.replace(/^PASS /,'');
+})(0);
 </script>
 </body>
 </html>

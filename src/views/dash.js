@@ -63,6 +63,7 @@ export function dashApplyOp(o){
   return false;
 }
 export function dashInit(){if(_dashInited)return;_dashInited=true;try{const f=localStorage.getItem('dynamo-todo-filter');if(f)todoFilter=f;const o=localStorage.getItem('dynamo-todo-owner-filter');if(o)todoOwnerFilter=o}catch(e){}initTabs();dRenderAll()}
+export function dashBadge(){const tab=document.getElementById('dashTab');if(!tab)return;const vis=dashVisible();tab.style.display=vis?'':'none';if(!vis)return;const open=dashData().todos.filter(t=>!t.done&&!t.deleted).length;const b=document.getElementById('dashBadge');if(b){b.textContent=open;b.style.display=open?'':'none'}}
 export function dashRefresh(){const tab=document.getElementById('dashTab');if(!tab)return;const vis=dashVisible();tab.style.display=vis?'':'none';if(!vis)return;if(!_dashInited)dashInit();else rebuildTabs();const open=dashData().todos.filter(t=>!t.done&&!t.deleted).length;const b=document.getElementById('dashBadge');if(b){b.textContent=open;b.style.display=open?'':'none'}}
 export function safeNum(v){if(v==null)return 0;if(typeof v==='number')return v;let s=String(v).replace(/[^0-9.\-]/g,'').trim();return parseFloat(s)||0}
 export function dEsc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}

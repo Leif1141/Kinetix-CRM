@@ -68,12 +68,30 @@ export function orgTouches(o){
   if(o.kind!=='person')orgPeople(o).forEach(p=>touchList(p).forEach(add));
   return out.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 }
-export function lastTouch(r){const t=(r.kind==='person'?touchList(r).filter(x=>!isSysNote(x)):orgTouches(r))[0];return t?t.date:null}
+// Render-scoped cache. Only active inside withRenderCache(), so code that changes a record and reads it
+// back outside a render never sees a stale value.
+let _rc=null;
+export function withRenderCache(fn){const outer=_rc;if(!outer)_rc={last:new Map(),people:null};try{return fn()}finally{if(!outer)_rc=null}}
+function lastTouchRaw(r){const t=(r.kind==='person'?touchList(r).filter(x=>!isSysNote(x)):orgTouches(r))[0];return t?t.date:null}
+export function lastTouch(r){if(!_rc||!r)return lastTouchRaw(r);if(!_rc.last.has(r))_rc.last.set(r,lastTouchRaw(r));return _rc.last.get(r)}
 export function tType(t){if(t.src==='Granola'||t.src==='Meeting')return 'Meeting';if(t.src==='Call')return 'Call';if(t.src==='Kinetix'||t.src==='Gmail')return 'Email';if(t.src==='Note'||t.src==='Letter'||t.src==='LinkedIn')return t.src;return 'Email'}
 export function lastOfType(r,ty){const t=touchList(r).find(x=>tType(x)===ty);return t?t.date:null}
 export function isStale(c){const th=STALE_DAYS[c.stage];if(th==null)return false;const lt=lastTouch(c);return daysAgo(lt||(c.stageLog?.slice(-1)[0]?.date)||null)>th}
 export function stageDate(c){return c.stageLog?.slice(-1)[0]?.date||null}
-export function orgPeople(o){const on=normName(o.firm||o.name||'');return liveOnly(S.people||[]).filter(p=>p.orgId===o.id||(!p.orgId&&on&&normName(p.firm||'')===on))}
+function orgPeopleRaw(o){const on=normName(o.firm||o.name||'');return liveOnly(S.people||[]).filter(p=>p.orgId===o.id||(!p.orgId&&on&&normName(p.firm||'')===on))}
+function peopleIndex(){
+  // people grouped by the org they hang off (orgId, else normalised firm name), keeping list order
+  const byOrg=new Map(),byFirm=new Map();
+  liveOnly(S.people||[]).forEach((p,i)=>{const e=[i,p];if(p.orgId){(byOrg.get(p.orgId)||byOrg.set(p.orgId,[]).get(p.orgId)).push(e)}else{const f=normName(p.firm||'');if(f)(byFirm.get(f)||byFirm.set(f,[]).get(f)).push(e)}});
+  return {byOrg,byFirm};
+}
+export function orgPeople(o){
+  if(!_rc)return orgPeopleRaw(o);
+  if(!_rc.people)_rc.people=peopleIndex();
+  const on=normName(o.firm||o.name||'');
+  const a=_rc.people.byOrg.get(o.id)||[],b=on?(_rc.people.byFirm.get(on)||[]):[];
+  return (b.length?a.concat(b).sort((x,y)=>x[0]-y[0]):a).map(e=>e[1]);
+}
 export function addTouch(rec,key,t){rec.touches=rec.touches||{};if(!rec.touches[key])rec.touches[key]=t}
 
 export function dismissSugg(k){
