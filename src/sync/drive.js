@@ -1,7 +1,7 @@
 import {legacyExport} from '../store/shards.js';
 import {S} from '../state.js';
 import {applyPatchObj} from './patch.js';
-import {db, save, serverGet} from '../store/firebase.js';
+import {db, save, serverGet, currentUser} from '../store/firebase.js';
 import {gmailToken} from './google.js';
 import {isoWeekKey, toast, today} from '../util.js';
 import {renderAll} from '../main.js';
@@ -19,19 +19,22 @@ export async function loadDriveProxy(){
   try{
     const snap=await db.ref('crm-config/driveProxy').once('value');
     const v=snap.val();
-    if(v&&v.url&&v.key){driveProxy={url:v.url,key:v.key};localStorage.setItem('kx_driveProxy',JSON.stringify(driveProxy));return driveProxy}
+    // The proxy authenticates the signed-in user by the Firebase ID token; there is no shared key any more.
+    if(v&&v.url){driveProxy={url:v.url};try{localStorage.setItem('kx_driveProxy',JSON.stringify(driveProxy))}catch(e){}return driveProxy}
   }catch(e){console.warn('driveProxy from Firebase failed',e)}
-  try{const l=JSON.parse(localStorage.getItem('kx_driveProxy')||'null');if(l&&l.url&&l.key)driveProxy=l}catch(e){}
+  try{const l=JSON.parse(localStorage.getItem('kx_driveProxy')||'null');if(l&&l.url)driveProxy={url:l.url}}catch(e){}
   return driveProxy;
 }
 export async function driveCall(action,params,body){
   if(!driveProxy)throw new Error('Drive proxy not configured');
+  if(!currentUser)throw new Error('not signed in');
+  const idToken=await currentUser.getIdToken();
   let res;
   if(body){
     res=await fetch(driveProxy.url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify(Object.assign({key:driveProxy.key,action:action},params||{},body))});
+      body:JSON.stringify(Object.assign({idToken,action:action},params||{},body))});
   }else{
-    const q=new URLSearchParams(Object.assign({key:driveProxy.key,action:action},params||{}));
+    const q=new URLSearchParams(Object.assign({idToken,action:action},params||{}));
     res=await fetch(driveProxy.url+'?'+q.toString());
   }
   if(!res.ok)throw new Error('proxy '+res.status);
