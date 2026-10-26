@@ -11,7 +11,9 @@ export function daysAgo(d){if(!d)return 9999;return Math.floor((Date.now()-new D
 export function esc(s){return (s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 export function fmtM(v){return (v===''||v===null||v===undefined||isNaN(v))?'-':Number(v).toFixed(1)}
 export function fmtD(d){if(!d)return '-';return new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}
-export function fmtAgo(d){if(!d)return '-';const n=daysAgo(d);return n===0?'today':n===1?'1 day ago':n<31?n+' days ago':n<365?Math.floor(n/30)+'mo ago':Math.floor(n/365)+'y ago'}
+// calendar days between a date and today (local time); a date-only string is read as a local date
+export function calDaysAgo(d){if(!d)return 9999;const s=String(d);const a=/^\d{4}-\d{2}-\d{2}$/.test(s)?new Date(s+'T12:00:00'):new Date(s);if(isNaN(a))return 9999;const n=new Date();return Math.round((new Date(n.getFullYear(),n.getMonth(),n.getDate())-new Date(a.getFullYear(),a.getMonth(),a.getDate()))/864e5)}
+export function fmtAgo(d){if(!d)return '-';const n=calDaysAgo(d);return n===0?'today':n===1?'yesterday':n<31?n+' days ago':n<365?Math.floor(n/30)+'mo ago':Math.floor(n/365)+'y ago'}
 export function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2800)}
 // pure, so the result is memoised per input string (bounded)
 const _nn=new Map();

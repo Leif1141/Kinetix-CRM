@@ -1,3 +1,5 @@
+import {letterDoneStep, effDue} from '../state.js';
+import {logDone} from './actions.js';
 import {openDialog, confirmDialog} from './dialog.js';
 import {ACTIVE_STAGES, BOARD_COLS, CHANNELS, CH_DE, LETTER_TARGET_WEEK, LIVE, LS_DE, STAGES, ST_DE} from '../constants.js';
 import {S, addTouch, cadenceOf, chanOf, dispName, findRec, fixUml, isDue, lastTouch, tType, touchList} from '../state.js';
@@ -48,7 +50,10 @@ export async function markLetterSent(id){
   else{const ds=daysBetween(r.letterSent,dt);r.cadDone=r.cadDone||{};if(ds>330)r.cadDone.l12=dt;else if(ds>150)r.cadDone.l6=dt}
   r.letterStatus='sent';
   if(r.stage==='Identified'){r.stage='Contacted';r.stageLog=r.stageLog||[];r.stageLog.push({stage:'Contacted',date:dt})}
-  save();if(profRec&&profRec.id===id)renderRecordPage();renderAll();toast('Letter recorded, cadence running');
+  // the open step dated up to the posting was the letter itself: log it as done, the cadence takes over
+  if(r.nextAction&&(!r.nextDate||r.nextDate<=dt)){logDone(r,r.nextAction);r.nextAction='';r.nextDate='';r.nextSet=''}
+  const cd=cadenceOf(r);
+  save();if(profRec&&profRec.id===id)renderRecordPage();renderAll();toast('Letter recorded'+(cd&&cd.next?'; '+cd.next.label.toLowerCase()+' due '+fmtDe(cd.next.due):''));
 }
 export async function pipeSetStage(id,ns){
   const r=findRec(id);if(!r||ns===r.stage)return;
@@ -86,8 +91,8 @@ export function bCard(c){
     '<div class="nm"><span class="star'+(c.fav?' on':'')+'" data-click="toggleFav|'+c.id+'|$e" title="Markieren">&#9733;</span> '+esc(fixUml(dispName(c)))+'</div>'+
     '<div class="muted">'+(c.ebit!=null&&c.ebit!==''?'EBIT '+fmtM(c.ebit):'')+(c.revenue?' · Revenue '+fmtM(c.revenue):'')+(c.location?' · '+esc(c.location):'')+'</div>'+
     (ch?'<span class="chch">'+esc(chDe(c))+(c.channelVia&&(ch==='Partner letter'||ch==='M&A house / advisor'||ch==='Tax adviser / auditor'||ch==='Trade fair')?': '+esc(c.channelVia.split(/[ (]/)[0]):'')+'</span> ':'')+lsChip(c)+cadChip(c)+
-    (c.nextAction?'<div class="na">'+esc(c.nextAction)+'</div>':(['Contacted','Replied','Meeting','NDA','LOI','Diligence'].includes(c.stage)&&!cadenceOf(c)?'<div class="na" style="color:#9A3B12">No next step recorded</div>':''))+
-    '<div style="margin-top:3px">'+dueDe(c.nextDate,c.id)+' <span class="mini" data-click="shiftDue|'+c.id+'|#7|$e" title="one week later">+1W</span><span class="mini" data-click="shiftDue|'+c.id+'|#30|$e" title="one month later">+1M</span>'+staleTxt(c)+'</div></div>'
+    (c.nextAction?'<div class="na"'+(letterDoneStep(c)?' style="color:#595959" title="Done by the letter; the cadence follows"':'')+'>'+(letterDoneStep(c)?'Letter sent '+fmtDe(c.letterSent)+'. ':'')+esc(c.nextAction)+'</div>':(['Contacted','Replied','Meeting','NDA','LOI','Diligence'].includes(c.stage)&&!cadenceOf(c)?'<div class="na" style="color:#9A3B12">No next step recorded</div>':''))+
+    '<div style="margin-top:3px">'+(letterDoneStep(c)?'':dueDe(c.nextDate,c.id))+' <span class="mini" data-click="shiftDue|'+c.id+'|#7|$e" title="one week later">+1W</span><span class="mini" data-click="shiftDue|'+c.id+'|#30|$e" title="one month later">+1M</span>'+staleTxt(c)+'</div></div>'
 }
 export function renderPipeline(){
   if(!pipeView){try{pipeView=localStorage.getItem('kxPipeView')||'board'}catch(e){pipeView='board'}}
@@ -126,7 +131,7 @@ export function renderPipeline(){
     ls:{k:'ls',t:'Letter',v:c=>c.letterStatus||'',h:c=>lsSel(c)},
     chan:{k:'chan',t:'Channel',v:c=>chanOf(c),h:c=>esc(chDe(c))+(c.channelVia?'<div class="muted" style="font-size:10px">'+esc(c.channelVia.slice(0,40))+'</div>':''),muted:1},
     next:{k:'next',t:'Next step',w:'32%',v:c=>c.nextAction||'',h:c=>esc(c.nextAction||'')+' '+cadChip(c)},
-    due:{k:'due',t:'Due',v:c=>c.nextDate||'9999',h:c=>dueDe(c.nextDate,c.id)},
+    due:{k:'due',t:'Due',v:c=>effDue(c)||'9999',h:c=>letterDoneStep(c)?dueDe(effDue(c)):dueDe(c.nextDate,c.id)},
     last:{k:'last',t:'Last contact',v:c=>lastTouch(c)||'',h:c=>{const d=lastTouch(c);return d?fmtDe(d)+' <span style="font-size:10px">('+daysAgo(d)+'d)</span>':'-'},muted:1},
     days:{k:'days',t:'Days in stage',num:1,v:c=>{const l=(c.stageLog||[]).slice(-1)[0];return l&&l.date?daysAgo(l.date):null},h:c=>{const l=(c.stageLog||[]).slice(-1)[0];return l&&l.date?daysAgo(l.date):'-'},muted:1},
     reason:{k:'reason',t:'Reason',w:'36%',v:c=>c.deadReason||c.flag||'',h:c=>esc(c.deadReason||c.lastSummary||c.flag||'')},
@@ -142,13 +147,19 @@ export function renderPipeline(){
   if(pipeView==='focus'){
     const fl=[...new Map([...active,...ready,...list.filter(c=>c.fav&&c.stage!=='Dead')].map(c=>[c.id,c])).values()];
     if(!pipeSort.focus)fl.sort(cardSort);
-    body='<div class="section">'+pTable('focus',[C.name,C.stage,C.chan,C.ebit,C.next,C.due,C.last,C.days],fl,0)+'</div>'+lower;
+    // one block per stage, in funnel order, so the stage of a row is never in doubt
+    const grp=c=>isReady(c)?'ready':(LIVE.includes(c.stage)?c.stage:'other');
+    const GL={ready:'To contact',Contacted:'Contacted',Replied:'Replied',Meeting:'Meeting',NDA:'NDA / info',LOI:'LOI',Diligence:'Diligence',other:'Starred, other stages'};
+    body=Object.keys(GL).map(k=>{const g=fl.filter(c=>grp(c)===k);if(!g.length)return '';if(!pipeSort['focus_'+k])g.sort(cardSort);return '<div class="section stagegrp stg-'+k+'"><div class="stagehdr">'+GL[k]+' <span>'+g.length+'</span></div>'+pTable('focus_'+k,[C.name,C.chan,C.ebit,C.next,C.due,C.last,C.days],g,0)+'</div>'}).join('')+lower;
   }else if(pipeView==='channel'){
     const rows=CHANNELS.filter(Boolean).concat(['']).map(ch=>{const g=list.filter(c=>(chanOf(c)||'')===ch&&c.stage!=='Identified');const rep=g.filter(c=>['Replied','Meeting','NDA','LOI','Diligence','Closed'].includes(c.stage)||(c.stageLog||[]).some(l=>['Replied','Meeting','NDA','LOI'].includes(l.stage))).length;return {ch,g,appr:g.length,rep,meet:g.filter(c=>(c.stageLog||[]).some(l=>['Meeting','NDA','LOI','Diligence','Closed'].includes(l.stage))).length,pass:g.filter(c=>c.stage==='Dead').length,hold:g.filter(c=>c.stage==='On hold').length}}).filter(x=>x.appr);
     body='<div class="section"><table class="ps"><tr><th>Channel</th><th style="text-align:right">Approached</th><th style="text-align:right">Replied</th><th style="text-align:right">Rate</th><th style="text-align:right">Meeting+</th><th style="text-align:right">On hold</th><th style="text-align:right">Passed</th><th>Companies</th></tr>'+rows.map(x=>'<tr><td><b>'+esc(CH_DE[x.ch]||x.ch)+'</b></td><td style="text-align:right">'+x.appr+'</td><td style="text-align:right">'+x.rep+'</td><td style="text-align:right">'+(x.appr?Math.round(100*x.rep/x.appr)+'%':'-')+'</td><td style="text-align:right">'+x.meet+'</td><td style="text-align:right">'+x.hold+'</td><td style="text-align:right">'+x.pass+'</td><td style="font-size:11px">'+x.g.slice(0,60).map(c=>'<a href="#" data-click="openRec|'+c.id+'|$e">'+esc(fixUml(dispName(c)))+'</a> <span class="muted">('+(ST_DE[c.stage]||c.stage)+')</span>').join(', ')+'</td></tr>').join('')+'</table></div>'+lower;
   }else{
     const colItems=k=>k==='ready'?ready:list.filter(c=>c.stage===k);
-    body='<div class="board">'+BOARD_COLS.map(col=>{const its=colItems(col.k).sort(cardSort);const lim=pipeExpand['b_'+col.k]?its.length:8;return '<div class="bcol" data-dragover="pipeDragOver|$e|$el" data-dragleave="removeClass|$el|dragover" data-drop="pipeDrop|$e|$el|'+col.k+'"><h5>'+col.t+' <span style="font-weight:400;color:#595959">'+its.length+'</span></h5>'+its.slice(0,lim).map(bCard).join('')+(its.length>8?'<button class="sm" style="width:100%" data-click="togglePipeExpand|b_'+col.k+'">'+(pipeExpand['b_'+col.k]?'Show fewer':'+'+(its.length-8)+' more')+'</button>':'')+'</div>'}).join('')+'</div>'+
+    // Meeting, NDA, LOI and Diligence hold one or two companies each: they share one narrow column
+    const LATE=['Meeting','NDA','LOI','Diligence'];
+    const colHtml=(col,sub)=>{const its=colItems(col.k).sort(cardSort);const lim=pipeExpand['b_'+col.k]?its.length:8;return '<div class="bcol'+(sub?' bsub':'')+'" data-dragover="pipeDragOver|$e|$el" data-dragleave="removeClass|$el|dragover" data-drop="pipeDrop|$e|$el|'+col.k+'"><h5>'+col.t+' <span style="font-weight:400;color:#595959">'+its.length+'</span></h5>'+its.slice(0,lim).map(bCard).join('')+(its.length>8?'<button class="sm" style="width:100%" data-click="togglePipeExpand|b_'+col.k+'">'+(pipeExpand['b_'+col.k]?'Show fewer':'+'+(its.length-8)+' more')+'</button>':'')+'</div>'};
+    body='<div class="board">'+BOARD_COLS.filter(c=>!LATE.includes(c.k)).map(c=>colHtml(c)).join('')+'<div class="bstack">'+BOARD_COLS.filter(c=>LATE.includes(c.k)).map(c=>colHtml(c,true)).join('')+'</div></div>'+
       '<div class="dropbar"><div class="dropz" data-dragover="pipeDragOver|$e|$el" data-dragleave="removeClass|$el|dragover" data-drop="pipeDrop|$e|$el|On hold">Drop a card here: put on hold (with reason and revisit date)</div><div class="dropz" data-dragover="pipeDragOver|$e|$el" data-dragleave="removeClass|$el|dragover" data-drop="pipeDrop|$e|$el|Dead">Drop a card here: pass (with reason)</div></div>'+lower;
   }
   document.getElementById('pipeBody').innerHTML=body;

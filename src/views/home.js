@@ -1,3 +1,4 @@
+import {letterDoneStep} from '../state.js';
 import {ACTIVE_STAGES, LETTER_TARGET_WEEK, LIVE} from '../constants.js';
 import {S, allRecs, cadenceOf, cadDue, dispName, findRec, fixUml, grpOf, GRP_DEF, isDismissed, isIgnoredRec, isStale, isSysNote, lastTouch, liveOnly, orgPeople, orgTouches, tType, touchList} from '../state.js';
 import {addDays, cleanPrev, daysAgo, esc, fmtD, fmtDe, today, weekStart} from '../util.js';
@@ -51,11 +52,11 @@ export function buildQueue(){
   const t=today();
   const items=[];
   const all=allRecs().filter(r=>!isIgnoredRec(r));
-  all.filter(r=>r.nextDate&&r.nextDate<=t).forEach(r=>{
+  all.filter(r=>r.nextDate&&r.nextDate<=t&&!letterDoneStep(r)).forEach(r=>{
     const kind=isPromise(r)?'promise':(r.nextDate<t?'overdue':'due');
     items.push({rec:r,kind,key:'due_'+r.id,text:r.nextAction||'follow up',due:r.nextDate,sort:(kind==='promise'?'0':'1')+r.nextDate});
   });
-  (S.companies||[]).filter(c=>!isIgnoredRec(c)&&cadDue(c)&&!(c.nextDate&&c.nextDate<=t)).forEach(c=>{
+  (S.companies||[]).filter(c=>!isIgnoredRec(c)&&cadDue(c)&&!(c.nextDate&&c.nextDate<=t&&!letterDoneStep(c))).forEach(c=>{
     const cd=cadenceOf(c);
     items.push({rec:c,kind:'cadence',key:'cdz_'+c.id+'_'+cd.next.k,text:'Letter of '+fmtDe(cd.sent)+(cd.via?' via '+cd.via:'')+': '+cd.next.label,due:cd.next.due,sort:'2'+cd.next.due});
   });
@@ -74,7 +75,7 @@ export function buildQueue(){
 }
 export function laterThisWeek(){
   const t=today(),end=addDays(weekStart(t),6);
-  return allRecs().filter(r=>!isIgnoredRec(r)&&r.nextDate&&r.nextDate>t&&r.nextDate<=(end>addDays(t,6)?end:addDays(t,6))).sort((a,b)=>a.nextDate.localeCompare(b.nextDate));
+  return allRecs().filter(r=>!isIgnoredRec(r)&&r.nextDate&&r.nextDate>t&&!letterDoneStep(r)&&r.nextDate<=(end>addDays(t,6)?end:addDays(t,6))).sort((a,b)=>a.nextDate.localeCompare(b.nextDate));
 }
 
 export function weekScore(){
