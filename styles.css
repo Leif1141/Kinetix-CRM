@@ -78,6 +78,7 @@ tr.rowlink:hover td{background:#F0F0F5}
 .pbox label{font-size:9px;color:var(--gray);text-transform:uppercase;display:block;margin-top:6px}
 .stagesel{font-size:11px;padding:2px 6px;border:1px solid #D3D3D2;border-radius:10px;background:#fff;color:#2E3C65;max-width:150px}
 .pbox input,.pbox select,.pbox textarea{width:100%;font-family:Arial;font-size:12px;padding:4px 6px;border:1px solid var(--lgray);border-radius:3px}
+.pbox input[type=checkbox],.pbox input[type=radio]{width:auto;flex:none;padding:0;margin:1px 0 0}
 .pbox .inline{display:flex;gap:6px;flex-wrap:wrap}
 .pbox .inline input,.pbox .inline select{width:auto}
 .timeline{border-left:2px solid var(--sub);margin-left:6px;padding-left:12px}

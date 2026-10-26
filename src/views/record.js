@@ -7,7 +7,7 @@ import {fld, gv, n1, selFld, starHtml, stagePill} from './ui.js';
 import {letterBox} from './pipeline.js';
 import {renderAll} from '../main.js';
 import {save} from '../store/firebase.js';
-import {shareHtml} from '../shares.js';
+import {shareHtml, sharedByRec} from '../shares.js';
 import {logDone} from './actions.js';
 import {openPromises} from './home.js';
 
@@ -106,6 +106,15 @@ function promisesHtml(r){
   if(log.length)h+='<details style="margin-top:8px"><summary class="muted" style="font-size:11px;cursor:pointer">Completed ('+(r.actionLog||[]).length+')</summary>'+log.map(a=>'<div style="font-size:11px;margin-top:3px"><span class="muted">'+fmtD(a.done)+'</span> '+esc(fixUml(a.what||''))+'</div>').join('')+'</details>';
   return h+'</div>';
 }
+// Advisers who receive target names from Leif. Changing the category or person type re-renders the page,
+// so the box appears or disappears as soon as the type is set.
+const NAME_TAKERS=['M&A sourcing intermediaries'];
+function givesNames(r){
+  if(sharedByRec(r).length)return true;
+  if(r.kind==='advisor')return NAME_TAKERS.includes(r.category);
+  if(r.kind==='person'){if(NAME_TAKERS.includes(r.ptype))return true;const o=personOrg(r);return !!(o&&o.kind==='advisor'&&NAME_TAKERS.includes(o.category))}
+  return false;
+}
 export function renderRecordPage(){
   const r=profRec;const el=document.getElementById('p-record');if(!r||!el)return;
   const spec=fieldSpecs(r);const isT=r.kind==='target',isP=r.kind==='person';
@@ -122,7 +131,7 @@ export function renderRecordPage(){
     +'</div><div class="rec-r">'
     +promisesHtml(r)
     +wrapUpHtml(r)
-    +'<div class="pbox"><h4>'+(isT?'Shared with':'Names you gave them')+(isT?' <button class="sm" data-click="addShare">+ Add</button>':'')+'</h4>'+shareHtml(r)+'</div>'
+    +(isT||givesNames(r)?'<div class="pbox"><h4>'+(isT?'Shared with':'Names you gave them')+(isT?' <button class="sm" data-click="addShare">+ Add</button>':'')+'</h4>'+shareHtml(r)+'</div>':'')
     +'<div class="pbox"><h4>Log activity</h4><div class="inline">'+selFld('la_type','Type',ACT_TYPES,'Call')+fld('la_date','Date',today(),'date')+fld('la_txt','Subject','')+'</div><label>Note</label><textarea id="la_note" rows="2"></textarea><div class="inline" style="margin-top:4px">'+fld('la_owe','I promised (becomes an open promise)','')+fld('la_owe_by','By',addDays(today(),3),'date')+'</div><button class="sm primary" data-click="logActivity" style="margin-top:4px">Log</button></div>'
     +'<div class="pbox"><h4>Activity timeline <span class="muted" style="font-weight:400">'+Object.keys(r.touches||{}).length+' activities</span></h4>'
       +'<div class="tl-ctl">Period: <select data-change="setTlPeriod|$vn"><option value="13"'+(tlPeriod===13?' selected':'')+'>13 weeks</option><option value="26"'+(tlPeriod===26?' selected':'')+'>26 weeks</option><option value="52"'+(tlPeriod===52?' selected':'')+'>52 weeks</option></select> '
@@ -210,7 +219,7 @@ function afterCommit(key){
   // header, dependent blocks and the other tabs, without tearing down the field being edited next
   const r=profRec;if(!r)return;
   const head=document.querySelector('#p-record .rec-head');if(head)head.outerHTML=headHtml(r);
-  if(key==='stage'||key==='nextAction'||key==='nextDate'||key==='priority'){setTimeout(()=>{if(!document.querySelector('#p-record .rfe'))renderRecordPage()},50)}
+  if(key==='stage'||key==='nextAction'||key==='nextDate'||key==='priority'||key==='category'||key==='ptype'){setTimeout(()=>{if(!document.querySelector('#p-record .rfe'))renderRecordPage()},50)}
   clearTimeout(_rt);_rt=setTimeout(renderAll,150);
 }
 function donePromise(i){
@@ -251,7 +260,7 @@ export function filesHtml(r){
   return h||'<span class="muted">No files linked</span>';
 }
 export async function addLink(){const v=await openDialog({title:'Add a link',fields:[{key:'t',label:'Title',required:true},{key:'u',label:'URL',placeholder:'https://',required:true}],ok:'Add'});if(!v)return;const t=v.t.trim(),u=v.u.trim();profRec.links=profRec.links||[];profRec.links.push({title:t,url:u});ensureInState(profRec);save();renderRecordPage()}
-export function listChips(r){return '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px;align-items:start">'+(S.customLists||[]).map(l=>'<label style="font-size:11px;display:flex;align-items:flex-start;gap:5px;text-transform:none;margin:0;line-height:1.3"><input type="checkbox" style="margin:0" '+(((r.lists||[]).includes(l))?'checked':'')+' data-change="toggleList|'+r.id+'|'+esc(l)+'|$c"> '+esc(l)+'</label>').join('')+'</div>'}
+export function listChips(r){return '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px;align-items:start">'+(S.customLists||[]).map(l=>'<label style="font-size:11px;display:flex;align-items:flex-start;gap:6px;text-transform:none;margin:0;line-height:1.3;color:#000;text-align:left"><input type="checkbox" style="margin:1px 0 0" '+(((r.lists||[]).includes(l))?'checked':'')+' data-change="toggleList|'+r.id+'|'+esc(l)+'|$c"> '+esc(l)+'</label>').join('')+'</div>'}
 export function toggleList(id,l,on){const r=findRec(id)||profRec;if(!r)return;r.lists=r.lists||[];if(on&&!r.lists.includes(l))r.lists.push(l);if(!on)r.lists=r.lists.filter(x=>x!==l);ensureInState(r);save()}
 
 export let tlPeriod=13,tlTypes={Email:true,Meeting:true,Call:true,Note:true,Letter:true};
@@ -283,25 +292,28 @@ export function convTouches(r){
   if(r.kind==='person'){const o=personOrg(r);if(o){const seen=new Set(ts.map(t=>(t.date||'')+'|'+(t.subject||'')));touchList(o).forEach(t=>{if(isSysNote(t))return;const k=(t.date||'')+'|'+(t.subject||'');if(!seen.has(k)){seen.add(k);ts.push(t)}});ts.sort((a,b)=>(b.date||'').localeCompare(a.date||''))}}
   return ts;
 }
+// A call or meeting has no direction for the purpose of "who owes the next move".
+const isCallTouch=t=>srcLabel(t)==='Call';
+const dirWord=t=>isCallTouch(t)?'Call':(t.dir==='out'?'Sent':'Received');
 export function wrapUpHtml(r){
-  const ts=convTouches(r);
+  const ts=convTouches(r); // newest first
   if(!ts.length)return '';
   const newest=ts[0];
-  const lastIn=ts.find(t=>t.dir==='in'),lastOut=ts.find(t=>t.dir==='out');
   const open=(r.nextAction||'').trim();
-  const ball=open
-    ? 'Ball with you - open item above (last exchange '+(newest.dir==='in'?'received ':'sent ')+fmtAgo(newest.date)+')'
-    : (newest.dir==='in'
-      ? 'Ball with you - they wrote last, '+fmtAgo(newest.date)
-      : 'Ball with them - you wrote last, '+fmtAgo(newest.date));
+  const ball=(isCallTouch(newest)
+      ? 'Last contact: call '+fmtAgo(newest.date)
+      : newest.dir==='in'
+        ? 'Ball with you - they wrote last, '+fmtAgo(newest.date)
+        : 'Ball with them - you wrote last, '+fmtAgo(newest.date))
+    +(open?' <span class="muted" style="font-weight:400">&middot; your next step is set above</span>':'');
   const cut=(s,n)=>{s=(s||'').replace(/\s+/g,' ').trim();return s.length>n?s.slice(0,n)+' …':s};
-  const blk=(t,lab)=>!t?'':'<div style="margin-bottom:9px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">'+lab+' &middot; '+fmtD(t.date)+' &middot; '+fmtAgo(t.date)+' &middot; '+esc(srcLabel(t))+(t.who?' &middot; '+esc(fixUml(t.who)):'')+'</div><b style="font-size:12px">'+linkWrap(t,esc(fixUml(t.subject||'(no subject)')))+(t.link?' <span class="muted">&#8599;</span>':'')+'</b>'+((t.prev||t.note)?'<div class="tnote" style="margin-top:4px">'+esc(cut(fixUml(cleanPrev(t.prev||t.note,1200)),1200))+'</div>':'')+'</div>';
-  const older=ts.filter(t=>t!==lastIn&&t!==lastOut).slice(0,4);
-  return '<div class="pbox" style="border-left:3px solid '+(newest.dir==='in'?'#C6943E':'#2E3C65')+'">'+
+  const blk=t=>!t?'':'<div style="margin-bottom:9px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">'+dirWord(t)+' &middot; '+fmtD(t.date)+' &middot; '+fmtAgo(t.date)+' &middot; '+esc(srcLabel(t))+(t.who?' &middot; '+esc(fixUml(t.who)):'')+'</div><b style="font-size:12px">'+linkWrap(t,esc(fixUml(t.subject||'(no subject)')))+(t.link?' <span class="muted">&#8599;</span>':'')+'</b>'+((t.prev||t.note)?'<div class="tnote" style="margin-top:4px">'+esc(cut(fixUml(cleanPrev(t.prev||t.note,1200)),1200))+'</div>':'')+'</div>';
+  const older=ts.slice(2,6);
+  return '<div class="pbox" style="border-left:3px solid '+(!isCallTouch(newest)&&newest.dir==='in'?'#C6943E':'#2E3C65')+'">'+
     '<h4>Where we left things</h4>'+
     '<div style="font-size:12px;font-weight:bold;margin-bottom:9px">'+ball+'</div>'+
-    blk(lastIn,'Last received')+blk(lastOut,'Last sent')+
-    (older.length?'<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--lgray)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">Earlier in this thread</div>'+older.map(t=>'<div style="font-size:11px;margin-top:5px">'+fmtD(t.date)+' <span class="muted">'+(t.dir==='out'?'sent':'received')+' &middot; '+esc(srcLabel(t))+'</span> <b>'+linkWrap(t,esc(fixUml(t.subject||'')))+'</b>'+(t.prev?'<div class="tnote" style="margin-top:2px">'+esc(cut(fixUml(cleanPrev(t.prev,400)),400))+'</div>':'')+'</div>').join('')+'</div>':'')+
+    blk(ts[0])+blk(ts[1])+
+    (older.length?'<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--lgray)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">Earlier in this thread</div>'+older.map(t=>'<div style="font-size:11px;margin-top:5px">'+fmtD(t.date)+' <span class="muted">'+(isCallTouch(t)?'call':(t.dir==='out'?'sent':'received')+' &middot; '+esc(srcLabel(t)))+'</span> <b>'+linkWrap(t,esc(fixUml(t.subject||'')))+'</b>'+(t.prev?'<div class="tnote" style="margin-top:2px">'+esc(cut(fixUml(cleanPrev(t.prev,400)),400))+'</div>':'')+'</div>').join('')+'</div>':'')+
     '</div>';
 }
 export function setTlPeriod(w){tlPeriod=w;drawTimeline(profRec)}
