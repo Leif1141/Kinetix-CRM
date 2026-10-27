@@ -59,6 +59,15 @@ export function unarchiveAll(){let n=0;rawRecs().forEach(r=>{if(r.archived){dele
 export function toggleArchived(on){S.showArchived=!!on;save();renderAll()}
 export function findRec(id){return rawRecs().find(r=>r.id===id)}
 export function dispName(r){return r.name||r.firm}
+// Two-line label for lists (Leif 27.10.2026): the organisation on top, the person below. A person shows the
+// organisation they belong to (linked record, else the firm field) on top and their own name below; a company
+// or adviser firm shows its name on top and its contact below. A person without an organisation shows the name only.
+export function rowLabel(r){
+  if(!r)return {top:'',sub:''};
+  // linked organisation or the firm field; no fuzzy name match here, the label is drawn for every queue row
+  if(r.kind==='person'){const o=r.orgId?findRec(r.orgId):null;const firm=(o&&o!==r?dispName(o):r.firm)||'';return firm?{top:firm,sub:r.name||''}:{top:r.name||'',sub:''}}
+  return {top:dispName(r)||'',sub:r.contact||''};
+}
 export function touchList(r){return Object.values(r.touches||{}).sort((a,b)=>(b.date||'').localeCompare(a.date||''))}
 export function isSysNote(t){return !!(t&&t.src==='Note'&&/^✔/.test(t.subject||''))}
 export function orgTouches(o){

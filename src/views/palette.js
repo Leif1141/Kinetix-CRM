@@ -1,4 +1,4 @@
-import {S, allRecs, addTouch, dispName, findRec, fixUml, lastTouch} from '../state.js';
+import {S, allRecs, addTouch, dispName, findRec, fixUml, lastTouch, rowLabel} from '../state.js';
 import {addDays, esc, fmtAgo, foldSearch, toast, today, uid} from '../util.js';
 import {searchHay} from './search.js';
 import {openProfile} from './record.js';
@@ -59,7 +59,7 @@ function renderHits(){
   if(!q.trim()){body.innerHTML='<div class="pal-empty muted">Start typing a company, firm or person.</div>';return}
   if(!hits.length){body.innerHTML='<div class="pal-empty muted">No match.</div>';return}
   const kindLbl={target:'Target',advisor:'Advisor',person:'Person'};
-  body.innerHTML=hits.map((r,i)=>'<div class="pal-row'+(i===sel?' sel':'')+'" data-i="'+i+'"><div class="pal-main"><b>'+esc(fixUml(dispName(r)))+'</b> <span class="muted">'+kindLbl[r.kind]+(r.kind==='person'&&r.firm?' · '+esc(fixUml(r.firm)):r.kind==='target'?' · '+esc(r.stage||''):r.status?' · '+esc(r.status):'')+'</span>'+(r.nextAction?'<div class="muted" style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(fixUml(r.nextAction))+'</div>':'')+'</div>'
+  body.innerHTML=hits.map((r,i)=>'<div class="pal-row'+(i===sel?' sel':'')+'" data-i="'+i+'"><div class="pal-main"><b>'+esc(fixUml(rowLabel(r).top))+'</b> <span class="muted">'+kindLbl[r.kind]+(r.kind==='person'&&rowLabel(r).sub?' · '+esc(fixUml(rowLabel(r).sub)):r.kind==='target'?' · '+esc(r.stage||''):r.status?' · '+esc(r.status):'')+'</span>'+(r.nextAction?'<div class="muted" style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(fixUml(r.nextAction))+'</div>':'')+'</div>'
     +'<div class="pal-acts">'+ACTIONS.map((a,j)=>'<span class="pal-act'+(i===sel&&j===act?' on':'')+'" data-act="'+a.k+'">'+a.t+'</span>').join('')+'</div>'
     +'<div class="muted" style="font-size:10px;white-space:nowrap">'+(lastTouch(r)?fmtAgo(lastTouch(r)):'')+'</div></div>').join('');
   const s=body.querySelector('.pal-row.sel');if(s)s.scrollIntoView({block:'nearest'});

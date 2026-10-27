@@ -1,6 +1,6 @@
 import {letterDoneStep} from '../state.js';
 import {ACTIVE_STAGES, LETTER_TARGET_WEEK, LIVE} from '../constants.js';
-import {S, allRecs, cadenceOf, cadDue, dispName, findRec, fixUml, grpOf, GRP_DEF, isDismissed, isIgnoredRec, isStale, isSysNote, lastTouch, liveOnly, orgPeople, orgTouches, tType, touchList} from '../state.js';
+import {S, allRecs, cadenceOf, cadDue, dispName, findRec, fixUml, grpOf, GRP_DEF, isDismissed, isIgnoredRec, isStale, isSysNote, lastTouch, liveOnly, orgPeople, orgTouches, rowLabel, tType, touchList} from '../state.js';
 import {addDays, cleanPrev, daysAgo, esc, fmtD, fmtDe, today, weekStart} from '../util.js';
 import {grpChip, stagePill} from './ui.js';
 import {sugAct, unignoreRec} from './actions.js';
@@ -110,14 +110,14 @@ function dueTxt(d){
 }
 function rowHtml(it){
   const r=it.rec;
-  const sub=r.kind==='person'?(r.firm||''):(r.contact||'');
+  const lab=rowLabel(r),sub=lab.sub;
   const kindTag='<span class="qk qk-'+it.kind+'">'+QUEUE_KINDS[it.kind]+'</span>';
   const acts=it.kind==='stale'||it.kind==='noaction'||it.kind==='revisit'
     ?'<button class="sm" data-act="set" data-id="'+r.id+'">Set action</button> <button class="sm" data-act="dismiss" data-id="'+r.id+'" data-key="'+it.key+'">Dismiss</button>'
     :'<button class="sm primary" data-act="done" data-id="'+r.id+'" data-key="'+it.key+'" title="Log as done">Done</button> <button class="sm" data-act="1w" data-id="'+r.id+'" data-key="'+it.key+'">+1w</button> <button class="sm" data-act="1m" data-id="'+r.id+'" data-key="'+it.key+'">+1m</button> <button class="sm" data-act="ignore" data-id="'+r.id+'" data-key="'+it.key+'" title="Hide until there is new activity">Ignore</button>';
   return '<div class="qrow" data-open="'+r.id+'">'
     +'<div class="q-acts">'+acts+'</div>'
-    +'<div class="q-name"><b>'+esc(fixUml(dispName(r)))+'</b>'+(sub?'<div class="muted" style="font-size:10px">'+esc(fixUml(sub))+'</div>':'')+(r.kind==='target'?'<div>'+stagePill(r.stage)+'</div>':'')+'</div>'
+    +'<div class="q-name"><b>'+esc(fixUml(lab.top))+'</b>'+(sub?'<div class="muted" style="font-size:10px">'+esc(fixUml(sub))+'</div>':'')+(r.kind==='target'?'<div>'+stagePill(r.stage)+'</div>':'')+'</div>'
     +'<div class="q-type">'+grpChip(r)+'</div>'
     +'<div class="q-step">'+kindTag+' '+esc(fixUml(it.text||''))+'</div>'
     +'<div class="q-due">'+dueTxt(it.due)+'</div>'

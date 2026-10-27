@@ -1,5 +1,5 @@
 import {openDialog, confirmDialog} from './dialog.js';
-import {S, allRecs, dispName, findRec, fixUml, lastTouch, orgTouches, rawRecs} from '../state.js';
+import {S, allRecs, dispName, findRec, fixUml, lastTouch, orgTouches, rawRecs, rowLabel} from '../state.js';
 import {daysAgo, esc, fmtAgo, fmtD, toast, today} from '../util.js';
 import {dueChip, prioChip} from './ui.js';
 import {logDone} from './actions.js';
@@ -117,8 +117,7 @@ export function renderThreads(){
     const pc=t.p==='Hoch'?' p-hoch':(t.p==='Mittel'?' p-mittel':'');
     let h='<div class="th-row'+pc+(done?' done':'')+'">'
       +'<input type="checkbox" title="'+(done?'Ticked on '+esc(S.threadsDone[t.id]):'Tick off')+'" data-click="thToggle|'+t.id+'|$e"'+(done?' checked':'')+'>'
-      +'<div class="th-bd"><div class="th-head"><span class="th-nm" data-click="thOpen|'+t.id+'|$e">'+esc(t.name)+'</span>'
-      +(function(){const _r=findRec(t.id);const _c=(_r&&_r.kind!=='person'&&_r.contact)?_r.contact:t.contact;return _c&&_c!==t.name?'<span class="muted">'+esc(fixUml(_c))+'</span>':''})()
+      +(function(){const _r=findRec(t.id);const L=_r?rowLabel(_r):{top:t.name,sub:t.contact};const top=fixUml(L.top||t.name),sub=fixUml(L.sub||'');return '<span class="th-nm" data-click="thOpen|'+t.id+'|$e">'+esc(top)+'</span>'+(sub&&sub!==top?'<span class="muted">'+esc(sub)+'</span>':'')})()
       +pill(TH_CLS[v],TH_V[v])+(t.p&&t.p!=='Niedrig'?pill(t.p.toLowerCase(),({Hoch:'High',Mittel:'Medium'})[t.p]||t.p):'')
       +(still!=null&&still<9999?pill('lite',still+' days quiet'):'')
       +(t.auto?pill('lite','new since snapshot'):'')

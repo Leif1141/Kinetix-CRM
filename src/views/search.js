@@ -1,4 +1,4 @@
-import {allRecs, dispName, fixUml, lastTouch, orgPeople, personOrg} from '../state.js';
+import {allRecs, dispName, fixUml, lastTouch, orgPeople, personOrg, rowLabel} from '../state.js';
 import {esc, fmtAgo, foldSearch} from '../util.js';
 
 export function searchHay(r){
@@ -31,14 +31,14 @@ export function renderGlobalSearch(){
     ? '<table><tr><th style="width:78px">Type</th><th style="width:26%">Name</th><th style="width:26%">Contacts</th><th>Detail</th><th style="width:88px">Last contact</th></tr>'+hits.slice(0,80).map(x=>{
         const r=x.r;
         let contact;
-        if(r.kind==='person')contact=esc(fixUml(r.firm||''));
+        if(r.kind==='person'){const L=rowLabel(r);contact=L.sub?esc(fixUml(L.sub)):''}
         else{
           const names=[];if(r.contact)names.push(esc(fixUml(r.contact)));
           x.people.forEach(p=>{const n=fixUml(p.name||'');if(!n||names.some(s=>s.indexOf(esc(n))>=0))return;names.push('<span data-click="!openRec|'+p.id+'|$e" style="cursor:pointer;text-decoration:underline dotted">'+esc(n)+'</span>')});
           contact=names.join(', ');
         }
         const detail=[r.kind==='person'?r.title:'',r.category||r.ptype||'',r.email||'',r.city||r.location||''].filter(Boolean).join(' &middot; ');
-        return '<tr class="rowlink" data-click="openRec|'+r.id+'|$e"><td><span class="chip">'+kindLbl[r.kind]+'</span></td><td><b>'+esc(fixUml(dispName(r)))+'</b></td><td class="muted">'+contact+'</td><td class="muted">'+detail+'</td><td class="muted">'+fmtAgo(lastTouch(r))+'</td></tr>';
+        return '<tr class="rowlink" data-click="openRec|'+r.id+'|$e"><td><span class="chip">'+kindLbl[r.kind]+'</span></td><td><b>'+esc(fixUml(rowLabel(r).top))+'</b></td><td class="muted">'+contact+'</td><td class="muted">'+detail+'</td><td class="muted">'+fmtAgo(lastTouch(r))+'</td></tr>';
       }).join('')+'</table>'+(hits.length>80?'<p class="muted" style="padding:8px 12px">Showing the first 80.</p>':'')
     : '<p class="muted" style="padding:12px">Nothing found. Umlauts do not matter here - Koehler, Kohler and Köhler all match.</p>';
 }

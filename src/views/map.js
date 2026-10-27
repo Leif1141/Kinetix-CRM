@@ -160,10 +160,10 @@ export function groupChip(g){return '<span class="chip" title="'+esc(g.cat[0])+'
 
 // One label for every record: the person and the organisation they belong to.
 export function recLabel(r){
-  if(r.kind==='person'){const o=r.orgId?findRec(r.orgId):null;const firm=(o?dispName(o):r.firm)||'';return firm?fixUml(dispName(r))+' / '+fixUml(firm):fixUml(dispName(r))}
+  if(r.kind==='person'){const o=r.orgId?findRec(r.orgId):null;const firm=(o?dispName(o):r.firm)||'';return firm?fixUml(firm)+' / '+fixUml(dispName(r)):fixUml(dispName(r))}
   const p=orgPeople(r)[0];
   const who=r.contact||(p&&p.name)||'';
-  return who?fixUml(who)+' / '+fixUml(dispName(r)):fixUml(dispName(r));
+  return who?fixUml(dispName(r))+' / '+fixUml(who):fixUml(dispName(r));
 }
 // Cluster cities that sit within roughly `km` of each other so the list is regions, not 200 single entries.
 export function clusterCities(byCity,km){
