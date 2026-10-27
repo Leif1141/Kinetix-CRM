@@ -30,8 +30,8 @@ export function shiftDue(id,days,ev){if(ev)ev.stopPropagation();const r=findRec(
 export function toggleFav(id,ev){if(id&&typeof id==='object'&&id.stopPropagation){const t=id;id=ev;ev=t}if(ev&&ev.stopPropagation)ev.stopPropagation();const r=findRec(id);if(!r)return;r.fav=!r.fav;save();renderAll();if(profRec&&profRec.id===id)openProfile(r)}
 export function letterBox(rec){
   const cd=cadenceOf(rec);
-  const st=cd?('Letter sent on '+fmtDe(cd.sent)+(cd.via?' via '+esc(cd.via):'')+' · '+(cd.replied?'Reply received, cadence ended':cd.next?'next step: '+cd.next.label+' by '+fmtDe(cd.next.due):'Cadence complete')):(LS_DE[rec.letterStatus]||'No letter yet');
-  const steps=cd?'<div style="font-size:11px;margin-top:4px">'+cd.steps.map(s=>(s.done?'&#10003; ':'&#9675; ')+s.label+' '+fmtDe(s.due)).join(' &nbsp; ')+'</div>':'';
+  const st=cd?('Letter sent on '+fmtDe(cd.sent)+(cd.via?' via '+esc(cd.via):'')+' · '+(cd.replied?'Reply received, cadence ended':cd.partner?'follow-up by the partner, no cadence in the CRM':cd.next?'next step: '+cd.next.label+' by '+fmtDe(cd.next.due):'Cadence complete')):(LS_DE[rec.letterStatus]||'No letter yet');
+  const steps=cd&&!cd.partner?'<div style="font-size:11px;margin-top:4px">'+cd.steps.map(s=>(s.done?'&#10003; ':'&#9675; ')+s.label+' '+fmtDe(s.due)).join(' &nbsp; ')+'</div>':'';
   const b=(v,t)=>'<button class="sm'+(rec.letterStatus===v?' vbtn on':'')+'" data-click="setLetterStatus|'+rec.id+'|'+v+'">'+t+'</button> ';
   return '<div style="margin-top:8px;padding:8px;border:1px solid #E3E5EC;border-radius:5px"><label style="margin:0">Letter and cadence</label><div style="font-size:12px">'+st+'</div>'+steps+
     '<div style="margin-top:6px">'+(cd?'':b('planned','Letter planned')+b('ready','Letter drafted'))+'<button class="sm" data-click="markLetterSent|'+rec.id+'">Letter sent...</button></div></div>';
@@ -108,7 +108,7 @@ export function renderPipeline(){
   const kdef=[
     {k:'live',t:'Live',f:c=>LIVE.includes(c.stage)},
     {k:'due',t:'Due',f:c=>(LIVE.includes(c.stage)||isReady(c))&&isDue(c),warn:1},
-    {k:'nonext',t:'Without next step',f:c=>LIVE.includes(c.stage)&&!c.nextAction&&!(cadenceOf(c)&&cadenceOf(c).next),warn:1},
+    {k:'nonext',t:'Without next step',f:c=>LIVE.includes(c.stage)&&!c.nextAction&&!(cadenceOf(c)&&(cadenceOf(c).next||cadenceOf(c).partner)),warn:1},
     {k:'replied',t:'Replied or further',f:c=>LIVE.includes(c.stage)&&c.stage!=='Contacted'},
     {k:'ready',t:'To contact',f:isReady},
     {k:'letters',t:'Letters this week',v:lettersWeek+' / '+LETTER_TARGET_WEEK,f:c=>touchList(c).some(x=>tType(x)==='Letter'&&x.dir!=='in'&&(x.date||'').slice(0,10)>=ws)}

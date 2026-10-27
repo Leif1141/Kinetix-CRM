@@ -64,7 +64,7 @@ export function buildQueue(){
   live.filter(c=>isStale(c)&&!c.nextDate&&!isDismissed('stale_'+c.id)).forEach(c=>{
     items.push({rec:c,kind:'stale',key:'stale_'+c.id,text:c.stage+', last contact '+(lastTouch(c)?fmtDe(lastTouch(c)):'never'),due:'',sort:'4'+(lastTouch(c)||'')});
   });
-  live.filter(c=>!c.nextDate&&!isStale(c)&&!(cadenceOf(c)&&cadenceOf(c).next)&&!isDismissed('noact_'+c.id)).forEach(c=>{
+  live.filter(c=>!c.nextDate&&!isStale(c)&&!(cadenceOf(c)&&(cadenceOf(c).next||cadenceOf(c).partner))&&!isDismissed('noact_'+c.id)).forEach(c=>{
     items.push({rec:c,kind:'noaction',key:'noact_'+c.id,text:c.stage+', no next step scheduled',due:'',sort:'3'+(lastTouch(c)||'')});
   });
   (S.companies||[]).filter(c=>(c.stage==='Dead'||c.stage==='On hold')&&c.revisitDate&&c.revisitDate<=t&&!isDismissed('rev_'+c.id)).forEach(c=>{

@@ -1,5 +1,5 @@
 import {openDialog, confirmDialog} from './dialog.js';
-import {S, allRecs, dispName, findRec, fixUml, lastTouch, orgTouches, rawRecs, rowLabel} from '../state.js';
+import {S, allRecs, dispName, findRec, fixUml, isIgnoredRec, lastTouch, orgTouches, rawRecs, rowLabel} from '../state.js';
 import {daysAgo, esc, fmtAgo, fmtD, toast, today} from '../util.js';
 import {dueChip, prioChip} from './ui.js';
 import {logDone} from './actions.js';
@@ -78,6 +78,7 @@ export function thShow(t,q,cat){
   if(document.getElementById('thHideDone').checked&&thDone(t.id))return false;
   if(q){const st=thState(t.id);const h=[t.name,t.contact,t.o,t.a,t.e,t.cat,t.email,t.r,st.note].join(' ').toLowerCase();if(!h.includes(q))return false}
   const v=thV(t),d=thDone(t.id);
+  if(['open','leif','them','hoch'].includes(thFilt)&&thIgnored(t))return false;
   if((document.getElementById('thHideSched')||{}).checked&&['open','leif','them','hoch'].includes(thFilt)){const r=thRec(t);if(r&&r.nextDate)return false}
   if(thFilt==='open')return thIsOpen(t)&&!d;
   if(thFilt==='leif')return v==='OPEN_LEIF'&&!d;
@@ -89,10 +90,27 @@ export function thShow(t,q,cat){
   if(thFilt==='unclear')return v==='UNCLEAR';
   return true;
 }
+// Ignored on Today (until the next activity) means ignored here too.
+export function thIgnored(t){const r=thRec(t);return !!(r&&isIgnoredRec(r))}
+// Done, as on Today: the record's next action is logged as done and cleared, and the thread is ticked off.
+export function thDoneItem(id,ev){
+  if(ev&&ev.stopPropagation)ev.stopPropagation();
+  const t=THREADS_LIVE().find(x=>x.id===id);const r=t&&thRec(t);
+  if(r){const what=(r.nextAction||'').trim()||(t.a||'');if(what)logDone(r,what);r.nextAction='';r.nextDate='';r.nextSet='';if(S.dismissed)delete S.dismissed['due_'+r.id]}
+  S.threadsDone=S.threadsDone||{};S.threadsDone[id]=today();
+  save();renderAll();toast('Logged as done');
+}
+// Ignore, as on Today: hidden from the open lists and from Today until the next activity on the record.
+export function thIgnoreItem(id,ev){
+  if(ev&&ev.stopPropagation)ev.stopPropagation();
+  const t=THREADS_LIVE().find(x=>x.id===id);const r=t&&thRec(t);
+  if(r){r.ignored=today()}else{S.threadsDone=S.threadsDone||{};S.threadsDone[id]=today()}
+  save();renderAll();toast('Ignored until the next activity');
+}
 // Open items where the move is Leif's, for the tab badge (same filter as the 'My move' tile).
 export function threadsMyMoveCount(){
   const hs=!!((document.getElementById('thHideSched')||{checked:true}).checked),sched=t=>{const r=thRec(t);return !!(r&&r.nextDate)};
-  return THREADS_LIVE().filter(t=>thV(t)==='OPEN_LEIF'&&!thDone(t.id)&&!(hs&&sched(t))).length;
+  return THREADS_LIVE().filter(t=>thV(t)==='OPEN_LEIF'&&!thDone(t.id)&&!thIgnored(t)&&!(hs&&sched(t))).length;
 }
 export function renderThreads(){
   if(!document.getElementById('thBody'))return;
@@ -101,7 +119,8 @@ export function renderThreads(){
   const q=(document.getElementById('thSearch').value||'').toLowerCase().trim(), cat=sel.value;
   const cnt=f=>THREADS_LIVE().filter(f).length;
   const hs=!!((document.getElementById('thHideSched')||{}).checked),sched=t=>{const r=thRec(t);return !!(r&&r.nextDate)};
-  const leif=cnt(t=>thV(t)==='OPEN_LEIF'&&!thDone(t.id)&&!(hs&&sched(t))), them=cnt(t=>thV(t)==='OPEN_THEM'&&!thDone(t.id)&&!(hs&&sched(t))), hoch=cnt(t=>t.p==='Hoch'&&thIsOpen(t)&&!thDone(t.id)&&!(hs&&sched(t)));
+  const ok=t=>!thDone(t.id)&&!thIgnored(t)&&!(hs&&sched(t));
+  const leif=cnt(t=>thV(t)==='OPEN_LEIF'&&ok(t)), them=cnt(t=>thV(t)==='OPEN_THEM'&&ok(t)), hoch=cnt(t=>t.p==='Hoch'&&thIsOpen(t)&&ok(t));
   const ticked=cnt(t=>thDone(t.id)), closed=cnt(t=>thV(t)==='CLOSED'), dead=cnt(t=>thV(t)==='DEAD'), unclear=cnt(t=>thV(t)==='UNCLEAR');
   const badge=document.getElementById('thBadge');badge.style.display=leif?'inline-block':'none';badge.textContent=leif;
   document.getElementById('thKpis').innerHTML=[[leif,'My move','leif',leif>0],[them,'Their move','them'],[hoch,'Open, high priority','hoch'],[ticked,'Ticked off','ticked'],[closed,'Done','closed'],[dead,'Dead','dead'],[unclear,'Unclear','unclear']]
@@ -141,6 +160,7 @@ export function renderThreads(){
         +'<div style="margin-top:6px"><button class="sm" data-click="thCopy|'+t.id+'|'+(t.dr?'dr':'cs')+'">Copy</button> '
         +(t.dr&&t.email?'<button class="sm primary" data-click="thMail|'+t.id+'">Open in mail client</button>':'')+'</div></div>'}
     h+='<div class="th-acts">'
+      +(!done?'<button class="sm primary" data-click="thDoneItem|'+t.id+'|$e" title="Log as done">Done</button>'+'<button class="sm" data-click="thIgnoreItem|'+t.id+'|$e" title="Hide until there is new activity">Ignore</button>':'')
       +'<button class="sm" data-click="thMore|'+t.id+'">'+(more?'Less':'Details')+'</button>'
       +((t.dr||t.cs)?'<button class="sm'+(draft?' primary':'')+'" data-click="thDraft|'+t.id+'">'+(t.dr?'Draft':'Call guide')+'</button>':'')
       +(r&&t.a?'<button class="sm" data-click="thAdopt|'+t.id+'|$e" title="Copy the next action and date into the CRM record">Adopt into CRM</button>':'')

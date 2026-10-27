@@ -123,8 +123,10 @@ export function cadenceOf(c){
   const replied=ts.some(t=>t.dir==='in'&&tType(t)!=='Note')||['Replied','Meeting','NDA','LOI','Diligence','Closed','Dead','On hold'].includes(c.stage);
   const auto={email:ts.some(t=>t.dir==='out'&&tType(t)==='Email'),call:ts.some(t=>tType(t)==='Call'),l6:ts.some(t=>tType(t)==='Letter'&&daysBetween(sent,t.date)>150),l12:ts.some(t=>tType(t)==='Letter'&&daysBetween(sent,t.date)>330)};
   const steps=CAD_STEPS.map(s=>({k:s.k,label:s.label,due:addDays(sent,s.d),done:!!(done[s.k]||auto[s.k])}));
-  const next=replied?null:steps.find(s=>!s.done)||null;
-  return {sent,via:c.channel==='Partner letter'?(c.channelVia||''):'',replied,steps,next};
+  // a partner letter (e.g. via Rettig) is followed up by the partner: no follow-up steps in the CRM (Leif 27.10.2026)
+  const partner=c.channel==='Partner letter';
+  const next=(replied||partner)?null:steps.find(s=>!s.done)||null;
+  return {sent,via:partner?(c.channelVia||''):'',partner,replied,steps,next};
 }
 export function cadDue(c){const cd=cadenceOf(c);return !!(cd&&cd.next&&cd.next.due<=today())}
 // A target whose letter went out on or after the date of its next step: the letter was that step and the
