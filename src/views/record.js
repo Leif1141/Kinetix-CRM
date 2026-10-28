@@ -299,7 +299,8 @@ export function wrapUpHtml(r){
   const ts=convTouches(r); // newest first
   if(!ts.length)return '';
   const newest=ts[0];
-  const open=(r.nextAction||'').trim();
+  // "Kein offener Punkt: ..." is context, not a step of Leif's
+  const open=(r.nextAction||'').trim()&&!/^kein offener punkt/i.test((r.nextAction||'').trim());
   const ball=(isCallTouch(newest)
       ? 'Last contact: call '+fmtAgo(newest.date)
       : newest.dir==='in'
