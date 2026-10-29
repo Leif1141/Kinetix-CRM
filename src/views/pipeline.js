@@ -45,7 +45,9 @@ export function letterRows(cs){
   const out=[];
   for(const c of cs){
     const ts=Object.entries(c.touches||{}).filter(([k,t])=>t&&tType(t)==='Letter'&&t.dir!=='in');
-    ts.forEach(([k,t])=>out.push({c,key:k,date:(t.date||'').slice(0,10)}));
+    // the first letter shows letterSent, the date the cadence runs on, even where its touch carries another day
+    const first=ts.map(([k,t])=>(t.date||'').slice(0,10)).sort()[0];let fd=false;
+    ts.forEach(([k,t])=>{let d=(t.date||'').slice(0,10);if(c.letterSent&&!fd&&d===first){d=c.letterSent;fd=true}out.push({c,key:k,date:d})});
     if(c.letterSent&&!ts.length)out.push({c,key:'',date:c.letterSent});
   }
   return out.sort((a,b)=>b.date.localeCompare(a.date)||dispName(a.c).localeCompare(dispName(b.c)));
