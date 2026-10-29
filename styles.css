@@ -57,6 +57,15 @@ th .arr{color:var(--red)}
 td{padding:4px 8px;border-bottom:1px solid #E8E8EC;vertical-align:top}
 tr.rowlink{cursor:pointer}
 tr.rowlink:hover td{background:#F0F0F5}
+tr.rowlink.on td{background:#EEF1F8}
+/* letter and channel timeline in the pipeline (newest date on top) */
+.tl{margin:0 0 10px;border-left:2px solid #CFD1E2;margin-left:92px}
+.tl-row{display:flex;gap:10px;align-items:flex-start;padding:4px 0;position:relative}
+.tl-d{width:84px;margin-left:-104px;text-align:right;font-size:12px;flex:none}
+.tl-d .muted{font-size:10px}
+.tl-dot{width:10px;height:10px;border-radius:50%;background:#2E3C65;margin:3px 0 0 -6px;flex:none}
+.tl-c{flex:1;min-width:0}
+.tl-c .chch{margin:0 2px 3px 0;font-size:11px}
 .r{text-align:right}.c{text-align:center}
 .pill{display:inline-block;padding:1px 8px;border-radius:9px;font-size:10px;font-weight:700;white-space:nowrap}
 .chip{display:inline-block;background:#EDEFF5;border:1px solid var(--sub);border-radius:9px;padding:0 8px;font-size:10px;color:var(--deep);margin:1px 2px 1px 0;white-space:nowrap}

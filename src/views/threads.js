@@ -50,6 +50,7 @@ export function thV(t){return liveVerdict(t)}
 export function thRec(t){let r=findRec(t.id);if(!r)(t.alias||[]).some(a=>(r=findRec(a)));return r||null}
 export function thDone(id){return !!(S&&S.threadsDone&&S.threadsDone[id])}
 export function thIsOpen(t){const v=thV(t);return v==='OPEN_LEIF'||v==='OPEN_THEM'}
+export function resetThreadsView(){thFilt='open';thOpenIds=new Set();thAllOpen=false;document.querySelectorAll('.th-f').forEach(x=>x.classList.toggle('on',x.dataset.f==='open'));const b=document.getElementById('thAllBtn');if(b)b.textContent='All details'}
 export function thGo(f){thFilt=f;document.querySelectorAll('.th-f').forEach(x=>x.classList.toggle('on',x.dataset.f===f));renderThreads()}
 export function thOpen(id,ev){if(ev)ev.stopPropagation();const t=THREADS_LIVE().find(x=>x.id===id);const r=t?thRec(t):findRec(id);if(r)openProfile(r);else toast('Record no longer in the CRM')}
 export function thToggle(id,ev){

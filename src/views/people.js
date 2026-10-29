@@ -98,6 +98,7 @@ export function contactRows(){
 export function personLastTouch(p){return p.__org?(p.__last||null):lastTouch(p)}
 export function allPeopleRows(){return [...(S.people||[]),...contactRows()]}
 export let pGrp='';
+export function resetPeopleView(){pGrp=''}
 export function setPGrp(g){pGrp=pGrp===g?'':g;renderPeople()}
 export function personGrp(p){const o=personOrg(p);if(o)return grpOf(o);return grpOf(p)}
 export function renderPeople(){

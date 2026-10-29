@@ -3,21 +3,21 @@ import {invalidateShares} from './shares.js';
 import {ALLOWED_EMAILS} from './config.js';
 import {S, migrateChannels, migrateStages, withRenderCache} from './state.js';
 
-import {invalidateThreads, renderThreads, threadsMyMoveCount} from './views/threads.js';
+import {invalidateThreads, renderThreads, resetThreadsView, threadsMyMoveCount} from './views/threads.js';
 import {auth, currentUser, initFirebase, showApp} from './store/firebase.js';
 import {dashRefresh, dashBadge} from './views/dash.js';
 import {migratePrevClean} from './sync/triage.js';
 import {renderData} from './views/data.js';
-import {renderHome, initHome, homeUrgentCount} from './views/home.js';
-import {initRecordPage, refreshRecordPage} from './views/record.js';
+import {renderHome, initHome, homeUrgentCount, resetHomeView} from './views/home.js';
+import {closeProfile, initRecordPage, refreshRecordPage} from './views/record.js';
 import {initPalette} from './views/palette.js';
 import {undoLast} from './store/firebase.js';
 import {renderGlobalSearch} from './views/search.js';
 import {renderInbox} from './views/inbox.js';
 import {renderLocations} from './views/map.js';
 import {renderOrgs} from './views/orgs.js';
-import {renderPeople} from './views/people.js';
-import {renderPipeline} from './views/pipeline.js';
+import {renderPeople, resetPeopleView} from './views/people.js';
+import {renderPipeline, resetPipeView} from './views/pipeline.js';
 import {renderReports, renderYield} from './views/reports.js';
 import * as _m0 from './config.js';
 import * as _m2 from './constants.js';
@@ -96,19 +96,20 @@ export function renderAll(){
 
 document.getElementById('tabs').addEventListener('click',e=>{
   const t=e.target.closest('.tab');if(!t)return;
-  if(t.classList.contains('active')){
-    // second click on the active tab resets all its filters
-    const reset={orgs:['oSearch','oKind','oStage','oList'],people:['pSearch','pType','pHas'],pipeline:['fSearch'],threads:['thSearch','thCat'],locations:['locKind']}[t.dataset.t]||[];
-    reset.forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
-    renderAll();
-    return;
-  }
+  // a tab always opens the base view of its section (Leif 29.10.2026): an open record closes,
+  // searches, filters and drill-downs reset
+  const v=t.dataset.t;
+  ({home:['homeSearch'],orgs:['oSearch','oKind','oStage','oList'],people:['pSearch','pType','pHas'],pipeline:['fSearch','fChan'],threads:['thSearch','thCat'],locations:['locKind']}[v]||[]).forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
+  if(v==='pipeline'){const f=document.getElementById('fFav');if(f)f.checked=false}
+  ({home:resetHomeView,people:resetPeopleView,pipeline:resetPipeView,threads:resetThreadsView}[v]||(()=>{}))();
+  if(document.body.classList.contains('rec-open'))closeProfile();
+  if(t.classList.contains('active')){renderAll();window.scrollTo(0,0);return}
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');
   document.getElementById('p-'+t.dataset.t).classList.add('active');
   // the map needs a visible container to size itself, so it always renders on opening
-  if(t.dataset.t==='locations'||_stale.has(t.dataset.t))renderView(t.dataset.t);
+  renderView(v);window.scrollTo(0,0);
 });
 
 // BOOT

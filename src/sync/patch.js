@@ -87,13 +87,16 @@ export function applyPatchOps(ops){
       }else if(o.op==='setField'){
         const r=patchFind(o.match);
         const _ok=['notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','mobile','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict','outreachChannel','stage','channel','channelVia','letterSent','letterStatus','fav','ignored','cadDone','archived','deadCat'];
-        if(r&&o.field&&_ok.includes(o.field)){if(o.field==='stage'&&r.stage!==o.value){r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.value,date:o.date||today()})}r[o.field]=o.value;if(o.field==='phone')splitPhones(r);made++}else if(o.op==='addList'){
+        if(r&&o.field&&_ok.includes(o.field)){if(o.field==='stage'&&r.stage!==o.value){r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.value,date:o.date||today()})}r[o.field]=o.value;if(o.field==='phone')splitPhones(r);made++}else skipped++;
+      }else if(o.op==='addList'){
         if(o.name){S.customLists=S.customLists||[];if(!S.customLists.includes(o.name))S.customLists.push(o.name);made++}else skipped++;
+      }else if(o.op==='setAnalysed'){
+        // analysed and dropped without an approach (red in MASTER Scoring); replaced as a whole on every refresh
+        if(Array.isArray(o.items)){S.analysed={source:o.source||'',date:o.date||today(),items:o.items.filter(x=>x&&x.name).map(x=>({name:String(x.name),loc:x.loc||'',ebit:x.ebit??null,score:x.score??null,reason:x.reason||'',src:x.src||o.source||''}))};made++}else skipped++;
       }else if(o.op==='renameList'){
         if(o.from&&o.to&&(S.customLists||[]).includes(o.from)){S.customLists=S.customLists.map(x=>x===o.from?o.to:x);allRecs().forEach(r=>{if(r.lists)r.lists=r.lists.map(x=>x===o.from?o.to:x)});made++}else skipped++;
       }else if(o.op==='removeList'){
         if(o.name&&(S.customLists||[]).includes(o.name)){S.customLists=S.customLists.filter(x=>x!==o.name);allRecs().forEach(r=>{if(r.lists)r.lists=r.lists.filter(x=>x!==o.name)});made++}else skipped++;
-      }else skipped++;
       }else skipped++;
     }catch(e){skipped++}
   }

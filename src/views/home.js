@@ -93,6 +93,7 @@ export function weekScore(){
   return {letters,target:LETTER_TARGET_WEEK,replies:replied.size,meetings,names,noNext,weekStart:ws};
 }
 
+export function resetHomeView(){homeGrp='';homeKind='';try{localStorage.setItem('kxHomeGrp','')}catch(e){}}
 export function setHomeGrp(g){homeGrp=homeGrp===g?'':g;try{localStorage.setItem('kxHomeGrp',homeGrp)}catch(e){}renderHome()}
 export function setHomeKind(k){homeKind=homeKind===k?'':k;renderHome()}
 function matches(item){
