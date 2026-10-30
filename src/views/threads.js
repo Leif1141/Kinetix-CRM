@@ -50,7 +50,10 @@ export function thV(t){return liveVerdict(t)}
 export function thRec(t){let r=findRec(t.id);if(!r)(t.alias||[]).some(a=>(r=findRec(a)));return r||null}
 export function thDone(id){return !!(S&&S.threadsDone&&S.threadsDone[id])}
 export function thIsOpen(t){const v=thV(t);return v==='OPEN_LEIF'||v==='OPEN_THEM'}
-export function resetThreadsView(){thFilt='open';thOpenIds=new Set();thAllOpen=false;document.querySelectorAll('.th-f').forEach(x=>x.classList.toggle('on',x.dataset.f==='open'));const b=document.getElementById('thAllBtn');if(b)b.textContent='All details'}
+// Their move starts collapsed (Leif 30.10.2026); its filter tile or a search opens it.
+export let thThemOpen=false;
+export function setThThemOpen(el){if(thFilt!=='them'&&!document.getElementById('thSearch').value.trim())thThemOpen=el.open}
+export function resetThreadsView(){thFilt='open';thOpenIds=new Set();thAllOpen=false;thThemOpen=false;document.querySelectorAll('.th-f').forEach(x=>x.classList.toggle('on',x.dataset.f==='open'));const b=document.getElementById('thAllBtn');if(b)b.textContent='All details'}
 export function thGo(f){thFilt=f;document.querySelectorAll('.th-f').forEach(x=>x.classList.toggle('on',x.dataset.f===f));renderThreads()}
 export function thOpen(id,ev){if(ev)ev.stopPropagation();const t=THREADS_LIVE().find(x=>x.id===id);const r=t?thRec(t):findRec(id);if(r)openProfile(r);else toast('Record no longer in the CRM')}
 export function thToggle(id,ev){
@@ -172,7 +175,9 @@ export function renderThreads(){
       +'</div></div></div>';
     return h;
   };
-  const html=TH_ORDER.filter(v=>groups[v].length).map(v=>'<div class="section"><div class="section-hdr" style="background:'+TH_HDR[v]+'">'+TH_V[v]+' ('+groups[v].length+')</div>'+groups[v].map(row).join('')+'</div>').join('');
+  const html=TH_ORDER.filter(v=>groups[v].length).map(v=>v==='OPEN_THEM'
+    ?'<details class="section"'+(thThemOpen||thFilt==='them'||q?' open':'')+' data-toggle="setThThemOpen|$el"><summary class="section-hdr" style="background:'+TH_HDR[v]+';display:list-item;cursor:pointer">'+TH_V[v]+' ('+groups[v].length+')</summary>'+groups[v].map(row).join('')+'</details>'
+    :'<div class="section"><div class="section-hdr" style="background:'+TH_HDR[v]+'">'+TH_V[v]+' ('+groups[v].length+')</div>'+groups[v].map(row).join('')+'</div>').join('');
   document.getElementById('thBody').innerHTML=html||'<p class="muted" style="padding:14px">Nothing in this view.</p>';
   document.getElementById('thCount').textContent=shown+' items';
 }
