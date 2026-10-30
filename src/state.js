@@ -102,7 +102,9 @@ export function orgPeople(o){
   const a=_rc.people.byOrg.get(o.id)||[],b=on?(_rc.people.byFirm.get(on)||[]):[];
   return (b.length?a.concat(b).sort((x,y)=>x[0]-y[0]):a).map(e=>e[1]);
 }
-export function addTouch(rec,key,t){rec.touches=rec.touches||{};if(!rec.touches[key])rec.touches[key]=t}
+// A touch removed by hand stays out: no sync or patch can bring the same key back.
+export function touchTomb(key){return String(key).replace(/\./g,'_')}
+export function addTouch(rec,key,t){if((S.removedTouches||{})[touchTomb(key)])return;rec.touches=rec.touches||{};if(!rec.touches[key])rec.touches[key]=t}
 
 export function dismissSugg(k){
   S.dismissed[k]=today();

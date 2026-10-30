@@ -23,7 +23,7 @@ export function decodeKeys(o){if(o===null||o===undefined||typeof o!=='object')re
 export function encodePath(p){return p.split('/').map(ENC).join('/')}
 
 export const REC_COLLS={companies:'target',advisors:'advisor',people:'person'};
-export const META_MAPS=['senderMap','geoCache','dismissed','dismissedUnmatched','ignoredSenders','ignoredDomains','appliedPatchTitles','appliedPatches','threadsDone','threadsState','emailMap','snoozeUntil'];
+export const META_MAPS=['senderMap','geoCache','dismissed','dismissedUnmatched','ignoredSenders','ignoredDomains','appliedPatchTitles','appliedPatches','threadsDone','threadsState','emailMap','snoozeUntil','removedTouches'];
 export const META_FLAGS=['lastSync','lastBackup','lastDriveBackup','_lastSnapshotWeek','_driveArchiveId','granolaFolderId','seedVer','chanMigV1','prevCleanV1','showArchived','locRadius','outreachTarget'];
 export const META_LISTS=['customLists','_openLists'];
 export const DASH_LISTS={todos:t=>'t'+String(t.id),progress:p=>'p'+hash((p.d||'')+'|'+(p.desc||'')),decisions:d=>'d'+hash(d.decision||'')};

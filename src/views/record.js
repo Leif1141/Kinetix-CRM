@@ -1,7 +1,7 @@
 import {openDialog, confirmDialog} from './dialog.js';
 import {invalidateThreads} from '../views/threads.js';
 import {ACT_TYPES, ADV_CATS, ADV_STATUS, CHANNELS, DEADREASONS, PRIORITIES, PTYPES, STAGES, VERDICTS} from '../constants.js';
-import {S, addTouch, chanOf, deadCatOf, dispName, findRec, fixUml, isSysNote, newPerson, orgPeople, personOrg, splitPhones, tType, touchList, lastTouch} from '../state.js';
+import {S, addTouch, chanOf, deadCatOf, dispName, findRec, fixUml, isSysNote, newPerson, orgPeople, personOrg, splitPhones, tType, touchList, touchTomb, lastTouch} from '../state.js';
 import {addDays, cleanPrev, esc, fmtAgo, fmtD, fmtDe, normName, toast, today, uid} from '../util.js';
 import {fld, gv, n1, selFld, starHtml, stagePill} from './ui.js';
 import {letterBox} from './pipeline.js';
@@ -239,13 +239,26 @@ export function tlHtml(r){
   const legend='<div style="font-size:10px;color:#595959;margin-bottom:6px;line-height:1.6"><span style="color:#2E3C65">●</span> Email sent &nbsp;<span style="color:#C6943E">●</span> Email received &nbsp;<span style="color:#008A3E">●</span> Meeting/Granola &nbsp;<span style="color:#7030A0">●</span> Call &nbsp;<span style="color:#8C97B8">●</span> Note/other</div>';
   return legend+'<div class="timeline">'+ts.slice(0,30).map(t=>{
     const k=Object.keys(r.touches||{}).find(k=>(r.touches||{})[k]===t);
-    return '<div class="titem t'+tType(t)+(t.dir==='out'?' out':'')+'"><b>'+fmtD(t.date)+'</b> '+(t.link?'<a href="'+esc(t.link)+'" target="_blank" title="Open original">'+esc(fixUml(t.subject))+'</a>':esc(fixUml(t.subject)))+' <span class="chip">'+esc(srcLabel(t))+'</span>'+(t.who?' <span class="muted">- '+esc(fixUml(t.who))+'</span>':'')+(t.link?' <a href="'+esc(t.link)+'" target="_blank">↗</a>':'')+(k?'<br><button class="sm" data-click="editNote|'+r.id+'|'+k+'">Note</button>':'')+(t.note?'<div class="tnote">'+esc(fixUml(t.note))+'</div>':(t.prev?'<div class="tnote">'+esc(fixUml(cleanPrev(t.prev,400)))+'</div>':''))+'</div>'
+    return '<div class="titem t'+tType(t)+(t.dir==='out'?' out':'')+'"><b>'+fmtD(t.date)+'</b> '+(t.link?'<a href="'+esc(t.link)+'" target="_blank" title="Open original">'+esc(fixUml(t.subject))+'</a>':esc(fixUml(t.subject)))+' <span class="chip">'+esc(srcLabel(t))+'</span>'+(t.who?' <span class="muted">- '+esc(fixUml(t.who))+'</span>':'')+(t.link?' <a href="'+esc(t.link)+'" target="_blank">↗</a>':'')+(k?'<br><button class="sm" data-click="editNote|'+r.id+'|'+k+'">Note</button> <button class="sm" data-click="removeTouch|'+r.id+'|'+k+'" title="Filed here by mistake">Remove</button>':'')+(t.note?'<div class="tnote">'+esc(fixUml(t.note))+'</div>':(t.prev?'<div class="tnote">'+esc(fixUml(cleanPrev(t.prev,400)))+'</div>':''))+'</div>'
   }).join('')+'</div>';
 }
 export async function editNote(recId,key){
   const r=findRec(recId);const t=(r.touches||{})[key];if(!t)return;
   const v=await openDialog({title:'Note',text:t.subject||'',fields:[{key:'n',label:'Note',type:'textarea',rows:4,value:t.note||''}]});
   if(v){t.note=v.n;save();if(profRec)renderRecordPage()}
+}
+// A wrongly filed entry goes from every record holding it (an organisation and its people share the key) and stays out.
+export async function removeTouch(recId,key){
+  const r=findRec(recId);const t=r&&(r.touches||{})[key];if(!t)return;
+  if(!(await confirmDialog('"'+fixUml(t.subject||'(no subject)')+'" goes from this record and every linked one, and later syncs will not bring it back. Undo can restore it.',{title:'Remove this entry?',ok:'Remove',danger:true})))return;
+  [...(S.companies||[]),...(S.advisors||[]),...(S.people||[])].filter(x=>(x.touches||{})[key]).forEach(x=>{
+    const letter=tType(x.touches[key])==='Letter'&&x.touches[key].dir!=='in';
+    delete x.touches[key];
+    // letterSent follows the letters that remain, so the cadence does not run on a removed one
+    if(letter&&x.letterSent)x.letterSent=Object.values(x.touches).filter(o=>tType(o)==='Letter'&&o.dir!=='in').map(o=>(o.date||'').slice(0,10)).sort()[0]||'';
+  });
+  S.removedTouches=S.removedTouches||{};S.removedTouches[touchTomb(key)]=today();
+  save();renderAll();if(profRec)renderRecordPage();toast('Entry removed');
 }
 export function filesHtml(r){
   let h='';
