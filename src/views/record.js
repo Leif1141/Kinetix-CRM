@@ -340,6 +340,21 @@ export async function deleteRec(){
   S.people=(S.people||[]).filter(p=>p.id!==r.id);
   save();closeProfile();
 }
+// Whoever is primary so far stays as a person on the record, also when they only lived in the contact text.
+export function setPrimary(recId,personId){
+  const r=findRec(recId),p=findRec(personId);if(!r||!p)return;
+  const ppl=orgPeople(r);
+  const parts=String(r.contact||'').split(';').map(x=>x.trim()).filter(Boolean);
+  parts.forEach((c,i)=>{
+    const m=c.match(/^([^(]+?)\s*\((.*)\)\s*$/),name=m?m[1].trim():c,title=m?m[2].trim():'';
+    if(normName(name)===normName(p.name)||ppl.some(x=>normName(x.name)===normName(name)))return;
+    const n=newPerson();n.name=name;n.title=title;n.firm=r.firm||r.name||'';n.orgId=r.id;
+    if(i===0){n.email=r.email||'';n.phone=r.phone||'';n.mobile=r.mobile||''}
+    S.people=S.people||[];S.people.push(n);
+  });
+  r.contact=p.name;r.email=p.email||'';r.phone=p.phone||'';r.mobile=p.mobile||'';
+  save();renderAll();if(profRec)renderRecordPage();toast(fixUml(p.name)+' is now primary');
+}
 export function peopleBoxHtml(rec,ppl){
   // Primary contact in full, everyone else on one line each.
   const prim=ppl.find(p=>rec.contact&&normName(p.name)===normName(rec.contact));
@@ -358,7 +373,7 @@ export function peopleBoxHtml(rec,ppl){
   if(rest.length){
     out+=(out?'<div style="border-top:1px solid #E8E8EC;margin:6px 0 5px"></div>':'')
       +'<div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959;margin-bottom:3px">Also here ('+rest.length+')</div>'
-      +rest.map(p=>'<div style="font-size:11px;margin-bottom:2px;cursor:pointer" data-click="openRec|'+p.id+'|$e"><b>'+esc(fixUml(p.name))+'</b>'+(p.email?' <span class="muted">'+esc(p.email)+'</span>':'')+(p.title?' <span class="muted">'+esc(p.title.slice(0,40))+'</span>':'')+'</div>').join('');
+      +rest.map(p=>'<div style="font-size:11px;margin-bottom:2px;cursor:pointer" data-click="openRec|'+p.id+'|$e"><b>'+esc(fixUml(p.name))+'</b>'+(p.email?' <span class="muted">'+esc(p.email)+'</span>':'')+(p.title?' <span class="muted">'+esc(p.title.slice(0,40))+'</span>':'')+' <button class="sm" data-click="!setPrimary|'+rec.id+'|'+p.id+'">Make primary</button></div>').join('');
   }
   return out||'<span class="muted">No people linked</span>';
 }
