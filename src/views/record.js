@@ -25,7 +25,7 @@ function fieldSpecs(r){
   const next=[F('nextAction','Next action','textarea'),F('nextDate','Due','date'),F('priority','Priority','select',{options:PRIORITIES})];
   if(r.kind==='target')return {
     sections:[
-      ['Company',[F('name','Company name','text',{required:true}),F('contact','Primary contact (owner / MD)'),F('email','Email'),F('phone','Phone (office)'),F('mobile','Mobile'),F('domain','Website'),F('location','Location')]],
+      ['Company',[F('name','Company name','text',{required:true}),F('contact','Primary contact (owner / MD)'),F('email','Email'),F('phone','Phone (office)'),F('mobile','Mobile'),F('domain','Website'),F('location','Location'),F('address','Address')]],
       ['Deal',[F('stage','Stage','select',{options:STAGES}),F('channel','Channel','select',{options:CHANNELS,get:c=>chanOf(c)}),F('channelVia','Via (partner, fair, contact)'),F('revenue','Revenue (€m)','number'),F('ebitda','EBITDA (€m)','number'),F('ebit','EBIT (€m)','number'),F('gm','Gross margin %','number',{get:c=>c.gm==null||c.gm===''?null:Math.round(c.gm*1000)/10,set:v=>v==null?null:v/100}),F('score','Score /100','number'),F('verdict','Verdict','select',{options:VERDICTS})]
         .concat(r.stage==='Dead'?[F('deadCat','Dead category','select',{options:DEADREASONS,get:deadCatOf}),F('revisitDate','Revisit date','date'),F('deadReason','Dead reason (detail)','textarea')]:[])],
       ['Profile',[F('description','Description','textarea'),F('ownership','Ownership'),F('flag','Flag'),F('notes','Research notes','textarea',{rows:6})]]
@@ -37,7 +37,7 @@ function fieldSpecs(r){
     ],next};
   return {
     sections:[
-      ['Person',[F('name','Full name','text',{required:true}),F('title','Title'),F('ptype','Type','select',{options:PTYPES}),F('firm','Organisation'),F('email','Email'),F('phone','Phone (office)'),F('mobile','Mobile'),F('linkedin','LinkedIn'),F('city','City')]],
+      ['Person',[F('name','Full name','text',{required:true}),F('title','Title'),F('ptype','Type','select',{options:PTYPES}),F('firm','Organisation'),F('email','Email'),F('phone','Phone (office)'),F('mobile','Mobile'),F('linkedin','LinkedIn'),F('city','City'),F('address','Address')]],
       ['Context',[F('angle','Angle / notes','textarea'),F('networkPath','Network path')]]
     ],next};
 }
