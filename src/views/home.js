@@ -53,7 +53,7 @@ export function buildQueue(){
   const items=[];
   allRecs().filter(isDeadSelf).forEach(r=>{
     const m=deadMail(r);
-    if(m)items.push({rec:r,kind:'deadmail',key:'deadmail_'+r.id,text:fixUml(dispName(r))+' (Dead) hat geschrieben: '+(m.subject||''),due:'',sort:'00'+m.date});
+    if(m)items.push({rec:r,kind:'deadmail',key:'deadmail_'+r.id,text:fixUml(dispName(r))+' (Dead) hat geschrieben: '+(m.subject||''),due:'',sort:'0z'+m.date});
   });
   const all=allRecs().filter(r=>!isIgnoredRec(r));
   all.filter(r=>r.nextDate&&r.nextDate<=t&&!letterDoneStep(r)&&!isDeadRec(r)).forEach(r=>{

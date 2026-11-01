@@ -1,5 +1,5 @@
 import {MY_ADDR} from '../constants.js';
-import {S, addTouch, allRecs, touchList} from '../state.js';
+import {S, addTouch, allRecs, tType, touchList} from '../state.js';
 import {cleanPrev, fmtD} from '../util.js';
 import {isDismissedUnmatched} from '../views/inbox.js';
 import {matchRecords} from './match.js';
@@ -55,8 +55,10 @@ export function retriageUnmatched(){
 export function reconcileDraftActions(){
   let n=0;
   allRecs().forEach(r=>{
-    if(!r.nextAction||!/entwurf|draft/i.test(r.nextAction))return;
-    const lo=touchList(r).find(t=>t.dir==='out'&&t.src!=='Note');
+    // A promise made on a call is never closed by itself, and only a mail counts as sent: the call's own
+    // Meeting or Granola touch closed the promise it had created (Sancovia, 30.10.2026).
+    if(!r.nextAction||!/entwurf|draft/i.test(r.nextAction)||/(^|\|\s*)Promised\b/.test(r.nextAction))return;
+    const lo=touchList(r).find(t=>t.dir==='out'&&t.src!=='Note'&&tType(t)==='Email');
     if(!lo)return;
     if(!r.nextSet)return; // only auto-complete actions with a known set-date
     const since=r.nextSet;
