@@ -321,7 +321,7 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
 .home-side .score .kpi{padding:6px 8px}
 .home-side .score .kpi .v{font-size:18px}
 .home-side .score .kpi.on{outline:2px solid var(--navy)}
-.qhead,.qrow{display:grid;grid-template-columns:118px minmax(120px,170px) 96px minmax(0,1fr) 112px 62px;gap:0 8px;align-items:start;padding:5px 8px;border-bottom:1px solid #E8E8EC}
+.qhead,.qrow{display:grid;grid-template-columns:128px minmax(120px,170px) 96px minmax(0,1fr) 112px 62px;gap:0 8px;align-items:start;padding:5px 8px;border-bottom:1px solid #E8E8EC}
 .qhead{font-size:11px;color:#595959;border-bottom:1px solid #D3D3D2}
 .qrow{cursor:pointer;font-size:12px;background:#fff}
 .qrow:hover{background:#F0F0F5}
