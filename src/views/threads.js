@@ -1,5 +1,5 @@
 import {openDialog, confirmDialog} from './dialog.js';
-import {S, allRecs, dispName, findRec, fixUml, isIgnoredRec, lastTouch, orgTouches, rawRecs, rowLabel} from '../state.js';
+import {S, allRecs, dispName, findRec, fixUml, isDeadRec, isDeadSelf, isIgnoredRec, lastTouch, orgTouches, rawRecs, rowLabel} from '../state.js';
 import {daysAgo, esc, fmtAgo, fmtD, toast, today} from '../util.js';
 import {dueChip, prioChip} from './ui.js';
 import {logDone} from './actions.js';
@@ -39,7 +39,7 @@ export function liveVerdict(t){
   // my own message unanswered = their move, silence for four months = done.
   const st=thState(t.id);if(st.v)return st.v;
   const r=thRec(t);if(!r)return t.v||'UNCLEAR';
-  if(r.stage==='Dead'||r.status==='Dead')return 'DEAD';
+  if(isDeadRec(r))return 'DEAD';
   const ts=orgTouches(r);const last=ts[0];
   if(!last)return t.v||'UNCLEAR';
   if(daysAgo(last.date)>120&&!r.nextDate)return 'CLOSED';
@@ -94,8 +94,8 @@ export function thShow(t,q,cat){
   if(thFilt==='unclear')return v==='UNCLEAR';
   return true;
 }
-// Ignored on Today (until the next activity) means ignored here too.
-export function thIgnored(t){const r=thRec(t);return !!(r&&isIgnoredRec(r))}
+// Hidden on Today (until the next activity) means hidden here too, and Dead never shows in the open lists.
+export function thIgnored(t){const r=thRec(t);return !!(r&&(isIgnoredRec(r)||isDeadRec(r)))}
 // Done, as on Today: the record's next action is logged as done and cleared, and the thread is ticked off.
 export function thDoneItem(id,ev){
   if(ev&&ev.stopPropagation)ev.stopPropagation();
@@ -104,12 +104,12 @@ export function thDoneItem(id,ev){
   S.threadsDone=S.threadsDone||{};S.threadsDone[id]=today();
   save();renderAll();toast('Logged as done');
 }
-// Ignore, as on Today: hidden from the open lists and from Today until the next activity on the record.
+// Hide, as on Today: hidden from the open lists and from Today until the next activity on the record.
 export function thIgnoreItem(id,ev){
   if(ev&&ev.stopPropagation)ev.stopPropagation();
   const t=THREADS_LIVE().find(x=>x.id===id);const r=t&&thRec(t);
   if(r){r.ignored=today()}else{S.threadsDone=S.threadsDone||{};S.threadsDone[id]=today()}
-  save();renderAll();toast('Ignored until the next activity');
+  save();renderAll();toast('Hidden until the next activity');
 }
 // Open items where the move is Leif's, for the tab badge (same filter as the 'My move' tile).
 export function threadsMyMoveCount(){
@@ -164,7 +164,8 @@ export function renderThreads(){
         +'<div style="margin-top:6px"><button class="sm" data-click="thCopy|'+t.id+'|'+(t.dr?'dr':'cs')+'">Copy</button> '
         +(t.dr&&t.email?'<button class="sm primary" data-click="thMail|'+t.id+'">Open in mail client</button>':'')+'</div></div>'}
     h+='<div class="th-acts">'
-      +(!done?'<button class="sm primary" data-click="thDoneItem|'+t.id+'|$e" title="Log as done">Done</button>'+'<button class="sm" data-click="thIgnoreItem|'+t.id+'|$e" title="Hide until there is new activity">Ignore</button>':'')
+      +(!done?'<button class="sm primary" data-click="thDoneItem|'+t.id+'|$e" title="Log as done">Done</button>'+'<button class="sm" data-click="thIgnoreItem|'+t.id+'|$e" title="bis zur nächsten Aktivität">Hide</button>':'')
+      +(r&&isDeadSelf(r)?'<button class="sm" data-click="reviveRec|'+r.id+'|$e">Zurückholen</button>':(r?'<button class="sm" data-click="markDead|'+r.id+'|$e">Dead</button>':''))
       +'<button class="sm" data-click="thMore|'+t.id+'">'+(more?'Less':'Details')+'</button>'
       +((t.dr||t.cs)?'<button class="sm'+(draft?' primary':'')+'" data-click="thDraft|'+t.id+'">'+(t.dr?'Draft':'Call guide')+'</button>':'')
       +(r&&t.a?'<button class="sm" data-click="thAdopt|'+t.id+'|$e" title="Copy the next action and date into the CRM record">Adopt into CRM</button>':'')

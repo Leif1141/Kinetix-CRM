@@ -1,9 +1,9 @@
 import {letterDoneStep} from '../state.js';
 import {ACTIVE_STAGES, LETTER_TARGET_WEEK, LIVE} from '../constants.js';
-import {S, allRecs, cadenceOf, cadDue, dispName, findRec, fixUml, grpOf, GRP_DEF, isDismissed, isIgnoredRec, isStale, isSysNote, lastTouch, liveOnly, orgPeople, orgTouches, rowLabel, tType, touchList} from '../state.js';
+import {S, allRecs, cadenceOf, cadDue, deadMail, dispName, findRec, fixUml, grpOf, GRP_DEF, isDeadRec, isDeadSelf, isDismissed, isIgnoredRec, isStale, isSysNote, lastTouch, liveOnly, orgPeople, orgTouches, rowLabel, tType, touchList} from '../state.js';
 import {addDays, cleanPrev, daysAgo, esc, fmtD, fmtDe, today, weekStart} from '../util.js';
 import {grpChip, stagePill} from './ui.js';
-import {sugAct, unignoreRec} from './actions.js';
+import {deadMailOk, markDead, reviveRec, sugAct, unignoreRec} from './actions.js';
 import {openProfile} from './record.js';
 import {goTab} from '../main.js';
 
@@ -19,7 +19,7 @@ export function sugHead(r){
 }
 export function suggestions(){
   const byRec=new Map();
-  suggestionsRaw().filter(s=>!isDismissed(s.key)&&!isIgnoredRec(s.rec)).forEach(s=>{const g=byRec.get(s.rec.id);if(!g){s.also=[];byRec.set(s.rec.id,s)}else{g.also.push(s)}});
+  suggestionsRaw().filter(s=>!isDismissed(s.key)&&!isIgnoredRec(s.rec)&&(s.tag==='Revisit'||!isDeadRec(s.rec))).forEach(s=>{const g=byRec.get(s.rec.id);if(!g){s.also=[];byRec.set(s.rec.id,s)}else{g.also.push(s)}});
   return [...byRec.values()];
 }
 export function suggestionsRaw(only){
@@ -44,15 +44,19 @@ export function openPromises(r){
   return (r&&r.nextAction?r.nextAction.split('|'):[]).map(s=>s.trim()).filter(s=>/^Promised\b/.test(s));
 }
 const PARTNER_CH=['Partner letter','M&A house / advisor','Tax adviser / auditor','Network / referral','Bank','Platform'];
-export const QUEUE_KINDS={overdue:'Overdue',promise:'Promise made',due:'Due today',cadence:'Letter cadence',noaction:'Live deal without next step',stale:'Stale live deal',revisit:'Revisit date reached'};
+export const QUEUE_KINDS={deadmail:'Dead',overdue:'Overdue',promise:'Promise made',due:'Due today',cadence:'Letter cadence',noaction:'Live deal without next step',stale:'Stale live deal',revisit:'Revisit date reached'};
 let homeGrp='',homeQ='',homeKind='';
 try{homeGrp=localStorage.getItem('kxHomeGrp')||''}catch(e){}
 
 export function buildQueue(){
   const t=today();
   const items=[];
+  allRecs().filter(isDeadSelf).forEach(r=>{
+    const m=deadMail(r);
+    if(m)items.push({rec:r,kind:'deadmail',key:'deadmail_'+r.id,text:fixUml(dispName(r))+' (Dead) hat geschrieben: '+(m.subject||''),due:'',sort:'00'+m.date});
+  });
   const all=allRecs().filter(r=>!isIgnoredRec(r));
-  all.filter(r=>r.nextDate&&r.nextDate<=t&&!letterDoneStep(r)).forEach(r=>{
+  all.filter(r=>r.nextDate&&r.nextDate<=t&&!letterDoneStep(r)&&!isDeadRec(r)).forEach(r=>{
     const kind=isPromise(r)?'promise':(r.nextDate<t?'overdue':'due');
     items.push({rec:r,kind,key:'due_'+r.id,text:r.nextAction||'follow up',due:r.nextDate,sort:(kind==='promise'?'0':'1')+r.nextDate});
   });
@@ -75,7 +79,7 @@ export function buildQueue(){
 }
 export function laterThisWeek(){
   const t=today(),end=addDays(weekStart(t),6);
-  return allRecs().filter(r=>!isIgnoredRec(r)&&r.nextDate&&r.nextDate>t&&!letterDoneStep(r)&&r.nextDate<=(end>addDays(t,6)?end:addDays(t,6))).sort((a,b)=>a.nextDate.localeCompare(b.nextDate));
+  return allRecs().filter(r=>!isIgnoredRec(r)&&r.nextDate&&r.nextDate>t&&!letterDoneStep(r)&&r.nextDate<=(end>addDays(t,6)?end:addDays(t,6))&&!isDeadRec(r)).sort((a,b)=>a.nextDate.localeCompare(b.nextDate));
 }
 
 export function weekScore(){
@@ -113,9 +117,12 @@ function rowHtml(it){
   const r=it.rec;
   const lab=rowLabel(r),sub=lab.sub;
   const kindTag='<span class="qk qk-'+it.kind+'">'+QUEUE_KINDS[it.kind]+'</span>';
-  const acts=it.kind==='stale'||it.kind==='noaction'||it.kind==='revisit'
-    ?'<button class="sm" data-act="set" data-id="'+r.id+'">Set action</button> <button class="sm" data-act="dismiss" data-id="'+r.id+'" data-key="'+it.key+'">Dismiss</button>'
-    :'<button class="sm primary" data-act="done" data-id="'+r.id+'" data-key="'+it.key+'" title="Log as done">Done</button> <button class="sm" data-act="1w" data-id="'+r.id+'" data-key="'+it.key+'">+1w</button> <button class="sm" data-act="1m" data-id="'+r.id+'" data-key="'+it.key+'">+1m</button> <button class="sm" data-act="ignore" data-id="'+r.id+'" data-key="'+it.key+'" title="Hide until there is new activity">Ignore</button>';
+  const deadBtn=isDeadSelf(r)?'':' <button class="sm" data-act="dead" data-id="'+r.id+'">Dead</button>';
+  const acts=it.kind==='deadmail'
+    ?'<button class="sm primary" data-act="revive" data-id="'+r.id+'">Zurückholen</button> <button class="sm" data-act="deadok" data-id="'+r.id+'">Ok</button>'
+    :it.kind==='stale'||it.kind==='noaction'||it.kind==='revisit'
+    ?'<button class="sm" data-act="set" data-id="'+r.id+'">Set action</button> <button class="sm" data-act="dismiss" data-id="'+r.id+'" data-key="'+it.key+'">Dismiss</button>'+deadBtn
+    :'<button class="sm primary" data-act="done" data-id="'+r.id+'" data-key="'+it.key+'" title="Log as done">Done</button> <button class="sm" data-act="1w" data-id="'+r.id+'" data-key="'+it.key+'">+1w</button> <button class="sm" data-act="1m" data-id="'+r.id+'" data-key="'+it.key+'">+1m</button> <button class="sm" data-act="ignore" data-id="'+r.id+'" data-key="'+it.key+'" title="bis zur nächsten Aktivität">Hide</button>'+deadBtn;
   return '<div class="qrow" data-open="'+r.id+'">'
     +'<div class="q-acts">'+acts+'</div>'
     +'<div class="q-name"><b>'+esc(fixUml(lab.top))+'</b>'+(sub?'<div class="muted" style="font-size:10px">'+esc(fixUml(sub))+'</div>':'')+(r.kind==='target'?'<div>'+stagePill(r.stage)+'</div>':'')+'</div>'
@@ -125,18 +132,19 @@ function rowHtml(it){
     +'<div class="q-last muted">'+(lastTouch(r)?fmtDe(lastTouch(r)):'-')+'</div>'
     +'</div>';
 }
-export function homeUrgentCount(){return buildQueue().filter(i=>['overdue','promise','due','cadence'].includes(i.kind)).length}
+const URGENT_KINDS=['deadmail','overdue','promise','due','cadence'];
+export function homeUrgentCount(){return buildQueue().filter(i=>URGENT_KINDS.includes(i.kind)).length}
 export function renderHome(){
   const body=document.getElementById('homeQueue');if(!body)return;
   homeQ=((document.getElementById('homeSearch')||{}).value||'').toLowerCase().trim();
   const items=buildQueue();
-  const urgent=items.filter(i=>['overdue','promise','due','cadence'].includes(i.kind));
+  const urgent=items.filter(i=>URGENT_KINDS.includes(i.kind));
   const badge=document.getElementById('homeBadge');if(badge){badge.style.display=urgent.length?'inline-block':'none';badge.textContent=urgent.length}
   const counts={};items.forEach(i=>{const g=grpOf(i.rec);counts[g]=(counts[g]||0)+1});
   const bar=document.getElementById('homeGroups');
   if(bar)bar.innerHTML='<button class="sm'+(homeGrp?'':' vbtn on')+'" data-grp="">All ('+items.length+')</button>'+GRP_DEF.map(g=>'<button class="sm'+(homeGrp===g.k?' vbtn on':'')+'" style="border-left:4px solid '+g.c+'" data-grp="'+g.k+'">'+g.t+' ('+(counts[g.k]||0)+')</button>').join('');
   const shown=items.filter(matches);
-  const sections=[['overdue','promise','due','cadence'],['noaction','stale','revisit']];
+  const sections=[URGENT_KINDS,['noaction','stale','revisit']];
   let h='';
   const first=shown.filter(i=>sections[0].includes(i.kind)),rest=shown.filter(i=>sections[1].includes(i.kind));
   const hd='<div class="qhead"><div></div><div>Name</div><div>Type</div><div>Step</div><div>Due</div><div>Last contact</div></div>';
@@ -145,7 +153,7 @@ export function renderHome(){
   const later=laterThisWeek().filter(r=>!homeGrp||grpOf(r)===homeGrp);
   if(later.length)h+='<details class="psec"><summary>Later this week ('+later.length+')</summary>'+hd+later.map(r=>rowHtml({rec:r,kind:isPromise(r)?'promise':'due',key:'due_'+r.id,text:r.nextAction||'',due:r.nextDate})).join('')+'</details>';
   const ign=allRecs().filter(isIgnoredRec);
-  if(ign.length)h+='<p class="muted" style="font-size:11px;padding:4px 8px">Ignored until the next activity: '+ign.map(r=>esc(dispName(r))+' <a href="#" data-unignore="'+r.id+'">bring back</a>').join(' &middot; ')+'</p>';
+  if(ign.length)h+='<p class="muted" style="font-size:11px;padding:4px 8px">Hidden until the next activity: '+ign.map(r=>esc(dispName(r))+' <a href="#" data-unignore="'+r.id+'">bring back</a>').join(' &middot; ')+'</p>';
   body.innerHTML=h;
   renderScore();
   renderRecent();
@@ -186,6 +194,9 @@ export function initHome(){
     const b=e.target.closest('button[data-act]');
     if(b){e.stopPropagation();const id=b.dataset.id,key=b.dataset.key;
       if(b.dataset.act==='set'){import('./actions.js').then(m=>m.quickSetAction(id))}
+      else if(b.dataset.act==='dead')markDead(id);
+      else if(b.dataset.act==='revive')reviveRec(id);
+      else if(b.dataset.act==='deadok')deadMailOk(id);
       else if(b.dataset.act==='dismiss'){S.dismissed=S.dismissed||{};S.dismissed[key]=today();import('../store/firebase.js').then(m=>{m.save();renderHome()})}
       else sugAct(b.dataset.act,id,key);
       return}

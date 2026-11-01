@@ -1,7 +1,7 @@
 import {openDialog, confirmDialog} from './dialog.js';
 import {invalidateThreads} from '../views/threads.js';
 import {ACT_TYPES, ADV_CATS, ADV_STATUS, CHANNELS, DEADREASONS, PRIORITIES, PTYPES, STAGES, VERDICTS} from '../constants.js';
-import {S, addTouch, chanOf, deadCatOf, dispName, findRec, fixUml, isSysNote, newPerson, orgPeople, personOrg, splitPhones, tType, touchList, touchTomb, lastTouch} from '../state.js';
+import {S, addTouch, chanOf, deadCatOf, dispName, findRec, fixUml, isDeadSelf, isSysNote, newPerson, orgPeople, personOrg, splitPhones, tType, touchList, touchTomb, lastTouch} from '../state.js';
 import {addDays, cleanPrev, esc, fmtAgo, fmtD, fmtDe, normName, toast, today, uid} from '../util.js';
 import {fld, gv, n1, selFld, starHtml, stagePill} from './ui.js';
 import {letterBox} from './pipeline.js';
@@ -95,8 +95,8 @@ function headHtml(r){
   const status=isT?stagePill(r.stage):(isA?'<span class="chip">'+esc(r.status||'')+'</span>':(r.firm?'<span class="chip">'+esc(fixUml(r.firm))+'</span>':''));
   const org=r.kind==='person'?personOrg(r):null;
   return '<div class="rec-head"><button class="sm" id="recBack" title="Back (Esc)">&larr; Back</button>'
-    +'<div class="rec-title"><h2>'+(isNew?'<span class="muted">New '+kind.toLowerCase()+'</span>':esc(fixUml(dispName(r))))+'</h2><div class="muted" style="font-size:11px">'+kind+' &middot; '+status+(org?' &middot; <a href="#rec/'+org.id+'">'+esc(fixUml(dispName(org)))+'</a>':'')+' &middot; last contact '+(lastTouch(r)?fmtAgo(lastTouch(r)):'never')+'</div></div>'
-    +'<div class="rec-tools">'+starHtml(r)+'</div></div>';
+    +'<div class="rec-title"><h2>'+(isNew?'<span class="muted">New '+kind.toLowerCase()+'</span>':esc(fixUml(dispName(r))))+'</h2><div class="muted" style="font-size:11px">'+kind+' &middot; '+status+(r.kind==='person'&&isDeadSelf(r)?' <span class="chip">Dead</span>':'')+(org?' &middot; <a href="#rec/'+org.id+'">'+esc(fixUml(dispName(org)))+'</a>':'')+' &middot; last contact '+(lastTouch(r)?fmtAgo(lastTouch(r)):'never')+'</div></div>'
+    +'<div class="rec-tools">'+(isNew?'':(isDeadSelf(r)?'<button class="sm" data-click="reviveRec|'+r.id+'|$e">Zurückholen</button> ':'<button class="sm" data-click="markDead|'+r.id+'|$e">Dead</button> '))+starHtml(r)+'</div></div>';
 }
 function promisesHtml(r){
   const lines=openPromises(r);

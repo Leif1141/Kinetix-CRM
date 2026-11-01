@@ -138,6 +138,18 @@ export function letterDoneStep(r){return !!(r&&r.kind==='target'&&r.letterSent&&
 export function effDue(r){if(!r)return '';if(!letterDoneStep(r))return r.nextDate||'';const cd=cadenceOf(r);return cd&&cd.next?cd.next.due:''}
 export function isDue(c){const t=today();return !!(c.nextDate&&c.nextDate<=t&&!letterDoneStep(c))||cadDue(c)}
 export function isIgnoredRec(r){if(!r||!r.ignored)return false;const lt=lastTouch(r);return !(lt&&lt.slice(0,10)>r.ignored)}
+// Dead (Leif 01.11.2026): for good, unlike Hide. A person hangs off their organisation: Dead there counts for them too.
+export function isDeadSelf(r){return !!(r&&(r.stage==='Dead'||r.status==='Dead'))}
+export function isDeadRec(r){if(isDeadSelf(r))return true;if(!r||r.kind!=='person'||!r.orgId)return false;return isDeadSelf(findRec(r.orgId))}
+// The newest inbound mail on a Dead record that came after it went Dead and that Leif has not seen off with Ok.
+// Records set Dead by a patch carry only a date, so a mail of that same day does not count. Older mail is not new.
+const DEAD_MAIL_AFTER='2026-10-31';
+export function deadMail(r){
+  if(!isDeadSelf(r))return null;
+  const log=[...(r.stageLog||[])].reverse().find(l=>l.stage==='Dead');
+  const since=[r.deadAt||(log&&log.date)||(S.threadsDone||{})[r.id]||'',r.deadSeen||'',DEAD_MAIL_AFTER].sort().pop();
+  return orgTouches(r).find(t=>t.dir==='in'&&tType(t)==='Email'&&(t.date||'').slice(0,since.length)>since)||null;
+}
 
 export const GRP_DEF=[
   {k:'Targets',t:'Targets',s:'Target',c:'#2E3C65'},
