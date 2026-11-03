@@ -39,7 +39,10 @@ export function letterBox(rec){
     '<div style="margin-top:6px">'+(cd?'':b('planned','Letter planned')+b('ready','Letter drafted'))+'<button class="sm" data-click="markLetterSent|'+rec.id+'">Letter sent...</button></div></div>';
 }
 // Contact was made (letter, mail, call, meeting); a note alone is not contact
-export function wasApproached(c){return !!c.letterSent||touchList(c).some(t=>tType(t)!=='Note')||ACTIVE_STAGES.includes(c.stage)}
+// A channel counts as an approach too: a deal passed through an adviser leaves no touch on the record (Oelde via Heuking).
+export function wasApproached(c){return !!c.letterSent||!!c.channel||touchList(c).some(t=>tType(t)!=='Note')||ACTIVE_STAGES.includes(c.stage)}
+// Own letters are Leif's count against the weekly target; letters sent by a partner (Rettig) are listed apart.
+export const isOwnLetter=r=>r.c.channel!=='Partner letter'
 // One row per letter: the letter touches, plus the first letter where only its date was recorded (letterSent without a touch)
 export function letterRows(cs){
   const out=[];
@@ -83,13 +86,13 @@ function firstContact(c){const d=touchList(c).filter(t=>tType(t)!=='Note').map(t
 function drillHtml(cs){
   const i=pipeDrill.indexOf(':'),kind=pipeDrill.slice(0,i),arg=pipeDrill.slice(i+1),ws=weekStart(today());
   let rows,title;
-  if(kind==='letters'){rows=letterRows(cs);if(arg==='week')rows=rows.filter(r=>r.date>=ws);title=arg==='week'?'Letters this week':'All letters'}
+  if(kind==='letters'){rows=letterRows(cs);if(arg==='partner')rows=rows.filter(r=>!isOwnLetter(r));else{rows=rows.filter(isOwnLetter);if(arg==='week')rows=rows.filter(r=>r.date>=ws)}title=arg==='week'?'Own letters this week':arg==='partner'?'Letters sent by partners':'All own letters'}
   else{const g=cs.filter(c=>(chanOf(c)||'')===arg&&c.stage!=='Identified'&&wasApproached(c));rows=letterRows(g);const lc=new Set(rows.map(r=>r.c.id));
     g.filter(c=>!lc.has(c.id)).forEach(c=>rows.push({c,key:null,date:firstContact(c)}));rows.sort((a,b)=>(b.date||'').localeCompare(a.date||'')||dispName(a.c).localeCompare(dispName(b.c)));title=CH_DE[arg]||arg||'(no channel)'}
   const comps=[...new Map(rows.map(r=>[r.c.id,r.c])).values()];
   const nLet=rows.filter(r=>r.key!==null).length,cnt={};comps.forEach(c=>{const k=pipeStatus(c).k;cnt[k]=(cnt[k]||0)+1});
   const head=(nLet?nLet+' letter'+(nLet===1?'':'s')+' to ':'')+comps.length+' compan'+(comps.length===1?'y':'ies')+(comps.length?' &middot; '+['live','dead','hold','due','wait'].filter(k=>cnt[k]).map(k=>cnt[k]+' '+ST_LBL[k]).join(' &middot; '):'');
-  const tabs=kind==='letters'?' <button class="sm'+(arg==='week'?' vbtn on':'')+'" data-click="setPipeDrill|letters:week">This week</button><button class="sm'+(arg==='all'?' vbtn on':'')+'" data-click="setPipeDrill|letters:all">All letters</button>':'';
+  const tabs=kind==='letters'?' <button class="sm'+(arg==='week'?' vbtn on':'')+'" data-click="setPipeDrill|letters:week">This week</button><button class="sm'+(arg==='all'?' vbtn on':'')+'" data-click="setPipeDrill|letters:all">All own letters</button><button class="sm'+(arg==='partner'?' vbtn on':'')+'" data-click="setPipeDrill|letters:partner">Via partners</button>':'';
   const byDate=new Map();rows.forEach(r=>{const k=r.date||'';if(!byDate.has(k))byDate.set(k,[]);byDate.get(k).push(r)});
   const via=rs=>{const v=[...new Set(rs.map(r=>r.c.channel==='Partner letter'&&r.c.channelVia?r.c.channelVia:(r.key!==null?'own':'')).filter(Boolean))];return v.length?' &middot; '+v.map(esc).join(', '):''};
   const tl='<div class="tl">'+[...byDate].map(([d,rs])=>'<div class="tl-row"><div class="tl-d"><b>'+(d?fmtDe(d):'no date')+'</b><div class="muted">'+(d?agoTxt(d):'')+'</div></div><div class="tl-dot"></div><div class="tl-c"><div class="muted" style="font-size:11px;margin-bottom:3px">'+rs.length+(nLet?' letter'+(rs.length===1?'':'s'):' compan'+(rs.length===1?'y':'ies'))+via(rs)+'</div>'+[...new Map(rs.map(r=>[r.c.id,r.c])).values()].map(c=>{const s=pipeStatus(c),n=rs.filter(r=>r.c===c).length;return '<span class="chch" style="cursor:pointer;'+ST_STYLE[s.k]+'" title="'+esc(s.t)+'" data-click="openRec|'+c.id+'|$e">'+esc(fixUml(dispName(c)))+(n>1?' ('+n+' letters)':'')+'</span>'}).join(' ')+'</div></div>').join('')+'</div>';
@@ -177,14 +180,14 @@ export function renderPipeline(){
   const LIVE=ACTIVE_STAGES;
   const base=cs.filter(c=>(!q||(c.name||'').toLowerCase().includes(q)||(c.location||'').toLowerCase().includes(q)||primaryName(c).toLowerCase().includes(q)||(c.channelVia||'').toLowerCase().includes(q))&&(!fch||chanOf(c)===fch)&&(!onlyFav||c.fav));
   const isReady=c=>c.stage==='Identified'&&(c.letterStatus==='ready'||c.letterStatus==='planned'||c.fav);
-  const lettersWeek=letterRows(cs).filter(r=>r.date>=ws).length;
+  const lettersWeek=letterRows(cs).filter(r=>isOwnLetter(r)&&r.date>=ws).length;
   const kdef=[
     {k:'live',t:'Live',f:c=>LIVE.includes(c.stage)},
     {k:'due',t:'Due',f:c=>(LIVE.includes(c.stage)||isReady(c))&&isDue(c),warn:1},
     {k:'nonext',t:'Without next step',f:c=>LIVE.includes(c.stage)&&!c.nextAction&&!(cadenceOf(c)&&(cadenceOf(c).next||cadenceOf(c).partner)),warn:1},
     {k:'replied',t:'Replied or further',f:c=>LIVE.includes(c.stage)&&c.stage!=='Contacted'},
     {k:'ready',t:'To contact',f:isReady},
-    {k:'letters',t:'Letters this week',v:lettersWeek+' / '+LETTER_TARGET_WEEK,f:c=>letterRows([c]).some(r=>r.date>=ws),drill:'letters:week'}
+    {k:'letters',t:'Own letters this week',v:lettersWeek+' / '+LETTER_TARGET_WEEK,f:c=>letterRows([c]).some(r=>isOwnLetter(r)&&r.date>=ws),drill:'letters:week'}
   ];
   document.getElementById('pipeKpis').innerHTML=kdef.map(x=>{const n=base.filter(x.f).length;const on=x.drill?pipeDrill.indexOf('letters:')===0:pipeKpi===x.k;return '<div class="kpi'+(x.warn&&n?' warn':'')+(on?' on':'')+'" data-click="'+(x.drill?'setPipeDrill|'+x.drill:'setPipeKpi|'+x.k)+'" title="'+(x.drill?'Click for the letters with their dates':'Click to filter the view')+'"><div class="v">'+(x.v||n)+'</div><div class="l">'+x.t+'</div></div>'}).join('');
   const kf=kdef.find(x=>x.k===pipeKpi);

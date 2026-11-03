@@ -86,9 +86,12 @@ export function weekScore(){
   const ws=weekStart(today());
   const inWeek=t=>(t.date||'').slice(0,10)>=ws;
   const seen=new Set();const allT=[];
-  allRecs().forEach(r=>Object.entries(r.touches||{}).forEach(([k,t])=>{if(!seen.has(k)){seen.add(k);allT.push(t)}}));
+  const allK={};
+  allRecs().forEach(r=>Object.entries(r.touches||{}).forEach(([k,t])=>{if(!seen.has(k)){seen.add(k);allT.push(t);allK[k]=t}}));
   const week=allT.filter(inWeek).filter(t=>!isSysNote(t));
-  const letters=week.filter(t=>tType(t)==='Letter'&&t.dir!=='in').length;
+  // own letters only: a letter a partner sent (Rettig) does not count against Leif's weekly target
+  const partnerK=new Set();(S.companies||[]).forEach(c=>{if(c.channel==='Partner letter')Object.keys(c.touches||{}).forEach(k=>partnerK.add(k))});
+  const letters=Object.entries(allK).filter(([k,t])=>inWeek(t)&&!isSysNote(t)&&tType(t)==='Letter'&&t.dir!=='in'&&!partnerK.has(k)).length;
   const replied=new Set();
   (S.companies||[]).forEach(c=>{if(orgTouches(c).some(t=>inWeek(t)&&t.dir==='in'&&tType(t)==='Email'))replied.add(c.id)});
   const meetings=week.filter(t=>tType(t)==='Meeting').length;
