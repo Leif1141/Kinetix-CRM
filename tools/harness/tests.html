@@ -17,7 +17,7 @@ pre{font-size:11px;background:#F4F5F9;padding:8px;border-radius:4px;white-space:
 <pre id="log"></pre>
 <script type="module">
 import {shard, unshard, diffTree, legacyExport, ensureDefaults, isLegacyBlob, encodeKeys, decodeKeys, encodePath, stableStringify, prune, sameValue} from '../../src/store/shards.js';
-import {planContacts, applyContactPlan, splitNames, parseName, looksLikeName, addressFor, isGeneralAddr} from '../../src/contacts.js';
+import {planContacts, applyContactPlan, splitNames, parseName, looksLikeName, addressFor, isGeneralAddr, isSkipped} from '../../src/contacts.js';
 const out=document.getElementById('out'), logEl=document.getElementById('log');
 const results=[];
 function t(name,fn){let ok=false,msg='';try{const r=fn();ok=r===true||r===undefined;if(typeof r==='string'){ok=false;msg=r}}catch(e){ok=false;msg=e.message}results.push({name,ok,msg});
@@ -63,10 +63,13 @@ t('parseName takes the role from brackets and "Termine über"',()=>{const a=pars
 t('function words are not names',()=>!looksLikeName('Firmenkunden')&&!looksLikeName('Legal')&&looksLikeName('Hagelgans')||'wrong');
 t('an address goes to a person only by name, never a general one',()=>addressFor('Anna Beispiel',['info@x.de','anna.beispiel@x.de'],['Anna Beispiel'])==='anna.beispiel@x.de'&&addressFor('Anna Beispiel',['info@x.de'],['Anna Beispiel'])===''&&isGeneralAddr('kontakt@x.de')||'wrong');
 const SC=ensureDefaults(JSON.parse(JSON.stringify(blob)));const plan=planContacts(SC,mkP,nid);applyContactPlan(SC,plan);
-t('after the move no organisation carries contact text',()=>{const n=[...SC.companies,...SC.advisors].filter(o=>o.contact).length;return n===0||n+' left'});
+t('after the move no live organisation carries contact text (archived and vendor records are left as they are)',()=>{const n=[...SC.companies,...SC.advisors].filter(o=>o.contact&&!isSkipped(o)).length;return n===0||n+' left'});
+t('all IHK chambers are one live organisation named IHK',()=>{const l=SC.advisors.filter(o=>(o.firm||'').includes('IHK')&&!o.archived);return (l.length===1&&l[0].firm==='IHK')||l.map(o=>o.firm).join(', ')});
+t('no person is linked twice in one plan',()=>{const ids=plan.link.map(l=>l.person);return ids.length===new Set(ids).size||'duplicate link'});
+t('no person record for archived or vendor organisations',()=>{const skip=new Set([...blob.companies,...blob.advisors].filter(o=>isSkipped(o)).map(o=>o.id));const bad=plan.create.filter(p=>skip.has(p.orgId));return !bad.length||bad.map(p=>p.name).join(', ')});
 t('every primaryId points to a person of that organisation',()=>{const P=new Map(SC.people.map(p=>[p.id,p]));const bad=[...SC.companies,...SC.advisors].filter(o=>o.primaryId&&(!P.get(o.primaryId)||P.get(o.primaryId).orgId!==o.id));return !bad.length||bad.length+' broken'});
-t('no organisation keeps an address that a person of it carries',()=>{const bad=[...SC.companies,...SC.advisors].filter(o=>o.email&&SC.people.some(p=>p.orgId===o.id&&(p.email||'').toLowerCase()===o.email.toLowerCase()));return !bad.length||bad.map(o=>o.name||o.firm).join(', ')});
-t('every address on a new person was on its organisation or in its correspondence',()=>{const O=new Map([...blob.companies,...blob.advisors].map(o=>[o.id,o]));const bad=plan.create.filter(p=>{if(!p.email)return false;const o=O.get(p.orgId);return !JSON.stringify(o).toLowerCase().includes(p.email)});return !bad.length||bad.map(p=>p.email).join(', ')});
+t('no live organisation keeps an address that a person of it carries',()=>{const bad=[...SC.companies,...SC.advisors].filter(o=>o.email&&!isSkipped(o)&&SC.people.some(p=>p.orgId===o.id&&(p.email||'').toLowerCase()===o.email.toLowerCase()));return !bad.length||bad.map(o=>o.name||o.firm).join(', ')});
+t('every address on a new person was on its organisation or in its correspondence',()=>{const O=new Map([...blob.companies,...blob.advisors].map(o=>[o.id,o]));const bad=plan.create.filter(p=>{if(!p.email)return false;const o=[...O.values()].find(x=>(x.name||x.firm)===p.firm);return !JSON.stringify(o||{}).toLowerCase().includes(p.email)});return !bad.length||bad.map(p=>p.email).join(', ')});
 t('the move is idempotent',()=>{const p2=planContacts(SC,mkP,nid);return (!p2.create.length&&!p2.link.length&&!p2.orgSet.length)||JSON.stringify({c:p2.create.length,l:p2.link.length,o:p2.orgSet.length})});
 t('no touch is lost or moved by the move',()=>{const n=s=>['companies','advisors','people'].reduce((a,c)=>a+s[c].reduce((m,r)=>m+Object.keys(r.touches||{}).length,0),0);return n(SC)===n(blob)||n(SC)+' vs '+n(blob)});
 const fails=results.filter(r=>!r.ok).length;

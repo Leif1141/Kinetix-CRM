@@ -33,6 +33,7 @@ export async function moveContacts(){
   const moved=plan.orgSet.filter(u=>u.set.email===null).length;
   const v=await confirmDialog(['New people: '+plan.create.length,'Existing people linked: '+plan.link.length,
     'Organisations changed: '+plan.orgSet.length+' (contact text removed, '+moved+' personal addresses moved to their person)',
+    'New organisations from firm fields: '+plan.newOrgs.length,'Merged: '+plan.merge.map(m=>(m.from.length+1)+' records into '+m.name).join(', '),
     'People without an organisation afterwards: '+plan.review.filter(r=>r.kind==='person').length,'',
     'A copy of the current state is downloaded first. Undo reverses it.'].join('\n'),{title:'Move contacts to people',ok:'Move contacts'});
   if(!v)return;
@@ -40,5 +41,5 @@ export async function moveContacts(){
   const r=applyContactPlan(S,plan);
   // financials already in the CRM came from MASTER Scoring before the stamp existed
   (S.companies||[]).forEach(c=>{if(!c.finSrc&&['revenue','ebitda','ebit','score'].some(k=>c[k]!=null&&c[k]!==''))c.finSrc={file:'',date:S.contactsMigV1,held:true}});
-  save();renderAll();toast(r.created+' people created, '+r.linked+' linked, '+r.orgs+' organisations updated');
+  save();renderAll();toast(r.created+' people created, '+r.linked+' linked, '+r.newOrgs+' organisations added, '+r.merged+' merged');
 }
