@@ -1,8 +1,8 @@
-import {allRecs, dispName, fixUml, lastTouch, orgPeople, personOrg, rowLabel} from '../state.js';
+import {allRecs, dispName, fixUml, lastTouch, orgPeople, personOrg, rowLabel, primaryName} from '../state.js';
 import {esc, fmtAgo, foldSearch} from '../util.js';
 
 export function searchHay(r){
-  return foldSearch([dispName(r),r.name,r.firm,r.contact,r.email,r.domain,r.city,r.location,r.title,r.category,r.ptype,r.stage,r.status,(r.lists||[]).join(' '),r.description,(r.notes||'').slice(0,600)].filter(Boolean).join(' '));
+  return foldSearch([dispName(r),r.name,r.firm,primaryName(r),r.email,r.domain,r.city,r.location,r.title,r.category,r.ptype,r.stage,r.status,(r.lists||[]).join(' '),r.description,(r.notes||'').slice(0,600)].filter(Boolean).join(' '));
 }
 export function renderGlobalSearch(){
   const q=foldSearch((document.getElementById('gSearch')||{}).value||'');
@@ -33,7 +33,7 @@ export function renderGlobalSearch(){
         let contact;
         if(r.kind==='person'){const L=rowLabel(r);contact=L.sub?esc(fixUml(L.sub)):''}
         else{
-          const names=[];if(r.contact)names.push(esc(fixUml(r.contact)));
+          const names=[];const pn=primaryName(r);if(pn&&!x.people.some(p=>p.name===pn))names.push(esc(fixUml(pn)));
           x.people.forEach(p=>{const n=fixUml(p.name||'');if(!n||names.some(s=>s.indexOf(esc(n))>=0))return;names.push('<span data-click="!openRec|'+p.id+'|$e" style="cursor:pointer;text-decoration:underline dotted">'+esc(n)+'</span>')});
           contact=names.join(', ');
         }

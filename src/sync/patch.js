@@ -4,7 +4,7 @@ import {STAGES} from '../constants.js';
 import {autoThread, invalidateThreads, seedThreads} from '../views/threads.js';
 import {backfillPersonTouches, retriageUnmatched} from './triage.js';
 import {dashApplyOp} from '../views/dash.js';
-import {normName, toast, today} from '../util.js';
+import {normName, toast, today, uid} from '../util.js';
 import {renderAll} from '../main.js';
 import {save} from '../store/firebase.js';
 
@@ -32,14 +32,28 @@ export function patchFind(m){
     return shortT.every(t=>longT.includes(t));
   })||null;
 }
+// Fields owned by MASTER Scoring: a patch that writes one stamps the record with the file and date (finSrc).
+const FIN_FIELDS=['revenue','ebitda','ebit','gm','score','verdict','ownership','flag'];
+let _patchName='';
+function stampFin(r,k){if(r.kind==='target'&&FIN_FIELDS.includes(k))r.finSrc={file:_patchName,date:today()}}
 export function patchSet(r,set){
   if(!set)return;
   for(const k of Object.keys(set)){
     if(['id','kind','touches','stageLog','stage'].includes(k))continue;
     if(k==='notes'&&r.notes&&set.notes){if(!r.notes.includes(set.notes))r.notes=(r.notes+' | '+set.notes).trim();continue}
     if(k==='nextAction'&&set[k]!==r[k])r.nextSet=today();
-    r[k]=set[k];
+    r[k]=set[k];stampFin(r,k);
   }
+}
+// Runs still write contact, email, mobile and title onto organisations (phase 3 part A). After every patch the
+// same rules as the one-off migration move them to linked people, so the organisation keeps no contact text.
+export async function normaliseContacts(){
+  if(!S.contactsMigV1)return 0; // before the one-off move on the Data tab, patches behave as they always did
+  const {planContacts,applyContactPlan}=await import('../contacts.js'); // loaded on demand, not at start
+  const plan=planContacts(S,newPerson,uid);
+  if(!plan.create.length&&!plan.link.length&&!plan.orgSet.length)return 0;
+  applyContactPlan(S,plan);
+  return plan.create.length+plan.link.length+plan.orgSet.length;
 }
 export function applyPatchOps(ops){
   let made=0,skipped=0;
@@ -87,7 +101,7 @@ export function applyPatchOps(ops){
       }else if(o.op==='setField'){
         const r=patchFind(o.match);
         const _ok=['notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','mobile','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict','outreachChannel','stage','channel','channelVia','letterSent','letterStatus','fav','ignored','cadDone','archived','deadCat'];
-        if(r&&o.field&&_ok.includes(o.field)){if(o.field==='stage'&&r.stage!==o.value){r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.value,date:o.date||today()})}r[o.field]=o.value;if(o.field==='phone')splitPhones(r);made++}else skipped++;
+        if(r&&o.field&&_ok.includes(o.field)){if(o.field==='stage'&&r.stage!==o.value){r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.value,date:o.date||today()})}r[o.field]=o.value;stampFin(r,o.field);if(o.field==='phone')splitPhones(r);made++}else skipped++;
       }else if(o.op==='addList'){
         if(o.name){S.customLists=S.customLists||[];if(!S.customLists.includes(o.name))S.customLists.push(o.name);made++}else skipped++;
       }else if(o.op==='setAnalysed'){
@@ -107,9 +121,12 @@ export function applyPatchObj(p,name,force){
 
   S.appliedPatchTitles=S.appliedPatchTitles||{};
   if(S.appliedPatchTitles[name]&&!force)return null;
+  _patchName=name||'';
   const r=applyPatchOps(p.ops);
+  _patchName='';
   S.appliedPatchTitles[name]=today();
   try{backfillPersonTouches();const _rt=retriageUnmatched();r.made+=_rt.assigned}catch(e){console.warn('post-patch triage:',e)}
+  normaliseContacts().then(n=>{if(n){save();renderAll()}}).catch(e=>console.warn('contacts after patch:',e));
   return r;
 }
 export function applyPatchFile(ev){

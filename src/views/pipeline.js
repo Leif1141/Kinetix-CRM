@@ -1,4 +1,4 @@
-import {letterDoneStep, effDue} from '../state.js';
+import {letterDoneStep, effDue, primaryName} from '../state.js';
 import {logDone} from './actions.js';
 import {openDialog, confirmDialog} from './dialog.js';
 import {ACTIVE_STAGES, BOARD_COLS, CHANNELS, CH_DE, LETTER_TARGET_WEEK, LIVE, LS_DE, STAGES, ST_DE} from '../constants.js';
@@ -118,7 +118,7 @@ export async function markLetterSent(id){
   const dt=/^\d{4}-\d{2}-\d{2}$/.test((v.d||'').trim())?v.d.trim():today();
   const via=(v.via||'').trim();
   const first=!r.letterSent;
-  addTouch(r,'letter_'+dt+'_'+uid(),{date:dt+'T12:00:00Z',dir:'out',src:'Letter',subject:(first?'Erstbrief':'Folgebrief')+(via?' über '+via:''),who:r.contact||'',note:''});
+  addTouch(r,'letter_'+dt+'_'+uid(),{date:dt+'T12:00:00Z',dir:'out',src:'Letter',subject:(first?'Erstbrief':'Folgebrief')+(via?' über '+via:''),who:primaryName(r),note:''});
   if(first){r.letterSent=dt;if(!r.channel||!CHANNELS.includes(r.channel))r.channel=via?'Partner letter':'Own letter';if(via)r.channelVia=via}
   else{const ds=daysBetween(r.letterSent,dt);r.cadDone=r.cadDone||{};if(ds>330)r.cadDone.l12=dt;else if(ds>150)r.cadDone.l6=dt}
   r.letterStatus='sent';
@@ -175,7 +175,7 @@ export function renderPipeline(){
   const q=(document.getElementById('fSearch').value||'').toLowerCase(),fch=fc?fc.value:'',onlyFav=!!(document.getElementById('fFav')||{}).checked;
   const t=today(),ws=weekStart(t);
   const LIVE=ACTIVE_STAGES;
-  const base=cs.filter(c=>(!q||(c.name||'').toLowerCase().includes(q)||(c.location||'').toLowerCase().includes(q)||(c.contact||'').toLowerCase().includes(q)||(c.channelVia||'').toLowerCase().includes(q))&&(!fch||chanOf(c)===fch)&&(!onlyFav||c.fav));
+  const base=cs.filter(c=>(!q||(c.name||'').toLowerCase().includes(q)||(c.location||'').toLowerCase().includes(q)||primaryName(c).toLowerCase().includes(q)||(c.channelVia||'').toLowerCase().includes(q))&&(!fch||chanOf(c)===fch)&&(!onlyFav||c.fav));
   const isReady=c=>c.stage==='Identified'&&(c.letterStatus==='ready'||c.letterStatus==='planned'||c.fav);
   const lettersWeek=letterRows(cs).filter(r=>r.date>=ws).length;
   const kdef=[

@@ -1,7 +1,7 @@
 import {openDialog, confirmDialog} from './dialog.js';
 import {invalidateThreads} from '../views/threads.js';
 import {ACT_TYPES, ADV_CATS, ADV_STATUS, CHANNELS, DEADREASONS, PRIORITIES, PTYPES, STAGES, VERDICTS} from '../constants.js';
-import {S, addTouch, chanOf, deadCatOf, dispName, findRec, fixUml, isDeadSelf, isSysNote, newPerson, orgPeople, personOrg, splitPhones, tType, touchList, touchTomb, lastTouch} from '../state.js';
+import {S, addTouch, chanOf, deadCatOf, dispName, findRec, fixUml, isDeadSelf, isSysNote, newPerson, orgPeople, personOrg, primaryOf, splitPhones, tType, touchList, touchTomb, lastTouch} from '../state.js';
 import {addDays, cleanPrev, esc, fmtAgo, fmtD, fmtDe, normName, toast, today, uid} from '../util.js';
 import {fld, gv, n1, selFld, starHtml, stagePill} from './ui.js';
 import {letterBox} from './pipeline.js';
@@ -21,18 +21,23 @@ let prevTab='home',isNew=false;
 
 const COUNTRIES=['Germany','United Kingdom','Switzerland','France','Netherlands','Luxembourg','Sweden','Denmark','Austria','United States','Other'];
 const F=(key,label,type,opts)=>Object.assign({key,label,type:type||'text'},opts||{});
+// Financials, score, verdict, ownership and flag live in MASTER Scoring (Leif 03.11.2026): the CRM shows them read-only,
+// with the patch file and date they arrived with. Corrections are made in the workbook and come back through the daily run.
+const RO={ro:true};
+function finSrcText(c){const f=c.finSrc;if(!f)return '';if(f.held)return 'MASTER Scoring, as held on '+fmtDe(f.date);return 'MASTER Scoring'+(f.file?' via '+f.file:'')+(f.date?', '+fmtDe(f.date):'')}
 function fieldSpecs(r){
   const next=[F('nextAction','Next action','textarea'),F('nextDate','Due','date'),F('priority','Priority','select',{options:PRIORITIES})];
   if(r.kind==='target')return {
     sections:[
-      ['Company',[F('name','Company name','text',{required:true}),F('contact','Primary contact (owner / MD)'),F('email','Email'),F('phone','Phone (office)'),F('mobile','Mobile'),F('domain','Website'),F('location','Location'),F('address','Address')]],
-      ['Deal',[F('stage','Stage','select',{options:STAGES}),F('channel','Channel','select',{options:CHANNELS,get:c=>chanOf(c)}),F('channelVia','Via (partner, fair, contact)'),F('revenue','Revenue (€m)','number'),F('ebitda','EBITDA (€m)','number'),F('ebit','EBIT (€m)','number'),F('gm','Gross margin %','number',{get:c=>c.gm==null||c.gm===''?null:Math.round(c.gm*1000)/10,set:v=>v==null?null:v/100}),F('score','Score /100','number'),F('verdict','Verdict','select',{options:VERDICTS})]
+      ['Company',[F('name','Company name','text',{required:true}),F('email','General email'),F('phone','Phone (office)')].concat(r.mobile?[F('mobile','Mobile (not yet on a person)')]:[]).concat([F('domain','Website'),F('location','Location'),F('address','Address')])],
+      ['Deal',[F('stage','Stage','select',{options:STAGES}),F('channel','Channel','select',{options:CHANNELS,get:c=>chanOf(c)}),F('channelVia','Via (partner, fair, contact)')]
         .concat(r.stage==='Dead'?[F('deadCat','Dead category','select',{options:DEADREASONS,get:deadCatOf}),F('revisitDate','Revisit date','date'),F('deadReason','Dead reason (detail)','textarea')]:[])],
-      ['Profile',[F('description','Description','textarea'),F('ownership','Ownership'),F('flag','Flag'),F('notes','Research notes','textarea',{rows:6})]]
+      ['Financials and scoring',[F('revenue','Revenue (€m)','number',RO),F('ebitda','EBITDA (€m)','number',RO),F('ebit','EBIT (€m)','number',RO),F('gm','Gross margin %','number',Object.assign({get:c=>c.gm==null||c.gm===''?null:Math.round(c.gm*1000)/10},RO)),F('score','Score /100','number',RO),F('verdict','Verdict','select',Object.assign({options:VERDICTS},RO)),F('finSrc','Source','text',Object.assign({get:finSrcText},RO))]],
+      ['Profile',[F('description','Description','textarea'),F('ownership','Ownership','text',RO),F('flag','Flag','text',RO),F('notes','Research notes','textarea',{rows:6})]]
     ],next};
   if(r.kind==='advisor')return {
     sections:[
-      ['Firm',[F('firm','Firm name','text',{required:true}),F('contact','Primary contact'),F('email','Email'),F('phone','Phone (office)'),F('mobile','Mobile'),F('domain','Domain'),F('city','City'),F('address','Address')]],
+      ['Firm',[F('firm','Firm name','text',{required:true}),F('email','General email'),F('phone','Phone (office)')].concat(r.mobile?[F('mobile','Mobile (not yet on a person)')]:[]).concat([F('domain','Domain'),F('city','City'),F('address','Address')])],
       ['Relationship',[F('category','Category','select',{options:ADV_CATS}),F('status','Status','select',{options:ADV_STATUS}),F('market','Market','select',{options:['DE','UK'],get:a=>a.market||(/uk|united kingdom/i.test(a.geo||'')?'UK':'DE')}),F('geo','Geo (country)','select',{options:COUNTRIES}),F('cadence','Check-in cadence (days)','int',{def:30}),F('introPath','Intro path'),F('notes','Notes','textarea')]]
     ],next};
   return {
@@ -52,7 +57,7 @@ function display(r,s){
   if(s.key==='email')return '<a href="mailto:'+esc(v)+'" data-click="!">'+esc(v)+'</a>';
   return esc(fixUml(String(v))).replace(/\n/g,'<br>');
 }
-function fieldHtml(r,s){return '<div class="rf" data-f="'+s.key+'"><label>'+esc(s.label)+'</label><div class="rfv" tabindex="0" title="Click to edit">'+display(r,s)+'</div></div>'}
+function fieldHtml(r,s){return s.ro?'<div class="rf ro" data-f="'+s.key+'"><label>'+esc(s.label)+'</label><div class="rfv" title="From MASTER Scoring, edit it in the workbook">'+display(r,s)+'</div></div>':'<div class="rf" data-f="'+s.key+'"><label>'+esc(s.label)+'</label><div class="rfv" tabindex="0" title="Click to edit">'+display(r,s)+'</div></div>'}
 function editorHtml(r,s){
   const v=getVal(r,s);const cur=v===null||v===undefined?'':String(v);
   if(s.type==='select'){const has=cur===''||s.options.includes(cur);return '<select class="rfe">'+s.options.map(o=>'<option value="'+esc(o)+'"'+(o===cur?' selected':'')+'>'+esc(o)+'</option>').join('')+(has?'':'<option selected>'+esc(cur)+'</option>')+'</select>'}
@@ -192,7 +197,7 @@ export function initRecordPage(){
 function specFor(r,key){const sp=fieldSpecs(r);return [...sp.sections.flatMap(x=>x[1]),...sp.next].find(s=>s.key===key)}
 function startEdit(wrap){
   const r=profRec;if(!r||!wrap||wrap.querySelector('.rfe'))return;
-  const s=specFor(r,wrap.dataset.f);if(!s)return;
+  const s=specFor(r,wrap.dataset.f);if(!s||s.ro)return;
   const fv=wrap.querySelector('.rfv');fv.style.display='none';
   wrap.insertAdjacentHTML('beforeend',editorHtml(r,s));
   const ed=wrap.querySelector('.rfe');
@@ -340,35 +345,25 @@ export async function deleteRec(){
   S.people=(S.people||[]).filter(p=>p.id!==r.id);
   save();closeProfile();
 }
-// Whoever is primary so far stays as a person on the record, also when they only lived in the contact text.
+// The primary person is a link (primaryId); nothing is copied onto the organisation.
 export function setPrimary(recId,personId){
   const r=findRec(recId),p=findRec(personId);if(!r||!p)return;
-  const ppl=orgPeople(r);
-  const parts=String(r.contact||'').split(';').map(x=>x.trim()).filter(Boolean);
-  parts.forEach((c,i)=>{
-    const m=c.match(/^([^(]+?)\s*\((.*)\)\s*$/),name=m?m[1].trim():c,title=m?m[2].trim():'';
-    if(normName(name)===normName(p.name)||ppl.some(x=>normName(x.name)===normName(name)))return;
-    const n=newPerson();n.name=name;n.title=title;n.firm=r.firm||r.name||'';n.orgId=r.id;
-    if(i===0){n.email=r.email||'';n.phone=r.phone||'';n.mobile=r.mobile||''}
-    S.people=S.people||[];S.people.push(n);
-  });
-  r.contact=p.name;r.email=p.email||'';r.phone=p.phone||'';r.mobile=p.mobile||'';
+  r.primaryId=p.id;if(p.orgId!==r.id)p.orgId=r.id;
   save();renderAll();if(profRec)renderRecordPage();toast(fixUml(p.name)+' is now primary');
 }
 export function peopleBoxHtml(rec,ppl){
-  // Primary contact in full, everyone else on one line each.
-  const prim=ppl.find(p=>rec.contact&&normName(p.name)===normName(rec.contact));
+  // Primary person in full, everyone else on one line each.
+  const prim=primaryOf(rec);
   const rest=ppl.filter(p=>p!==prim);
   let out='';
   if(prim){
     out+='<div style="margin-bottom:6px;cursor:pointer" data-click="openRec|'+prim.id+'|$e"><b>'+esc(fixUml(prim.name))+'</b> <span class="chip">primary</span>'
       +(prim.title?'<div class="muted" style="font-size:11px">'+esc(prim.title)+'</div>':'')
       +(prim.email?'<div style="font-size:11px"><a href="mailto:'+esc(prim.email)+'" data-click="!">'+esc(prim.email)+'</a></div>':'')
-      +(prim.phone?'<div class="muted" style="font-size:11px">'+esc(prim.phone)+'</div>':'')+'</div>';
+      +[prim.phone,prim.mobile].filter(Boolean).map(n=>'<div class="muted" style="font-size:11px">'+esc(n)+'</div>').join('')+'</div>';
   } else if(rec.contact){
     out+='<div style="margin-bottom:6px"><b>'+esc(fixUml(rec.contact))+'</b> <span class="chip">primary</span>'
-      +(rec.email?'<div style="font-size:11px"><a href="mailto:'+esc(rec.email)+'">'+esc(rec.email)+'</a></div>':'')
-      +'<div class="muted" style="font-size:10px">from the company record, no separate person record yet</div></div>';
+      +'<div class="muted" style="font-size:10px">contact text, not yet moved to a person record</div></div>';
   }
   if(rest.length){
     out+=(out?'<div style="border-top:1px solid #E8E8EC;margin:6px 0 5px"></div>':'')

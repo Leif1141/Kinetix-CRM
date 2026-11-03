@@ -1,5 +1,5 @@
 import {openDialog, confirmDialog} from './dialog.js';
-import {S, allRecs, dispName, findRec, fixUml, isDeadRec, isDeadSelf, isIgnoredRec, lastTouch, orgTouches, rawRecs, rowLabel} from '../state.js';
+import {S, allRecs, dispName, findRec, fixUml, isDeadRec, isDeadSelf, isIgnoredRec, lastTouch, orgTouches, rawRecs, rowLabel, primaryName} from '../state.js';
 import {daysAgo, esc, fmtAgo, fmtD, toast, today} from '../util.js';
 import {dueChip, prioChip} from './ui.js';
 import {logDone} from './actions.js';
@@ -20,7 +20,7 @@ let THREADS_SEED=null;
 export async function ensureThreadSeed(){if(!THREADS_SEED)THREADS_SEED=(await import('../data/threads-seed.js')).THREADS_SEED;seedThreads()}
 export function seedThreads(){if(THREADS_SEED&&(!S.threads||!Array.isArray(S.threads)||!S.threads.length)){S.threads=JSON.parse(JSON.stringify(THREADS_SEED))}}
 export function autoThread(r){
-  return {id:r.id,name:fixUml(dispName(r)),contact:r.kind==='person'?'':(r.contact||''),email:r.email||'',v:'',p:(r.priority==='Urgent'||r.priority==='High')?'Hoch':(r.priority==='Medium'?'Mittel':'Niedrig'),cat:r.kind==='target'?'Targets':(r.category||''),auto:true};
+  return {id:r.id,name:fixUml(dispName(r)),contact:r.kind==='person'?'':primaryName(r),email:r.email||'',v:'',p:(r.priority==='Urgent'||r.priority==='High')?'Hoch':(r.priority==='Medium'?'Mittel':'Niedrig'),cat:r.kind==='target'?'Targets':(r.category||''),auto:true};
 }
 export let _threadsCache=null,_threadsCacheKey='';
 export function invalidateThreads(){_threadsCache=null}

@@ -1,4 +1,4 @@
-import {letterDoneStep} from '../state.js';
+import {letterDoneStep, primaryName} from '../state.js';
 import {ACTIVE_STAGES, LETTER_TARGET_WEEK, LIVE} from '../constants.js';
 import {S, allRecs, cadenceOf, cadDue, deadMail, dispName, findRec, fixUml, grpOf, GRP_DEF, isDeadRec, isDeadSelf, isDismissed, isIgnoredRec, isStale, isSysNote, lastTouch, liveOnly, orgPeople, orgTouches, rowLabel, tType, touchList} from '../state.js';
 import {addDays, cleanPrev, daysAgo, esc, fmtD, fmtDe, today, weekStart} from '../util.js';
@@ -12,7 +12,7 @@ import {goTab} from '../main.js';
 // ═══════════════════════════════════════════════════════════════
 export function sugHead(r){
   const n=dispName(r);
-  const extra = r.kind==='advisor' ? (r.contact||'') : (r.kind==='person' ? (r.firm||'') : (r.location||''));
+  const extra = r.kind==='advisor' ? primaryName(r) : (r.kind==='person' ? (r.firm||'') : (r.location||''));
   const t = r.category||r.ptype||r.type||'';
   const bits=[extra,t].filter(Boolean).join(', ');
   return bits ? n+' ('+bits+')' : n;
@@ -103,7 +103,7 @@ export function setHomeKind(k){homeKind=homeKind===k?'':k;renderHome()}
 function matches(item){
   if(homeGrp&&grpOf(item.rec)!==homeGrp)return false;
   if(homeKind&&item.kind!==homeKind)return false;
-  if(homeQ){const r=item.rec;const h=(dispName(r)+' '+(r.contact||'')+' '+(r.firm||'')+' '+(item.text||'')).toLowerCase();if(!h.includes(homeQ))return false}
+  if(homeQ){const r=item.rec;const h=(dispName(r)+' '+primaryName(r)+' '+(r.firm||'')+' '+(item.text||'')).toLowerCase();if(!h.includes(homeQ))return false}
   return true;
 }
 function dueTxt(d){
@@ -183,7 +183,7 @@ function renderRecent(){
     const sum=_ai?(x.r.lastSummary):((_base?(x.t.dir==='out'?'You: ':'They: ')+_base:'')+(x.r.nextAction?' → Next: '+x.r.nextAction.slice(0,90):''));
     let sec='';
     if(x.r.kind==='person')sec=x.r.firm||'';
-    else{const pp=orgPeople(x.r);sec=(pp[0]&&pp[0].name)||x.r.contact||''}
+    else sec=primaryName(x.r)
     const subj=(x.t.dir==='out'?'<span style="color:#2E3C65" title="Sent by you">↑</span> ':'<span style="color:#C6943E" title="Received">↓</span> ')+(x.t.link?'<a href="'+esc(x.t.link)+'" target="_blank" data-click="!">'+esc(x.t.subject)+'</a>':esc(x.t.subject));
     return '<tr class="rowlink" data-open="'+x.r.id+'"><td class="muted" style="white-space:nowrap;vertical-align:top">'+fmtD(x.t.date)+'</td><td style="vertical-align:top"><b>'+esc(x.r.kind==='person'?dispName(x.r):(sec||dispName(x.r)))+'</b><div class="muted" style="font-size:11px">'+esc(x.r.kind==='person'?sec:dispName(x.r))+'</div>'+(x.n>1?' <span class="chip">+'+(x.n-1)+' this wk</span>':'')+'</td><td style="vertical-align:top">'+subj+'</td><td class="muted" style="vertical-align:top">'+esc(sum.slice(0,180))+'</td></tr>'}).join('')+'</table>':'<p class="muted" style="padding:12px">No activity yet. Sync to pull emails.</p>';
 }

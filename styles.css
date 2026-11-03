@@ -344,6 +344,8 @@ body.rec-open #p-record{display:block}
 .rf label{font-size:9px;color:var(--gray);text-transform:uppercase;display:block}
 .rfv{font-size:12px;padding:3px 6px;border:1px solid transparent;border-radius:3px;min-height:22px;cursor:text;overflow-wrap:anywhere}
 .rfv:hover,.rfv:focus{border-color:var(--lgray);background:#F4F5F9;outline:none}
+.rf.ro .rfv{cursor:default}
+.rf.ro .rfv:hover{border-color:transparent;background:none}
 .rfe{width:100%;font-family:Arial;font-size:12px;padding:3px 6px;border:1px solid var(--navy);border-radius:3px;box-sizing:border-box}
 .promise{display:flex;gap:8px;align-items:flex-start;font-size:12px;margin-top:4px}
 details.pbox>summary::-webkit-details-marker{display:none}

@@ -1,4 +1,4 @@
-import {S, allOrgs, allRecs, dispName, findRec, fixUml, lastTouch, liveOnly, orgPeople, personOrg} from '../state.js';
+import {S, allOrgs, allRecs, dispName, findRec, fixUml, lastTouch, liveOnly, orgPeople, personOrg, primaryName} from '../state.js';
 import {daysAgo, esc, normName, toast} from '../util.js';
 import {save} from '../store/firebase.js';
 
@@ -137,13 +137,13 @@ export function locGroups(kindFilter){
   if(wantOrg)allOrgs().forEach(o=>{
     if(kindFilter&&o.kind!==kindFilter)return;
     const c=effCity(o);if(!c)return;
-    add('o:'+o.id,{key:'o:'+o.id,rec:o,org:o,name:dispName(o),city:c,cat:locParty(o),contact:o.contact||'',people:[]});
+    add('o:'+o.id,{key:'o:'+o.id,rec:o,org:o,name:dispName(o),city:c,cat:locParty(o),contact:primaryName(o),people:[]});
   });
   liveOnly(S.people||[]).forEach(p=>{
     const pc=recCity(p);if(!pc)return;
     const o=personOrg(p);
     if(o&&wantOrg&&(!kindFilter||o.kind===kindFilter)){
-      const g=add('o:'+o.id,{key:'o:'+o.id,rec:o,org:o,name:dispName(o),city:effCity(o)||pc,cat:locParty(o),contact:o.contact||'',people:[]});
+      const g=add('o:'+o.id,{key:'o:'+o.id,rec:o,org:o,name:dispName(o),city:effCity(o)||pc,cat:locParty(o),contact:primaryName(o),people:[]});
       g.people.push(p);if(!g.contact)g.contact=p.name;return;
     }
     if(!wantPerson)return;
@@ -162,7 +162,7 @@ export function groupChip(g){return '<span class="chip" title="'+esc(g.cat[0])+'
 export function recLabel(r){
   if(r.kind==='person'){const o=r.orgId?findRec(r.orgId):null;const firm=(o?dispName(o):r.firm)||'';return firm?fixUml(firm)+' / '+fixUml(dispName(r)):fixUml(dispName(r))}
   const p=orgPeople(r)[0];
-  const who=r.contact||(p&&p.name)||'';
+  const who=primaryName(r)||(p&&p.name)||'';
   return who?fixUml(dispName(r))+' / '+fixUml(who):fixUml(dispName(r));
 }
 // Cluster cities that sit within roughly `km` of each other so the list is regions, not 200 single entries.

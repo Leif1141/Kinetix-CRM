@@ -17,6 +17,7 @@ pre{font-size:11px;background:#F4F5F9;padding:8px;border-radius:4px;white-space:
 <pre id="log"></pre>
 <script type="module">
 import {shard, unshard, diffTree, legacyExport, ensureDefaults, isLegacyBlob, encodeKeys, decodeKeys, encodePath, stableStringify, prune, sameValue} from '../../src/store/shards.js';
+import {planContacts, applyContactPlan, splitNames, parseName, looksLikeName, addressFor, isGeneralAddr} from '../../src/contacts.js';
 const out=document.getElementById('out'), logEl=document.getElementById('log');
 const results=[];
 function t(name,fn){let ok=false,msg='';try{const r=fn();ok=r===true||r===undefined;if(typeof r==='string'){ok=false;msg=r}}catch(e){ok=false;msg=e.message}results.push({name,ok,msg});
@@ -55,6 +56,19 @@ t('unshard shares objects with its input tree (the store must clone before unsha
 t('a touch added after unshard(clone(tree)) is seen by diffTree',()=>{const tr=shard(S0);const s=ensureDefaults(unshard(JSON.parse(JSON.stringify(tr))));const r=s.advisors.find(x=>x.touches&&Object.keys(x.touches).length);r.touches['test_first_touch']={date:'2026-10-22',dir:'out',src:'Note',subject:'t'};const ops=diffTree(tr,shard(s));return ('touches/'+r.id+'/test_first_touch' in ops)||'touch invisible to the diff: '+JSON.stringify(Object.keys(ops)).slice(0,100)});
 t('a touch added after unshard(tree) without clone is invisible to diffTree (documents the hazard)',()=>{const tr=shard(S0);const s=ensureDefaults(unshard(tr));const r=s.advisors.find(x=>x.touches&&Object.keys(x.touches).length);r.touches['test_first_touch']={date:'2026-10-22',dir:'out',src:'Note',subject:'t'};const ops=diffTree(tr,shard(s));return !('touches/'+r.id+'/test_first_touch' in ops)||'now visible; hazard gone'});
 t('sameValue agrees with stableStringify on every record pair and on edge values',()=>{const recs=[...S0.companies,...S0.advisors,...S0.people];for(let i=0;i<recs.length;i++){const a=recs[i],b=recs[(i+1)%recs.length],c=JSON.parse(JSON.stringify(a));if(!sameValue(a,c))return 'clone differs: '+a.id;if(sameValue(a,b)!==(stableStringify(a)===stableStringify(b)))return 'disagree on '+a.id}const E=[[null,undefined],[{x:1,y:undefined},{x:1}],[{x:null},{}],[[1,undefined],[1,null]],[NaN,null],[0,'0'],[[1,2],[2,1]],[{a:{b:[1,{c:2}]}},{a:{b:[1,{c:2}]}}],[{a:{b:[1,{c:2}]}},{a:{b:[1,{c:3}]}}]];for(const [a,b] of E)if(sameValue(a,b)!==(stableStringify(a)===stableStringify(b)))return 'disagree on '+stableStringify(a)+' vs '+stableStringify(b);return true});
+// phase 3 part A: contact text to linked people
+let _n=0;const mkP=()=>({kind:'person',name:'',title:'',firm:'',orgId:'',email:'',phone:'',mobile:'',fav:false,lists:[],touches:{}});const nid=()=>'tnew'+(_n++);
+t('splitNames keeps brackets together',()=>{const r=splitNames('A Eins (GF, Vertrieb); B Zwei und C Drei');return r.length===3&&r[0]==='A Eins (GF, Vertrieb)'||JSON.stringify(r)});
+t('parseName takes the role from brackets and "Termine über"',()=>{const a=parseName('Dr. X Y (Partner)'),b=parseName('Termine über Conny Thieme');return a.name==='Dr. X Y'&&a.role==='Partner'&&b.name==='Conny Thieme'&&b.role==='Appointments'||JSON.stringify([a,b])});
+t('function words are not names',()=>!looksLikeName('Firmenkunden')&&!looksLikeName('Legal')&&looksLikeName('Hagelgans')||'wrong');
+t('an address goes to a person only by name, never a general one',()=>addressFor('Anna Beispiel',['info@x.de','anna.beispiel@x.de'],['Anna Beispiel'])==='anna.beispiel@x.de'&&addressFor('Anna Beispiel',['info@x.de'],['Anna Beispiel'])===''&&isGeneralAddr('kontakt@x.de')||'wrong');
+const SC=ensureDefaults(JSON.parse(JSON.stringify(blob)));const plan=planContacts(SC,mkP,nid);applyContactPlan(SC,plan);
+t('after the move no organisation carries contact text',()=>{const n=[...SC.companies,...SC.advisors].filter(o=>o.contact).length;return n===0||n+' left'});
+t('every primaryId points to a person of that organisation',()=>{const P=new Map(SC.people.map(p=>[p.id,p]));const bad=[...SC.companies,...SC.advisors].filter(o=>o.primaryId&&(!P.get(o.primaryId)||P.get(o.primaryId).orgId!==o.id));return !bad.length||bad.length+' broken'});
+t('no organisation keeps an address that a person of it carries',()=>{const bad=[...SC.companies,...SC.advisors].filter(o=>o.email&&SC.people.some(p=>p.orgId===o.id&&(p.email||'').toLowerCase()===o.email.toLowerCase()));return !bad.length||bad.map(o=>o.name||o.firm).join(', ')});
+t('every address on a new person was on its organisation or in its correspondence',()=>{const O=new Map([...blob.companies,...blob.advisors].map(o=>[o.id,o]));const bad=plan.create.filter(p=>{if(!p.email)return false;const o=O.get(p.orgId);return !JSON.stringify(o).toLowerCase().includes(p.email)});return !bad.length||bad.map(p=>p.email).join(', ')});
+t('the move is idempotent',()=>{const p2=planContacts(SC,mkP,nid);return (!p2.create.length&&!p2.link.length&&!p2.orgSet.length)||JSON.stringify({c:p2.create.length,l:p2.link.length,o:p2.orgSet.length})});
+t('no touch is lost or moved by the move',()=>{const n=s=>['companies','advisors','people'].reduce((a,c)=>a+s[c].reduce((m,r)=>m+Object.keys(r.touches||{}).length,0),0);return n(SC)===n(blob)||n(SC)+' vs '+n(blob)});
 const fails=results.filter(r=>!r.ok).length;
 const sum=document.createElement('div');sum.style.marginTop='10px';sum.innerHTML='<b>'+(results.length-fails)+' of '+results.length+' passed</b>';out.appendChild(sum);
 window.__testResults=results;document.title=(fails?'FAIL ':'PASS ')+document.title;

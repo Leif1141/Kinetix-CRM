@@ -1,4 +1,4 @@
-import {S, addTouch, allOrgs, allRecs, dispName, findRec} from '../state.js';
+import {S, addTouch, allOrgs, allRecs, dispName, findRec, primaryName} from '../state.js';
 import {driveCall, driveProxy, driveReady} from './drive.js';
 import {gmailToken} from './google.js';
 import {isDismissedUnmatched} from '../views/inbox.js';
@@ -36,7 +36,7 @@ export async function syncGranolaCalls(){
       let recs=[];
       const nt=normName(title);
       (S.people||[]).forEach(p=>{const pn=normName(p.name||'');if(pn&&pn.length>5&&nt.includes(pn)){recs.push(p);if(p.orgId){const o=findRec(p.orgId);if(o&&!recs.includes(o))recs.push(o)}}});
-      if(!recs.length)allOrgs().forEach(o=>{const cn=normName((o.contact||'').replace(/\(.*?\)/g,''));const fn=normName(dispName(o)||'');if((cn&&cn.length>5&&nt.includes(cn))||(fn&&fn.length>5&&nt.includes(fn)))recs.push(o)});
+      if(!recs.length)allOrgs().forEach(o=>{const cn=normName(primaryName(o).replace(/\(.*?\)/g,''));const fn=normName(dispName(o)||'');if((cn&&cn.length>5&&nt.includes(cn))||(fn&&fn.length>5&&nt.includes(fn)))recs.push(o)});
       if(!recs.length)recs=matchRecords(title,'',false);
       if(recs.length){recs.forEach(r=>addTouch(r,key,t));added++}
       else{S.unmatched=S.unmatched||[];S.unmatched.push(Object.assign({},t,{key:key,sender:'granola'}))}

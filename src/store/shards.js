@@ -24,7 +24,7 @@ export function encodePath(p){return p.split('/').map(ENC).join('/')}
 
 export const REC_COLLS={companies:'target',advisors:'advisor',people:'person'};
 export const META_MAPS=['senderMap','geoCache','dismissed','dismissedUnmatched','ignoredSenders','ignoredDomains','appliedPatchTitles','appliedPatches','threadsDone','threadsState','emailMap','snoozeUntil','removedTouches'];
-export const META_FLAGS=['lastSync','lastBackup','lastDriveBackup','_lastSnapshotWeek','_driveArchiveId','granolaFolderId','seedVer','chanMigV1','prevCleanV1','showArchived','locRadius','outreachTarget'];
+export const META_FLAGS=['lastSync','lastBackup','lastDriveBackup','_lastSnapshotWeek','_driveArchiveId','granolaFolderId','seedVer','chanMigV1','prevCleanV1','contactsMigV1','showArchived','locRadius','outreachTarget'];
 export const META_LISTS=['customLists','_openLists'];
 export const DASH_LISTS={todos:t=>'t'+String(t.id),progress:p=>'p'+hash((p.d||'')+'|'+(p.desc||'')),decisions:d=>'d'+hash(d.decision||'')};
 export const DASH_LIST_NAMES=Object.keys(DASH_LISTS);
@@ -163,6 +163,15 @@ export function isLegacyBlob(data){
 export function legacyExport(S){
   const strip=arr=>(arr||[]).map(x=>{if(!isObj(x))return x;const {_ord,...rest}=x;return rest});
   const out={...S};
+  // Phase 3 part A: organisations no longer store contact text. The scheduled runs and the Python tools still read
+  // `contact` from the backup, so the export derives it from the linked people, primary first. Export only; the app
+  // never reads it back, and a run that writes it is folded into people by normaliseContacts().
+  if(S.contactsMigV1){
+    const byOrg=new Map();(S.people||[]).forEach(p=>{if(p&&p.orgId&&!p.archived)(byOrg.get(p.orgId)||byOrg.set(p.orgId,[]).get(p.orgId)).push(p)});
+    const withContact=o=>{const ppl=byOrg.get(o.id)||[];if(o.contact||!ppl.length)return o;const pr=ppl.find(p=>p.id===o.primaryId)||ppl[0];
+      return {...o,contact:[pr,...ppl.filter(p=>p!==pr)].map(p=>p.name).join('; ')}};
+    out.companies=(S.companies||[]).map(withContact);out.advisors=(S.advisors||[]).map(withContact);
+  }
   if(out.threads)out.threads=strip(out.threads);
   if(out.dash){out.dash={...out.dash};for(const name of DASH_LIST_NAMES)if(out.dash[name])out.dash[name]=strip(out.dash[name])}
   return out;

@@ -66,8 +66,12 @@ export function rowLabel(r){
   if(!r)return {top:'',sub:''};
   // linked organisation or the firm field; no fuzzy name match here, the label is drawn for every queue row
   if(r.kind==='person'){const o=r.orgId?findRec(r.orgId):null;const firm=(o&&o!==r?dispName(o):r.firm)||'';return firm?{top:firm,sub:r.name||''}:{top:r.name||'',sub:''}}
-  return {top:dispName(r)||'',sub:r.contact||''};
+  return {top:dispName(r)||'',sub:primaryName(r)};
 }
+// The primary person of an organisation (Leif 03.11.2026, phase 3 part A): the linked person named by primaryId,
+// else the first linked person. Contact text from before the move to person records is still read as a fallback.
+export function primaryOf(o){if(!o||o.kind==='person')return null;const ppl=orgPeople(o);return (o.primaryId&&ppl.find(p=>p.id===o.primaryId))||ppl[0]||null}
+export function primaryName(o){if(!o)return '';const p=primaryOf(o);return (p&&p.name)||o.contact||''}
 export function touchList(r){return Object.values(r.touches||{}).sort((a,b)=>(b.date||'').localeCompare(a.date||''))}
 export function isSysNote(t){return !!(t&&t.src==='Note'&&/^✔/.test(t.subject||''))}
 export function orgTouches(o){
