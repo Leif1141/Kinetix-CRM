@@ -1,4 +1,4 @@
-import {GRP_DEF, S, allOrgs, dispName, grpOf, lastTouch, personOrg, tType} from '../state.js';
+import {GRP_DEF, S, allOrgs, dispName, grpOf, introOf, introducedBy, lastTouch, personOrg, resetIntroIndex, tType} from '../state.js';
 import {esc, fmtAgo, normName} from '../util.js';
 import {starHtml, dueChip} from './ui.js';
 
@@ -102,6 +102,7 @@ export function resetPeopleView(){pGrp=''}
 export function setPGrp(g){pGrp=pGrp===g?'':g;renderPeople()}
 export function personGrp(p){const o=personOrg(p);if(o)return grpOf(o);return grpOf(p)}
 export function renderPeople(){
+  resetIntroIndex(); // intro texts may have changed since the last render
   const tsel=document.getElementById('pType');
   if(tsel.options.length<3){const types=[...new Set(allPeopleRows().map(p=>p.ptype).filter(Boolean))].sort();types.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;tsel.appendChild(o)})}
   const q=(document.getElementById('pSearch').value||'').toLowerCase();
@@ -118,14 +119,17 @@ export function renderPeople(){
   {const cnt={};BASE.forEach(p=>{const g=personGrp(p);cnt[g]=(cnt[g]||0)+1});const pg=document.getElementById('pGroups');if(pg)pg.innerHTML='<button class="sm'+(pGrp?'':' vbtn on')+'" data-click="setPGrp|">All</button>'+GRP_DEF.map(g=>'<button class="sm'+(pGrp===g.k?' vbtn on':'')+'" data-click="setPGrp|'+g.k+'">'+g.t+' ('+(cnt[g.k]||0)+')</button>').join('')}
   const hdr=(k,label)=>'<th data-click="sortPeople|'+k+'">'+label+(psortK===k?' <span class="arr">'+(psortD>0?'▲':'▼')+'</span>':'')+'</th>';
   const lastCell=p=>{const d=personLastTouch(p);if(d)return fmtAgo(d);if(p.__org){const f=lastTouch(p.__orgRec);return f?'<span title="Last contact with the firm">'+fmtAgo(f)+' (firm)</span>':'-'}return '-'};
+  // Intro (Leif 03.11.2026): how the contact came about, and whom this person introduced, in its own column
+  const introCell=p=>{const via=introOf(p),gave=p.__org?[]:introducedBy(p);return (via?'<div class="sub" title="'+esc(via)+'">'+esc(via.length>90?via.slice(0,87)+' ...':via)+'</div>':'')+(gave.length?'<div class="sub"><b>Introduced:</b> '+gave.map(r=>'<span data-click="!openRec|'+r.id+'|$e" style="cursor:pointer;text-decoration:underline dotted">'+esc(dispName(r))+'</span>').join(', ')+'</div>':'')};
   const nextCell=p=>p.nextAction?'<div class="nx">'+esc(p.nextAction)+'</div>'+(p.nextDate?dueChip(p.nextDate):''):'';
   const chip=p=>{const g=GRP_DEF.find(x=>x.k===personGrp(p))||GRP_DEF[5];return '<span class="gchip" style="background:'+g.c+'">'+(g.s||g.t)+'</span>'};
-  document.getElementById('peopleTable').innerHTML='<table class="ppl"><colgroup><col style="width:19%"><col style="width:8%"><col style="width:19%"><col style="width:18%"><col style="width:9%"><col style="width:27%"></colgroup><tr>'+hdr('name','Name')+'<th>Type</th>'+hdr('firm','Organization')+'<th>Email / phone</th>'+hdr('lastc','Last contact')+'<th>Next step</th></tr>'
+  document.getElementById('peopleTable').innerHTML='<table class="ppl"><colgroup><col style="width:17%"><col style="width:7%"><col style="width:16%"><col style="width:17%"><col style="width:15%"><col style="width:8%"><col style="width:20%"></colgroup><tr>'+hdr('name','Name')+'<th>Type</th>'+hdr('firm','Organization')+'<th>Email / phone</th><th>Intro</th>'+hdr('lastc','Last contact')+'<th>Next step</th></tr>'
     +rows.slice(0,400).map(p=>'<tr class="rowlink" data-click="openRec|'+p.id+'|$e">'
       +'<td>'+starHtml(p)+' <b>'+esc(p.name)+'</b>'+(p.title?'<div class="sub">'+esc(p.title)+'</div>':'')+'</td>'
       +'<td>'+chip(p)+'</td>'
-      +'<td>'+esc(p.firm||'-')+(p.networkPath?'<div class="sub" title="'+esc(p.networkPath)+'">'+esc(p.networkPath)+'</div>':'')+'</td>'
+      +'<td>'+esc(p.firm||'-')+'</td>'
       +'<td><div class="em">'+(p.email?'<a href="mailto:'+esc(p.email)+'" data-click="!">'+esc(p.email)+'</a>':'')+'</div>'+(p.__general?'<div class="sub">general address</div>':'')+((p.mobile||p.phone)?'<div class="sub">'+esc(p.mobile||p.phone)+'</div>':'')+'</td>'
+      +'<td>'+introCell(p)+'</td>'
       +'<td>'+lastCell(p)+'</td>'
       +'<td>'+nextCell(p)+'</td></tr>').join('')+'</table>';
 }

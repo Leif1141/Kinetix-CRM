@@ -72,6 +72,25 @@ export function rowLabel(r){
 // else the first linked person. Contact text from before the move to person records is still read as a fallback.
 export function primaryOf(o){if(!o||o.kind==='person')return null;const ppl=orgPeople(o);return (o.primaryId&&ppl.find(p=>p.id===o.primaryId))||ppl[0]||null}
 export function primaryName(o){if(!o)return '';const p=primaryOf(o);return (p&&p.name)||o.contact||''}
+// How a contact came about (Kontaktherstellung): the person's own entry, else the entry on their organisation.
+export function introOf(r){if(!r)return '';const own=(r.networkPath||r.introPath||'').trim();if(own||r.kind!=='person')return own;const o=r.orgId?findRec(r.orgId):null;return o?((o.networkPath||o.introPath||'').trim()):''}
+// The reverse: records whose intro text names this person (Hilke Dahinten gave Leif Leander Zerbach). Needs at least
+// two name parts, so a first name alone never matches. A firm and its own people are listed once, as the firm.
+const _fold=x=>(x||'').toLowerCase().replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss');
+let _introByTok=null;
+export function resetIntroIndex(){_introByTok=null}
+function introIndex(){
+  if(_introByTok)return _introByTok;
+  _introByTok=new Map();
+  allRecs().forEach(r=>{const t=_fold(r.networkPath||r.introPath||'').split(/[^a-z]+/).filter(x=>x.length>=3);if(!t.length)return;const e={r,set:new Set(t)};e.set.forEach(k=>(_introByTok.get(k)||_introByTok.set(k,[]).get(k)).push(e))});
+  return _introByTok;
+}
+export function introducedBy(p){
+  if(!p||p.kind!=='person')return [];
+  const toks=_fold(p.name).replace(/^(dr|prof)\.?\s+/g,'').split(/[^a-z]+/).filter(t=>t.length>=3);if(toks.length<2)return [];
+  const hits=(introIndex().get(toks[toks.length-1])||[]).filter(e=>e.r!==p&&toks.every(k=>e.set.has(k))).map(e=>e.r);
+  return hits.filter(r=>!(r.kind==='person'&&r.orgId&&hits.some(o=>o.id===r.orgId)));
+}
 export function touchList(r){return Object.values(r.touches||{}).sort((a,b)=>(b.date||'').localeCompare(a.date||''))}
 export function isSysNote(t){return !!(t&&t.src==='Note'&&/^✔/.test(t.subject||''))}
 export function orgTouches(o){
