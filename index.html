@@ -57,7 +57,7 @@
   <div class="tab" data-t="orgs">Organizations</div>
   <div class="tab" data-t="people">People</div>
   <div class="tab" data-t="pipeline">Pipeline</div>
-  <div class="tab" data-t="threads">Open Items <span class="tab-badge" id="thBadge" style="display:none"></span></div>
+  <div class="tab" data-t="threads">Waiting <span class="tab-badge" id="thBadge" style="display:none"></span></div>
   <div class="tab" data-t="inbox">Inbox <span class="tab-badge" id="inbBadge" style="display:none"></span></div>
   <div class="tab" data-t="locations">Map</div>
   <div class="tab" data-t="gaps">Data gaps</div>
@@ -123,21 +123,11 @@
 <div class="panel" id="p-followups" style="display:none"></div>
 
 <div class="panel" id="p-threads">
-  <div class="kpis" id="thKpis"></div>
   <div class="filterbar">
-    <button class="sm th-f on" data-f="open" data-click="thGo|open">All open</button>
-    <button class="sm th-f" data-f="leif" data-click="thGo|leif">My move</button>
-    <button class="sm th-f" data-f="them" data-click="thGo|them">Their move</button>
-    <button class="sm th-f" data-f="hoch" data-click="thGo|hoch">High priority only</button>
-    <button class="sm th-f" data-f="all" data-click="thGo|all">All</button>
     <input id="thSearch" placeholder="Search..." data-input="renderThreads" style="flex:1;min-width:160px">
-    <select id="thCat" data-change="renderThreads"><option value="">All categories</option></select>
-    <label style="font-size:12px"><input type="checkbox" id="thHideDone" data-change="renderThreads"> Hide ticked</label>
-    <label style="font-size:12px" title="Items whose CRM record already carries a next-action date are on the Today tab"><input type="checkbox" id="thHideSched" checked data-change="renderThreads"> Hide items scheduled on Today</label>
-    <button class="sm" data-click="thToggleAll" id="thAllBtn">All details</button>
     <span class="muted" id="thCount"></span>
   </div>
-  <div class="note muted" style="padding:0 2px 8px;font-size:11px">Mail threads from the CRM, snapshot of 15.09.2026 (187 counterparties). Click a tile or a filter. Recommendation and draft were prepared by Claude; status, ticks and notes are saved in the CRM.</div>
+  <div class="note muted" style="padding:0 2px 8px;font-size:11px">Your own mails and letters from the last 10 to 60 days that nobody has answered and that have no next step yet. Follow up puts the thread on Today, +2w brings it back in two weeks, Park removes it until the next mail. Mails you still owe an answer show on Today as Reply owed.</div>
   <div id="thBody"></div>
 </div>
 

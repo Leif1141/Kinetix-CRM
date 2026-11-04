@@ -1,6 +1,7 @@
 import {S, allOrgs, allRecs, dispName, findRec, fixUml, lastTouch, liveOnly, orgPeople, personOrg, primaryName} from '../state.js';
 import {daysAgo, esc, normName, toast} from '../util.js';
 import {save} from '../store/firebase.js';
+import {addrParts} from '../addr.js';
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -219,7 +220,7 @@ export function renderLocations(){
       const ex=addrLL(gr.rec);const pos=ex?ex:[g[0]+off*Math.sin(ang),g[1]+off*Math.cos(ang)];
       const m=L.circleMarker(pos,{radius:ex?7:8,color:ex?'#000':'#fff',weight:1.5,fillColor:col,fillOpacity:0.92}).addTo(locLayer);
       const ppl=gr.people.map(p=>fixUml(p.name)).join(', ')||fixUml(gr.contact||'');
-      m.bindPopup('<b>'+esc(gr.name)+'</b><br><span style="color:'+col+';font-weight:700">'+lbl+'</span> · '+esc(c)+(ppl?'<br>'+esc(ppl):'')+(ex?'<br><span style="font-size:10px">'+esc(gr.rec.address||'')+'</span>':'<br><span style="font-size:10px;color:#595959">nur Ort bekannt, keine Straßenadresse im CRM</span>')+'<br><a href="#" data-click="openRec|'+gr.rec.id+'|$e">Open profile →</a>');
+      m.bindPopup('<b>'+esc(gr.name)+'</b><br><span style="color:'+col+';font-weight:700">'+lbl+'</span> · '+esc(c)+(ppl?'<br>'+esc(ppl):'')+(ex?'<br><span style="font-size:10px">'+esc(gr.rec.address||'')+'</span>':(addrParts(gr.rec).street?'<br><span style="font-size:10px">'+esc(gr.rec.address||'')+' (pin at the city centre until the address is located)</span>':'<br><span style="font-size:10px">Only the city is known, no street address in the CRM</span>'))+'<br><a href="#" data-click="openRec|'+gr.rec.id+'|$e">Open profile →</a>');
     });
   });
   if(!locMap._legend){

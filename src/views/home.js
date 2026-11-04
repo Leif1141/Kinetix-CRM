@@ -6,6 +6,7 @@ import {grpChip, stagePill} from './ui.js';
 import {deadMailOk, markDead, reviveRec, sugAct, unignoreRec} from './actions.js';
 import {openProfile} from './record.js';
 import {goTab} from '../main.js';
+import {replyOwedItems} from './waiting.js';
 
 // ═══════════════════════════════════════════════════════════════
 // SUGGESTIONS ENGINE (keys drive Done / snooze / ignore)
@@ -44,7 +45,7 @@ export function openPromises(r){
   return (r&&r.nextAction?r.nextAction.split('|'):[]).map(s=>s.trim()).filter(s=>/^Promised\b/.test(s));
 }
 const PARTNER_CH=['Partner letter','M&A house / advisor','Tax adviser / auditor','Network / referral','Bank','Platform'];
-export const QUEUE_KINDS={deadmail:'Dead',overdue:'Overdue',promise:'Promise made',due:'Due today',cadence:'Letter cadence',noaction:'Live deal without next step',stale:'Stale live deal',revisit:'Revisit date reached'};
+export const QUEUE_KINDS={deadmail:'Dead',reply:'Reply owed',overdue:'Overdue',promise:'Promise made',due:'Due today',cadence:'Letter cadence',noaction:'Live deal without next step',stale:'Stale live deal',revisit:'Revisit date reached'};
 let homeGrp='',homeQ='',homeKind='';
 try{homeGrp=localStorage.getItem('kxHomeGrp')||''}catch(e){}
 
@@ -64,6 +65,7 @@ export function buildQueue(){
     const cd=cadenceOf(c);
     items.push({rec:c,kind:'cadence',key:'cdz_'+c.id+'_'+cd.next.k,text:'Letter of '+fmtDe(cd.sent)+(cd.via?' via '+cd.via:'')+': '+cd.next.label,due:cd.next.due,sort:'2'+cd.next.due});
   });
+  replyOwedItems().forEach(i=>items.push(i));
   const live=(S.companies||[]).filter(c=>ACTIVE_STAGES.includes(c.stage)&&!isIgnoredRec(c));
   live.filter(c=>isStale(c)&&!c.nextDate&&!isDismissed('stale_'+c.id)).forEach(c=>{
     items.push({rec:c,kind:'stale',key:'stale_'+c.id,text:c.stage+', last contact '+(lastTouch(c)?fmtDe(lastTouch(c)):'never'),due:'',sort:'4'+(lastTouch(c)||'')});
@@ -123,6 +125,8 @@ function rowHtml(it,sec){
   const deadBtn=isDeadSelf(r)?'':' <button class="sm" data-act="dead" data-id="'+r.id+'">Dead</button>';
   const acts=it.kind==='deadmail'
     ?'<button class="sm primary" data-act="revive" data-id="'+r.id+'">Zurückholen</button> <button class="sm" data-act="deadok" data-id="'+r.id+'">Ok</button>'
+    :it.kind==='reply'
+    ?'<button class="sm primary" data-act="set" data-id="'+r.id+'" title="Set the next step">Set action</button> <button class="sm" data-act="dismiss" data-id="'+r.id+'" data-key="'+it.key+'" title="Answered or nothing to answer">Answered</button> <button class="sm" data-act="ignore" data-id="'+r.id+'" data-key="'+it.key+'" title="bis zur nächsten Aktivität">Hide</button>'+deadBtn
     :it.kind==='stale'||it.kind==='noaction'||it.kind==='revisit'
     ?'<button class="sm" data-act="set" data-id="'+r.id+'">Set action</button> <button class="sm" data-act="dismiss" data-id="'+r.id+'" data-key="'+it.key+'">Dismiss</button>'+deadBtn
     :'<button class="sm primary" data-act="done" data-id="'+r.id+'" data-key="'+it.key+'" title="Log as done">Done</button> <button class="sm" data-act="2w" data-id="'+r.id+'" data-key="'+it.key+'" title="Push by two weeks">+2w</button> <button class="sm" data-act="ignore" data-id="'+r.id+'" data-key="'+it.key+'" title="bis zur nächsten Aktivität">Hide</button>'+deadBtn;
@@ -130,12 +134,12 @@ function rowHtml(it,sec){
     +'<div class="q-acts">'+(sec?'<span class="q-grip" title="Drag to reorder">⋮⋮</span>':'')+acts+'</div>'
     +'<div class="q-name"><b>'+esc(fixUml(lab.top))+'</b>'+(sub?'<div class="muted" style="font-size:10px">'+esc(fixUml(sub))+'</div>':'')+(r.kind==='target'?'<div>'+stagePill(r.stage)+'</div>':'')+'</div>'
     +'<div class="q-type">'+grpChip(r)+'</div>'
-    +'<div class="q-step">'+kindTag+' '+esc(fixUml(it.text||''))+'</div>'
+    +'<div class="q-step">'+kindTag+' '+(it.link?'<a href="'+esc(it.link)+'" target="_blank">'+esc(fixUml(it.text||''))+'</a>':esc(fixUml(it.text||'')))+'</div>'
     +'<div class="q-due">'+dueTxt(it.due)+'</div>'
     +'<div class="q-last muted">'+(lastTouch(r)?fmtDe(lastTouch(r)):'-')+'</div>'
     +'</div>';
 }
-const URGENT_KINDS=['deadmail','overdue','promise','due','cadence'];
+const URGENT_KINDS=['deadmail','overdue','promise','reply','due','cadence'];
 const DECIDE_KINDS=['noaction','stale','revisit'];
 // Manual order (Leif 04.11.2026): rows are dragged up and down within Today and within Needs a decision.
 // S.homeOrder holds a rank per queue key. An item without a rank (new in the queue) keeps its default slot;
