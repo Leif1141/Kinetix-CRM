@@ -112,6 +112,18 @@ document.getElementById('tabs').addEventListener('click',e=>{
   renderView(v);window.scrollTo(0,0);
 });
 
+// Escape (Leif 04.11.2026) does what a click on the active tab does: any open record closes and the section is
+// back at its start view, nothing selected, searches and filters empty. Dialogs, the palette and a field being
+// edited handle their own Escape first; a note being typed is never thrown away.
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape'||e.defaultPrevented)return;
+  if(document.querySelector('#kxDialog,#palette:not([hidden]),#p-record .rfe'))return;
+  const t=e.target;
+  if(t&&t.tagName==='TEXTAREA'&&t.value.trim())return;
+  if(t&&t.blur&&/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName))t.blur();
+  const a=document.querySelector('.tab.active');if(a)a.click();
+});
+
 // BOOT
 if(initFirebase()){
   window.__authGate=setTimeout(()=>{const a=document.getElementById('authScreen');if(a&&!currentUser)a.style.display='flex'},6000);

@@ -192,7 +192,7 @@ export function initRecordPage(){
     const fv=e.target.closest&&e.target.closest('.rfv');
     if(fv&&(e.key==='Enter'||e.key===' ')){e.preventDefault();startEdit(fv.parentElement)}
   });
-  document.addEventListener('keydown',e=>{if(e.key!=='Escape'||!document.body.classList.contains('rec-open'))return;const t=e.target;if(t&&t.closest&&t.closest('.rfe,input,textarea,select'))return;if(document.querySelector('#p-record .rfe'))return;closeProfile()});
+  // Escape is handled once in main.js: it does what a click on the active tab does
 }
 function specFor(r,key){const sp=fieldSpecs(r);return [...sp.sections.flatMap(x=>x[1]),...sp.next].find(s=>s.key===key)}
 function startEdit(wrap){
