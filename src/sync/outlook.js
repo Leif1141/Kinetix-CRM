@@ -79,7 +79,7 @@ export async function syncOutlookEmails(){
       cand.forEach(a=>{matchRecords(text,a,true).forEach(x=>{if(!recs.includes(x))recs.push(x)})});
       const t={date:msg.receivedDateTime,dir,subject:msg.subject||'(no subject)',link:msg.webLink||'',src:'Kinetix',who:dir==='out'?recipients.join(', '):sAddr,prev:cleanPrev((msg.uniqueBody&&msg.uniqueBody.content)||msg.bodyPreview,1500)};
       if(recs.length){recs.forEach(r=>{addTouch(r,key,t)});added++;if(msg.hasAttachments)attQueue.push({key,id:msg.id,holders:recs})}
-      else{if(!isDismissedUnmatched(key)&&!(S.unmatched||[]).some(u=>u.key===key)){S.unmatched=S.unmatched||[];S.unmatched.push({...t,key,sender:sAddr})}}
+      else{if(!isDismissedUnmatched(key)&&!(S.unmatched||[]).some(u=>u.key===key)){S.unmatched=S.unmatched||[];S.unmatched.push({...t,key,sender:sAddr,sname:dir==='in'?(msg.sender?.emailAddress?.name||''):(((msg.toRecipients||[]).find(r=>!MY_ADDR.some(m=>(r.emailAddress?.address||'').toLowerCase().includes(m)))||{}).emailAddress?.name||'')})}}
     });
     for(const q of attQueue.slice(0,25)){
       try{

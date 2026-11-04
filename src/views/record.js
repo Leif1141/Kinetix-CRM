@@ -1,10 +1,11 @@
 import {openDialog, confirmDialog} from './dialog.js';
 import {invalidateThreads} from '../views/threads.js';
 import {ACT_TYPES, ADV_CATS, ADV_STATUS, CHANNELS, DEADREASONS, PRIORITIES, PTYPES, STAGES, VERDICTS} from '../constants.js';
-import {S, addTouch, chanOf, deadCatOf, dispName, findRec, fixUml, isDeadSelf, isSysNote, newPerson, orgPeople, personOrg, primaryOf, splitPhones, tType, touchList, touchTomb, lastTouch} from '../state.js';
-import {addDays, cleanPrev, esc, fmtAgo, fmtD, fmtDe, normName, toast, today, uid} from '../util.js';
+import {S, addTouch, allOrgs, chanOf, deadCatOf, dispName, findRec, fixUml, isDeadSelf, isSysNote, newPerson, orgByDomain, orgDomain, orgPeople, personOrg, primaryOf, splitPhones, tType, touchList, touchTomb, lastTouch} from '../state.js';
+import {addDays, cleanPrev, esc, fmtAgo, fmtD, fmtDe, normDomain, normName, shortLoc, toast, today, uid} from '../util.js';
 import {fld, gv, n1, selFld, starHtml, stagePill} from './ui.js';
 import {letterBox} from './pipeline.js';
+import {addrParts, setAddrPart} from '../addr.js';
 import {renderAll} from '../main.js';
 import {save} from '../store/firebase.js';
 import {shareHtml, sharedByRec} from '../shares.js';
@@ -29,7 +30,7 @@ function fieldSpecs(r){
   const next=[F('nextAction','Next action','textarea'),F('nextDate','Due','date'),F('priority','Priority','select',{options:PRIORITIES})];
   if(r.kind==='target')return {
     sections:[
-      ['Company',[F('name','Company name','text',{required:true}),F('email','General email'),F('phone','Phone (office)')].concat(r.mobile?[F('mobile','Mobile (not yet on a person)')]:[]).concat([F('domain','Website'),F('location','Location'),F('address','Address')])],
+      ['Company',[F('name','Company name','text',{required:true}),F('email','General email'),F('phone','Phone (office)')].concat(r.mobile?[F('mobile','Mobile (not yet on a person)')]:[]).concat([F('domain','Website'),F('street','Street and number','text',{get:c=>addrParts(c).rawStreet,addr:true}),F('zip','Postcode','text',{get:c=>addrParts(c).zip,addr:true}),F('city','City','text',{get:c=>addrParts(c).city,addr:true})])],
       ['Deal',[F('stage','Stage','select',{options:STAGES}),F('channel','Channel','select',{options:CHANNELS,get:c=>chanOf(c)}),F('channelVia','Via (partner, fair, contact)')]
         .concat(r.stage==='Dead'?[F('deadCat','Dead category','select',{options:DEADREASONS,get:deadCatOf}),F('revisitDate','Revisit date','date'),F('deadReason','Dead reason (detail)','textarea')]:[])],
       ['Financials and scoring',[F('revenue','Revenue (€m)','number',RO),F('ebitda','EBITDA (€m)','number',RO),F('ebit','EBIT (€m)','number',RO),F('gm','Gross margin %','number',Object.assign({get:c=>c.gm==null||c.gm===''?null:Math.round(c.gm*1000)/10},RO)),F('score','Score /100','number',RO),F('verdict','Verdict','select',Object.assign({options:VERDICTS},RO)),F('finSrc','Source','text',Object.assign({get:finSrcText},RO))]],
@@ -37,40 +38,60 @@ function fieldSpecs(r){
     ],next};
   if(r.kind==='advisor')return {
     sections:[
-      ['Firm',[F('firm','Firm name','text',{required:true}),F('email','General email'),F('phone','Phone (office)')].concat(r.mobile?[F('mobile','Mobile (not yet on a person)')]:[]).concat([F('domain','Domain'),F('city','City'),F('address','Address')])],
+      ['Firm',[F('firm','Firm name','text',{required:true}),F('email','General email'),F('phone','Phone (office)')].concat(r.mobile?[F('mobile','Mobile (not yet on a person)')]:[]).concat([F('domain','Domain'),F('street','Street and number','text',{get:c=>addrParts(c).rawStreet,addr:true}),F('zip','Postcode','text',{get:c=>addrParts(c).zip,addr:true}),F('city','City','text',{get:c=>addrParts(c).city,addr:true})])],
       ['Relationship',[F('category','Category','select',{options:ADV_CATS}),F('status','Status','select',{options:ADV_STATUS}),F('market','Market','select',{options:['DE','UK'],get:a=>a.market||(/uk|united kingdom/i.test(a.geo||'')?'UK':'DE')}),F('geo','Geo (country)','select',{options:COUNTRIES}),F('cadence','Check-in cadence (days)','int',{def:30}),F('introPath','Intro path'),F('notes','Notes','textarea')]]
     ],next};
   return {
     sections:[
-      ['Person',[F('name','Full name','text',{required:true}),F('title','Title'),F('ptype','Type','select',{options:PTYPES}),F('firm','Organisation'),F('email','Email'),F('phone','Phone (office)'),F('mobile','Mobile'),F('linkedin','LinkedIn'),F('city','City'),F('address','Address')]],
+      ['Person',[F('name','Full name','text',{required:true}),F('title','Title'),F('ptype','Type','select',{options:PTYPES}),F('firm','Organisation','org',{get:p=>{const o=personOrg(p);return o?dispName(o):p.firm}}),F('email','Email'),F('phone','Phone (office)'),F('mobile','Mobile'),F('linkedin','LinkedIn'),F('city','City'),F('address','Address')]],
       ['Context',[F('angle','Angle / notes','textarea'),F('networkPath','Network path')]]
     ],next};
 }
 const getVal=(r,s)=>s.get?s.get(r):r[s.key];
+// Where a contact value came from (legal notice, register, business card, mail signature, entered in the CRM) and when.
+const SRC_FIELDS=['domain','email','phone','mobile','street','zip','city','address','title','linkedin','name'];
+function srcTip(r,k){const x=r.src&&r.src[k];return x?'Source: '+x.s+(x.d?', '+fmtDe(x.d):''):''}
+// A target at Contacted or later needs its domain, otherwise its mails are not matched.
+const needsDomain=r=>r.kind==='target'&&r.stage!=='Dead'&&STAGES.indexOf(r.stage)>=STAGES.indexOf('Contacted')&&!orgDomain(r);
 function display(r,s){
   const v=getVal(r,s);
+  if((v===null||v===undefined||v==='')&&s.key==='domain'&&needsDomain(r))return '<span class="miss">missing, mails are not matched</span>';
   if(v===null||v===undefined||v==='')return '<span class="muted">-</span>';
   if(s.type==='date')return esc(fmtDe(v));
   if(s.type==='number')return esc(n1(v)===''?String(v):n1(v));
   if(s.key==='stage')return stagePill(v);
   if(s.key==='domain'||s.key==='linkedin'){const u=/^https?:/.test(v)?v:'https://'+v;return '<a href="'+esc(u)+'" target="_blank" data-click="!">'+esc(v)+'</a>'}
+  if(s.type==='org'){const o=personOrg(r);return esc(fixUml(String(v)))+(o?' <a href="#rec/'+o.id+'" title="Open organisation">&#8599;</a>':' <span class="muted" title="Not linked to an organisation record">(not linked)</span>')}
   if(s.key==='email')return '<a href="mailto:'+esc(v)+'" data-click="!">'+esc(v)+'</a>';
   return esc(fixUml(String(v))).replace(/\n/g,'<br>');
 }
-function fieldHtml(r,s){return s.ro?'<div class="rf ro" data-f="'+s.key+'"><label>'+esc(s.label)+'</label><div class="rfv" title="From MASTER Scoring, edit it in the workbook">'+display(r,s)+'</div></div>':'<div class="rf" data-f="'+s.key+'"><label>'+esc(s.label)+'</label><div class="rfv" tabindex="0" title="Click to edit">'+display(r,s)+'</div></div>'}
+function fieldHtml(r,s){return s.ro?'<div class="rf ro" data-f="'+s.key+'"><label>'+esc(s.label)+'</label><div class="rfv" title="From MASTER Scoring, edit it in the workbook">'+display(r,s)+'</div></div>':'<div class="rf" data-f="'+s.key+'"><label>'+esc(s.label)+'</label><div class="rfv" tabindex="0" title="'+esc(srcTip(r,s.key)||'Click to edit')+'">'+display(r,s)+'</div></div>'}
 function editorHtml(r,s){
   const v=getVal(r,s);const cur=v===null||v===undefined?'':String(v);
   if(s.type==='select'){const has=cur===''||s.options.includes(cur);return '<select class="rfe">'+s.options.map(o=>'<option value="'+esc(o)+'"'+(o===cur?' selected':'')+'>'+esc(o)+'</option>').join('')+(has?'':'<option selected>'+esc(cur)+'</option>')+'</select>'}
+  if(s.type==='org')return '<input class="rfe" type="text" list="orgPick" autocomplete="off" placeholder="Type a company, advisor or domain" value="'+esc(cur)+'">'+orgPickList();
+  if(s.key==='email'&&!cur&&domHint[r.id])return '<input class="rfe" type="text" value="@'+esc(domHint[r.id])+'" data-caret0="1">';
   if(s.type==='textarea')return '<textarea class="rfe" rows="'+(s.rows||3)+'">'+esc(cur)+'</textarea>';
   if(s.type==='date')return '<input class="rfe" type="date" value="'+esc(cur)+'">';
   if(s.type==='number'||s.type==='int')return '<input class="rfe" type="text" inputmode="decimal" value="'+esc(cur)+'">';
   return '<input class="rfe" type="text" value="'+esc(cur)+'">';
 }
+// Organisation picker: every live company and advisor, searchable by name and domain.
+function orgPickList(){return '<datalist id="orgPick">'+allOrgs().filter(o=>!o.mergedInto&&dispName(o)).map(o=>'<option value="'+esc(dispName(o))+'" label="'+esc([orgDomain(o),o.kind==='target'?'Target':'Advisor'].filter(Boolean).join(' · '))+'">').join('')+'</datalist>'}
+function pickOrg(v){v=(v||'').trim();if(!v)return null;const nn=normName(v);const live=allOrgs().filter(o=>!o.mergedInto);
+  return live.find(o=>dispName(o)===v)||live.find(o=>normName(dispName(o)||'')===nn)||orgByDomain(v)||null}
+// New person from an organisation page: the org's domain is offered in the email field, never saved on its own.
+const domHint={};
 function ensureInState(r){
   if(r.kind==='target'&&!S.companies.find(c=>c.id===r.id))S.companies.push(r);
   if(r.kind==='advisor'&&!S.advisors.find(a=>a.id===r.id))S.advisors.push(r);
   if(r.kind==='person'&&!(S.people||[]).find(p=>p.id===r.id)){S.people=S.people||[];S.people.push(r)}
   isNew=false;
+}
+// One organisation per domain (and per name when creating): offer the record that already exists.
+async function offerExisting(dup,what,isDom){
+  const ok=await confirmDialog(dispName(dup)+' already has '+(isDom?'the domain ':'the name ')+what+'. A second organisation is not created.',{title:'Already in the CRM',ok:'Open '+dispName(dup)});
+  if(ok)openProfile(dup);
 }
 export function commitField(r,s,raw){
   let v=(raw??'').toString();
@@ -79,6 +100,18 @@ export function commitField(r,s,raw){
   else if(s.type==='int'){const n=parseInt(v,10);v=isNaN(n)?(s.def??null):n}
   if(s.required&&(v===''||v===null)){toast(s.label+' cannot be empty');return false}
   if(s.set)v=s.set(v);
+  if(s.key==='email'&&/^@/.test(v))v='';
+  if(r.kind!=='person'&&v&&(s.key==='domain'||(isNew&&(s.key==='name'||s.key==='firm')))){
+    const dup=s.key==='domain'?orgByDomain(v,{except:r.id}):allOrgs().find(o=>o.id!==r.id&&!o.mergedInto&&normName(dispName(o)||'')===normName(v));
+    if(dup){offerExisting(dup,s.key==='domain'?normDomain(v):v,s.key==='domain');return false}
+  }
+  if(r.kind==='person'&&s.type==='org'){
+    if((v||'')===(getVal(r,s)||''))return true;
+    const o=pickOrg(v),was=r.orgId?findRec(r.orgId):null;
+    if(o){r.orgId=o.id;r.firm=dispName(o)}else{r.orgId='';r.firm=v}
+    if(was&&was!==o&&was.primaryId===r.id)delete was.primaryId;
+    ensureInState(r);save();if(!o&&v)toast('No organisation record named "'+v+'": kept as text, not linked');return true;
+  }
   const old=getVal(r,s);
   const same=(a,b)=>(a===null||a===undefined||a==='')&&(b===null||b===undefined||b==='')||a===b;
   if(s.key==='gm'?same(r.gm,v):same(old,v))return true;
@@ -86,7 +119,10 @@ export function commitField(r,s,raw){
   if(s.key==='nextAction'){r.nextSet=today();invalidateThreads()}
   if(s.key==='deadCat'){r.deadCat=v}
   else if(s.key==='channel'){r.channel=v}
+  else if(s.addr)setAddrPart(r,s.key,v);
   else r[s.key]=v;
+  if(SRC_FIELDS.includes(s.key)){r.src=r.src||{};if(v===''||v===null)delete r.src[s.key];else r.src[s.key]={s:'Entered in the CRM',d:today()}}
+  if((s.key==='stage'||s.key==='domain')&&needsDomain(r))setTimeout(()=>toast('No domain: mails from '+dispName(r)+' are not matched. Add the website.'),0);
   if(s.key==='phone')splitPhones(r);
   ensureInState(r);
   save();
@@ -130,7 +166,7 @@ export function renderRecordPage(){
     +details
     +(isT?'<div class="pbox"><h4>Letter and cadence</h4>'+letterBox(r)+'</div>':'')
     +'<div class="pbox"><h4>Lists</h4>'+listChips(r)+'</div>'
-    +(isP?'':'<div class="pbox"><h4>People <button class="sm" data-click="addPersonToOrg">+ Add</button></h4>'+peopleBoxHtml(r,ppl)+'</div>')
+    +(isP?'':'<div class="pbox"><h4>People <button class="sm" data-click="addPersonToOrg">+ Person</button></h4>'+peopleBoxHtml(r,ppl)+'</div>')
     +'<div class="pbox"><h4>Files <button class="sm" data-click="addLink">+ Link</button></h4>'+filesHtml(r)+'</div>'
     +(isT?'<details class="pbox"><summary style="font-size:11px;color:var(--deep);text-transform:uppercase;letter-spacing:.4px;cursor:pointer;font-weight:700">Deal maths</summary><div class="pgrid" style="margin-top:6px">'+fld('dm_e','EBITDA (€m)',r.ebitda,'number')+fld('dm_m','Multiple',6,'number')+fld('dm_d','Debt %',60,'number')+fld('dm_r','Interest rate %',5,'number')+fld('dm_t','Tenor (yrs)',7,'number')+'</div><button class="sm primary" data-click="calcMaths" style="margin-top:6px">Calculate</button><div id="dm_out" style="margin-top:8px"></div></details>':'')
     +'</div><div class="rec-r">'
@@ -207,7 +243,7 @@ function startEdit(wrap){
     let ok=true;
     if(commit)ok=commitField(r,s,ed.value);
     ed.remove();fv.style.display='';
-    if(ok!==false){fv.innerHTML=display(r,s);afterCommit(s.key)}
+    if(ok!==false){fv.innerHTML=display(r,s);fv.title=srcTip(r,s.key)||'Click to edit';afterCommit(s.key)}
     if(moveNext){const all=[...document.querySelectorAll('#p-record .rf')];const i=all.indexOf(wrap);const nx=all[i+1];if(nx)startEdit(nx)}
   };
   ed.addEventListener('keydown',e=>{
@@ -217,7 +253,7 @@ function startEdit(wrap){
   });
   ed.addEventListener('blur',()=>setTimeout(()=>finish(true),0));
   if(s.type==='select'||s.type==='date')ed.addEventListener('change',()=>finish(true));
-  ed.focus();if(ed.select&&s.type!=='select')try{ed.select()}catch(e){}
+  ed.focus();if(ed.dataset.caret0){try{ed.setSelectionRange(0,0)}catch(e){}}else if(ed.select&&s.type!=='select')try{ed.select()}catch(e){}
 }
 let _rt=null;
 function afterCommit(key){
@@ -352,27 +388,28 @@ export function setPrimary(recId,personId){
   save();renderAll();if(profRec)renderRecordPage();toast(fixUml(p.name)+' is now primary');
 }
 export function peopleBoxHtml(rec,ppl){
-  // Primary person in full, everyone else on one line each.
+  // Everyone linked, one line each: star = main contact (primary), then role, email and numbers.
   const prim=primaryOf(rec);
-  const rest=ppl.filter(p=>p!==prim);
+  const list=prim?[prim,...ppl.filter(p=>p!==prim)]:ppl.slice();
   let out='';
-  if(prim){
-    out+='<div style="margin-bottom:6px;cursor:pointer" data-click="openRec|'+prim.id+'|$e"><b>'+esc(fixUml(prim.name))+'</b> <span class="chip">primary</span>'
-      +(prim.title?'<div class="muted" style="font-size:11px">'+esc(prim.title)+'</div>':'')
-      +(prim.email?'<div style="font-size:11px"><a href="mailto:'+esc(prim.email)+'" data-click="!">'+esc(prim.email)+'</a></div>':'')
-      +[prim.phone,prim.mobile].filter(Boolean).map(n=>'<div class="muted" style="font-size:11px">'+esc(n)+'</div>').join('')+'</div>';
-  } else if(rec.contact){
-    out+='<div style="margin-bottom:6px"><b>'+esc(fixUml(rec.contact))+'</b> <span class="chip">primary</span>'
-      +'<div class="muted" style="font-size:10px">contact text, not yet moved to a person record</div></div>';
-  }
-  if(rest.length){
-    out+=(out?'<div style="border-top:1px solid #E8E8EC;margin:6px 0 5px"></div>':'')
-      +'<div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959;margin-bottom:3px">Also here ('+rest.length+')</div>'
-      +rest.map(p=>'<div style="font-size:11px;margin-bottom:2px;cursor:pointer" data-click="openRec|'+p.id+'|$e"><b>'+esc(fixUml(p.name))+'</b>'+(p.email?' <span class="muted">'+esc(p.email)+'</span>':'')+(p.title?' <span class="muted">'+esc(p.title.slice(0,40))+'</span>':'')+' <button class="sm" data-click="!setPrimary|'+rec.id+'|'+p.id+'">Make primary</button></div>').join('');
-  }
+  if(!prim&&rec.contact)out+='<div class="pp-row"><span class="pp-star on" title="Main contact (primary)">&#9733;</span><div><b>'+esc(fixUml(rec.contact))+'</b><div class="muted" style="font-size:10px">contact text, not yet moved to a person record</div></div></div>';
+  out+=list.map(p=>{const on=p===prim;
+    const nums=[p.phone,p.mobile].filter(Boolean).map(n=>'<a href="tel:'+esc(n.replace(/[^+\d]/g,''))+'" data-click="!">'+esc(n)+'</a>').join(' · ');
+    return '<div class="pp-row" data-click="openRec|'+p.id+'|$e">'
+      +(on?'<span class="pp-star on" title="Main contact (primary)">&#9733;</span>':'<span class="pp-star" data-click="!setPrimary|'+rec.id+'|'+p.id+'" title="Make main contact (primary)">&#9734;</span>')
+      +'<div><b>'+esc(fixUml(p.name))+'</b>'+(p.title?' <span class="muted">'+esc(fixUml(p.title))+'</span>':'')
+      +((p.email||nums)?'<div style="font-size:11px">'+(p.email?'<a href="mailto:'+esc(p.email)+'" data-click="!">'+esc(p.email)+'</a>':'')+(p.email&&nums?' · ':'')+nums+'</div>':'')
+      +'</div></div>'}).join('');
   return out||'<span class="muted">No people linked</span>';
 }
-export function addPersonToOrg(){const p=newPerson();p.orgId=profRec.id;p.firm=dispName(profRec);openProfile(p)}
+export function addPersonToOrg(){
+  const o=profRec;if(!o||o.kind==='person')return;
+  const p=newPerson();p.orgId=o.id;p.firm=dispName(o);
+  p.ptype=o.kind==='target'?'Target contact':(PTYPES.includes(o.category)?o.category:'');
+  p.city=o.city||shortLoc(o).replace(/,.*$/,'')||'';
+  const d=orgDomain(o);if(d)domHint[p.id]=d;
+  openProfile(p);
+}
 export function logActivity(){
   const r=profRec;if(!r)return;
   const type=gv('la_type'),date=gv('la_date')||today(),txt=gv('la_txt'),note=gv('la_note');

@@ -66,7 +66,7 @@ export function goTab(t){if(t==='followups'||t==='overview')t='home';document.qu
 export const VIEWS={
   home:()=>{renderHome();renderGlobalSearch()},
   orgs:renderOrgs, people:renderPeople, pipeline:renderPipeline, threads:renderThreads, inbox:renderInbox,
-  locations:renderLocations, reports:()=>{renderYield();renderReports()}, data:renderData, dash:dashRefresh
+  locations:renderLocations, gaps:()=>import('./views/gaps.js').then(m=>withRenderCache(()=>m.renderGaps())), reports:()=>{renderYield();renderReports()}, data:renderData, dash:dashRefresh
 };
 const _stale=new Set(Object.keys(VIEWS));
 export function activeView(){const t=document.querySelector('#tabs .tab.active');return t?t.dataset.t:'home'}

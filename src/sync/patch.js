@@ -1,5 +1,6 @@
 import {openDialog, confirmDialog} from '../views/dialog.js';
-import {S, addTouch, allRecs, dispName, findRec, newAdvisor, newCompany, newPerson, splitPhones} from '../state.js';
+import {addrParts, setAddrPart} from '../addr.js';
+import {S, addTouch, allRecs, dispName, findRec, newAdvisor, newCompany, newPerson, orgByDomain, splitPhones} from '../state.js';
 import {STAGES} from '../constants.js';
 import {autoThread, invalidateThreads, seedThreads} from '../views/threads.js';
 import {backfillPersonTouches, retriageUnmatched} from './triage.js';
@@ -35,14 +36,23 @@ export function patchFind(m){
 // Fields owned by MASTER Scoring: a patch that writes one stamps the record with the file and date (finSrc).
 const FIN_FIELDS=['revenue','ebitda','ebit','gm','score','verdict','ownership','flag'];
 let _patchName='';
+// Contact data carries its source (legal notice, register, business card, mail signature) and date: op.source, op.date.
+const SRC_FIELDS=['domain','email','phone','mobile','street','zip','city','address','title','linkedin','contact','name'];
+function stampSrc(r,k,src,d){if(src&&SRC_FIELDS.includes(k)){r.src=r.src||{};r.src[k]={s:String(src),d:d||today()}}}
+// street, zip and city recompose the address line; a new address line replaces the parts it contains.
+function putVal(r,k,v){
+  if(r.kind!=='person'&&(k==='street'||k==='zip'||(k==='city'&&(r.street||r.zip)))){setAddrPart(r,k,v==null?'':String(v));return}
+  r[k]=v;
+  if(k==='address'&&r.kind!=='person'){delete r.street;delete r.zip;const p=addrParts(Object.assign({},r,{city:''}));if(p.zip&&p.city)r.city=p.city}
+}
 function stampFin(r,k){if(r.kind==='target'&&FIN_FIELDS.includes(k))r.finSrc={file:_patchName,date:today()}}
-export function patchSet(r,set){
+export function patchSet(r,set,src,d){
   if(!set)return;
   for(const k of Object.keys(set)){
     if(['id','kind','touches','stageLog','stage'].includes(k))continue;
     if(k==='notes'&&r.notes&&set.notes){if(!r.notes.includes(set.notes))r.notes=(r.notes+' | '+set.notes).trim();continue}
     if(k==='nextAction'&&set[k]!==r[k])r.nextSet=today();
-    r[k]=set[k];stampFin(r,k);
+    putVal(r,k,set[k]);stampFin(r,k);stampSrc(r,k,src,d);
   }
 }
 // Runs still write contact, email, mobile and title onto organisations (phase 3 part A). After every patch the
@@ -62,16 +72,18 @@ export function applyPatchOps(ops){
       if(o.op&&String(o.op).indexOf('dash')===0){if(dashApplyOp(o))made++;else skipped++;continue}
       if(o.op==='upsertAdvisor'){
         let r=patchFind(Object.assign({kind:'advisor'},o.match));
+        if(!r&&o.set&&o.set.domain){const d=orgByDomain(o.set.domain);if(d&&d.kind==='advisor')r=d} // one organisation per domain
         if(!r){r=newAdvisor();r.firm=(o.match&&o.match.firm)||(o.set&&o.set.firm)||'';S.advisors.push(r)}
-        patchSet(r,o.set);made++;
+        patchSet(r,o.set,o.source,o.date);made++;
       }else if(o.op==='upsertCompany'){
         let r=patchFind(Object.assign({kind:'target'},o.match));
+        if(!r&&o.set&&o.set.domain){const d=orgByDomain(o.set.domain);if(d&&d.kind==='target')r=d} // one organisation per domain
         if(!r){r=newCompany();r.name=(o.match&&o.match.name)||(o.set&&o.set.name)||'';S.companies.push(r)}
-        patchSet(r,o.set);made++;
+        patchSet(r,o.set,o.source,o.date);made++;
       }else if(o.op==='upsertPerson'){
         let r=patchFind(Object.assign({kind:'person'},o.match));
         if(!r){r=newPerson();r.name=(o.match&&o.match.name)||(o.set&&o.set.name)||'';S.people.push(r)}
-        patchSet(r,o.set);made++;
+        patchSet(r,o.set,o.source,o.date);made++;
       }else if(o.op==='addTouch'){
         const r=patchFind(o.match);
         if(r&&o.key&&o.touch){addTouch(r,o.key,o.touch);made++}else skipped++;
@@ -100,8 +112,8 @@ export function applyPatchOps(ops){
         if(t&&o.fields){['r','a','o','e','due','p','cat'].forEach(k=>{if(o.fields[k]!==undefined)t[k]=o.fields[k]});invalidateThreads();made++}else skipped++;
       }else if(o.op==='setField'){
         const r=patchFind(o.match);
-        const _ok=['notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','mobile','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict','outreachChannel','stage','channel','channelVia','letterSent','letterStatus','fav','ignored','cadDone','archived','deadCat'];
-        if(r&&o.field&&_ok.includes(o.field)){if(o.field==='stage'&&r.stage!==o.value){r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.value,date:o.date||today()})}r[o.field]=o.value;stampFin(r,o.field);if(o.field==='phone')splitPhones(r);made++}else skipped++;
+        const _ok=['street','zip','notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','mobile','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict','outreachChannel','stage','channel','channelVia','letterSent','letterStatus','fav','ignored','cadDone','archived','deadCat'];
+        if(r&&o.field&&_ok.includes(o.field)){if(o.field==='stage'&&r.stage!==o.value){r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.value,date:o.date||today()})}putVal(r,o.field,o.value);stampFin(r,o.field);stampSrc(r,o.field,o.source,o.date);if(o.field==='phone')splitPhones(r);made++}else skipped++;
       }else if(o.op==='addList'){
         if(o.name){S.customLists=S.customLists||[];if(!S.customLists.includes(o.name))S.customLists.push(o.name);made++}else skipped++;
       }else if(o.op==='setAnalysed'){

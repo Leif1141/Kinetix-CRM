@@ -1,3 +1,4 @@
+import {FREEMAIL} from '../constants.js';
 import {S, allOrgs, dispName, findRec} from '../state.js';
 import {nameTokens, normName} from '../util.js';
 
@@ -13,7 +14,6 @@ export function matchRecords(text,senderEmail,strict){
   // 1. try sender-map first (exact email -> record mapping)
   if(se&&S.senderMap[se.replace(/\./g,'_')]){hit=findRec(S.senderMap[se.replace(/\./g,'_')]);if(hit)out.push(hit)}
   // 2. try domain match (never on freemail domains)
-  const FREEMAIL=new Set(['gmail.com','googlemail.com','icloud.com','me.com','mac.com','gmx.de','gmx.at','gmx.net','gmx.ch','web.de','t-online.de','outlook.com','outlook.de','hotmail.com','hotmail.de','live.com','yahoo.com','yahoo.de','aol.com','proton.me','protonmail.com','mail.com','posteo.de','freenet.de']);
   const dom=se.split('@')[1]||'';
   if(!hit&&dom&&!FREEMAIL.has(dom)){const byDom=allOrgs().find(o=>(o.domain||'').toLowerCase()===dom||((o.email||'').split('@')[1]||'').toLowerCase()===dom);if(byDom)out.push(byDom)}
   // 3. people email match

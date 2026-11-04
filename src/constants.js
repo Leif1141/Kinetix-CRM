@@ -16,6 +16,7 @@ export const DEADREASONS=['No response','Not for sale','Valuation gap','Too smal
 export const VERDICTS=['','pursue','keep looking','watch','passed'];
 export const STALE_DAYS={'Identified':null,'Contacted':7,'Replied':5,'Meeting':7,'NDA':10,'LOI':7,'Diligence':14};
 export const MY_ADDR=['leif@kinetixcap.com','leif.berger26@gmail.com','leif@kinetix-industries.de','leif@kinetix-industries.com','tommy@kinetix-industries.com'];
+export const FREEMAIL=new Set(['gmail.com','googlemail.com','icloud.com','me.com','mac.com','gmx.de','gmx.at','gmx.net','gmx.ch','web.de','t-online.de','outlook.com','outlook.de','hotmail.com','hotmail.de','live.com','yahoo.com','yahoo.de','aol.com','proton.me','protonmail.com','mail.com','posteo.de','freenet.de']);
 export const ACT_TYPES=['Call','Meeting','Note','Letter','LinkedIn'];
 export const PRIORITIES=['','Urgent','High','Medium','Low'];
 export const PRIO_COL={'Urgent':'#112149','High':'#2E3C65','Medium':'#6B7AAF','Low':'#A9A4C6'};

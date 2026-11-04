@@ -18,6 +18,8 @@ export function toast(m){const t=document.getElementById('toast');t.textContent=
 // pure, so the result is memoised per input string (bounded)
 const _nn=new Map();
 export function normName(s){s=s||'';let v=_nn.get(s);if(v===undefined){v=s.toLowerCase().replace(/[().,&\/\-–']/g,' ').replace(LEGAL,' ').replace(/\s+/g,' ').trim();if(_nn.size>20000)_nn.clear();_nn.set(s,v)}return v}
+// www.Firma.de/kontakt -> firma.de; an email address gives its domain
+export function normDomain(s){s=String(s||'').trim().toLowerCase();if(!s)return '';if(s.includes('@')&&!/^https?:/.test(s))s=s.split('@').pop();return s.replace(/^https?:\/\//,'').replace(/^www\./,'').split(/[\/?#\s]/)[0].replace(/\.$/,'')}
 export function nameTokens(s){return normName(s).split(' ').filter(w=>w.length>=4)}
 
 // ═══════════════════════════════════════════════════════════════

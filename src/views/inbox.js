@@ -1,7 +1,8 @@
 import {openDialog, confirmDialog} from './dialog.js';
 import {MY_ADDR} from '../constants.js';
-import {S, addTouch, allOrgs, dispName, findRec, newPerson, orgPeople} from '../state.js';
-import {cleanPrev, esc, fmtD, normName, toast, today} from '../util.js';
+import {PTYPES} from '../constants.js';
+import {S, addTouch, allOrgs, dispName, findRec, newPerson, orgByDomain, orgPeople} from '../state.js';
+import {cleanPrev, esc, fmtD, normName, shortLoc, toast, today} from '../util.js';
 import {renderAll} from '../main.js';
 import {retriageUnmatched} from '../sync/triage.js';
 import {save} from '../store/firebase.js';
@@ -15,12 +16,35 @@ export function renderInbox(){
   b.style.display=(S.unmatched||[]).length?'inline-block':'none';b.textContent=(S.unmatched||[]).length;
   const opts='<option value="">Assign to…</option><optgroup label="Targets">'+(S.companies||[]).map(c=>'<option value="'+c.id+'">'+esc(c.name)+'</option>').join('')+'</optgroup><optgroup label="Advisors">'+(S.advisors||[]).map(a=>'<option value="'+a.id+'">'+esc(a.firm)+'</option>').join('')+'</optgroup>';
   const dl=document.getElementById('assignList')||(()=>{const d=document.createElement('datalist');d.id='assignList';document.body.appendChild(d);return d})();dl.innerHTML=[...(S.companies||[]).map(c=>[c.name,'Target']),...(S.advisors||[]).map(a=>[a.firm,'Advisor']),...(S.people||[]).map(p=>[p.name+(p.firm?' ('+p.firm+')':''),'Person'])].filter(x=>x[0]).map(x=>'<option value="'+esc(x[0])+'">'+x[1]+'</option>').join('');
-  document.getElementById('inboxBody').innerHTML=(S.unmatched||[]).length?(S.unmatched||[]).map((u,i)=>'<div class="inbox-item"><div class="body" style="cursor:pointer" data-click="toggleInboxBody|#'+i+'"><b>'+esc(u.subject)+'</b>'+(u.link?' <a href="'+esc(u.link)+'" target="_blank" data-click="!" title="Open original">&#8599;</a>':'')+'<div id="inb_body_'+i+'" style="display:none;margin-top:6px;padding:8px;background:#F4F5F9;border:1px solid var(--lgray);border-radius:4px;font-size:11px;white-space:pre-wrap">'+esc(cleanPrev(u.prev||u.note||'',2000)||'No content captured for this message. Use the link to open the original.')+'</div><div class="snip">'+esc(u.dir==='out'?('to: '+(u.who||u.sender)):u.sender)+' · '+fmtD(u.date)+' · '+u.src+'</div></div><input class="assign" id="asg_'+i+'" list="assignList" placeholder="Assign: type company or person…" data-enter="assignByName|#'+i+'|$el" style="min-width:220px"><button class="sm primary" data-click="assignByIndex|#'+i+'">Assign</button><button class="sm" data-click="ignoreUnmatched|#'+i+'|#0" title="Ignore this sender">Ignore</button><button class="sm" data-click="ignoreUnmatched|#'+i+'|#1" title="Ignore the whole domain">Ignore domain</button><button class="sm" data-click="dismissUnmatched|#'+i+'" title="Remove this item only">Dismiss</button></div>').join(''):'<p class="muted" style="padding:14px">No unmatched emails. Sync to pull new ones.</p>';
+  document.getElementById('inboxBody').innerHTML=(S.unmatched||[]).length?(S.unmatched||[]).map((u,i)=>'<div class="inbox-item"><div class="body" style="cursor:pointer" data-click="toggleInboxBody|#'+i+'"><b>'+esc(u.subject)+'</b>'+(u.link?' <a href="'+esc(u.link)+'" target="_blank" data-click="!" title="Open original">&#8599;</a>':'')+'<div id="inb_body_'+i+'" style="display:none;margin-top:6px;padding:8px;background:#F4F5F9;border:1px solid var(--lgray);border-radius:4px;font-size:11px;white-space:pre-wrap">'+esc(cleanPrev(u.prev||u.note||'',2000)||'No content captured for this message. Use the link to open the original.')+'</div><div class="snip">'+esc(u.dir==='out'?('to: '+(u.who||u.sender)):u.sender)+' · '+fmtD(u.date)+' · '+u.src+'</div></div>'+inboxOrgBtn(u,i)+'<input class="assign" id="asg_'+i+'" list="assignList" placeholder="Assign: type company or person…" data-enter="assignByName|#'+i+'|$el" style="min-width:220px"><button class="sm primary" data-click="assignByIndex|#'+i+'">Assign</button><button class="sm" data-click="ignoreUnmatched|#'+i+'|#0" title="Ignore this sender">Ignore</button><button class="sm" data-click="ignoreUnmatched|#'+i+'|#1" title="Ignore the whole domain">Ignore domain</button><button class="sm" data-click="dismissUnmatched|#'+i+'" title="Remove this item only">Dismiss</button></div>').join(''):'<p class="muted" style="padding:14px">No unmatched emails. Sync to pull new ones.</p>';
 }
 export async function assignByName(i,inp){const v=(inp.value||'').trim();if(!v)return;const nn=normName(v.replace(/\s*\(.*\)$/,''));let r=(S.companies||[]).find(c=>normName(c.name||'')===nn)||(S.advisors||[]).find(a=>normName(a.firm||'')===nn)||(S.people||[]).find(p=>normName(p.name||'')===nn);
   if(!r){const all=[...(S.companies||[]),...(S.advisors||[]),...(S.people||[])];const cands=all.filter(x=>normName(dispName(x)||'').includes(nn));if(cands.length===1)r=cands[0]}
   if(!r){const w=await openDialog({title:'New person',text:'"'+v+'" is not in the CRM. Create as a new person?',fields:[{key:'firm',label:'Firm (optional)',list:allOrgs().map(dispName).filter(Boolean)}],ok:'Create person'});if(!w){inp.value='';return}const firm=(w.firm||'').trim();const p=newPerson();p.name=v;p.firm=firm;const u=(S.unmatched||[])[i];const addr=((u&&(u.dir==='out'?(u.who||''):(u.sender||'')))||'').toLowerCase().match(/[\w.+-]+@[\w.-]+/);if(addr)p.email=addr[0];const o=firm?allOrgs().find(x=>normName(dispName(x))===normName(firm)):null;if(o)p.orgId=o.id;S.people=S.people||[];S.people.push(p);r=p}
   assignEmail(i,r.id)}
+// Counterparty address of an unmatched item: the sender of an incoming mail, the first other recipient of an outgoing one.
+function counterAddr(u){const base=u.dir==='out'?(u.who||''):(u.sender||'');return ((base.toLowerCase().match(/[\w.+-]+@[\w.-]+/g))||[]).find(a=>!MY_ADDR.some(m=>a.includes(m)))||''}
+// Sender's domain belongs to an organisation (its domain, general email or a linked person's address): offer it first.
+function inboxOrgBtn(u,i){const o=orgByDomain(counterAddr(u),{viaPeople:true});return o?'<button class="sm primary" data-click="addToOrgFromInbox|#'+i+'|'+o.id+'" title="Create '+esc(counterAddr(u))+' as a person at '+esc(dispName(o))+' and file this mail">Add to '+esc(dispName(o))+'</button>':''}
+// "Muster, Max" -> "Max Muster"; quotes and role suffixes dropped. Returns '' when it is not a person's name.
+function personFromDisplay(s){s=String(s||'').replace(/["']/g,'').replace(/\s*[\(\[].*?[\)\]]\s*/g,' ').trim();if(!s||s.includes('@'))return '';
+  const m=s.match(/^([^,]+),\s*([^,]+)$/);if(m)s=m[2].trim()+' '+m[1].trim();
+  const w=s.split(/\s+/);return w.length>=2&&w.length<=5&&w.every(x=>/^[A-Za-zÄÖÜäöüßÀ-ÿ][A-Za-zÄÖÜäöüßÀ-ÿ.\-]*$/.test(x))&&!/^(info|kontakt|contact|office|team|vertrieb|sales|service|support|noreply|no-reply)$/i.test(w[0])?s:''}
+export async function addToOrgFromInbox(i,orgId){
+  const u=(S.unmatched||[])[i],o=findRec(orgId);if(!u||!o)return;
+  const addr=counterAddr(u);
+  let p=addr?(S.people||[]).find(x=>(x.email||'').toLowerCase()===addr):null;
+  if(!p){
+    let name=personFromDisplay(u.sname);
+    if(!name){const w=await openDialog({title:'Add to '+dispName(o),text:(addr||'This sender')+' comes without a person\'s name. Enter the name, or cancel and use Assign for a general address.',fields:[{key:'name',label:'Full name',required:true,value:u.sname||''}],ok:'Add person'});if(!w)return;name=w.name.trim()}
+    p=newPerson();p.name=name;p.email=addr;p.orgId=o.id;p.firm=dispName(o);
+    p.ptype=o.kind==='target'?'Target contact':(PTYPES.includes(o.category)?o.category:'');
+    p.city=o.city||shortLoc(o).replace(/,.*$/,'')||'';
+    S.people=S.people||[];S.people.push(p);
+  }else if(!p.orgId){p.orgId=o.id;p.firm=dispName(o)}
+  assignEmail(i,p.id);
+  toast(p.name+' added to '+dispName(o)+', mail filed');
+}
 export function toggleInboxBody(i){const el=document.getElementById('inb_body_'+i);if(el)el.style.display=el.style.display==='none'?'':'none'}
 export function ignoreUnmatched(i,dom){
   const u=(S.unmatched||[])[i];if(!u)return;

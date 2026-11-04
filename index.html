@@ -60,6 +60,7 @@
   <div class="tab" data-t="threads">Open Items <span class="tab-badge" id="thBadge" style="display:none"></span></div>
   <div class="tab" data-t="inbox">Inbox <span class="tab-badge" id="inbBadge" style="display:none"></span></div>
   <div class="tab" data-t="locations">Map</div>
+  <div class="tab" data-t="gaps">Data gaps</div>
   <div class="tab" data-t="reports">Reports</div>
   <div class="tab" data-t="data" id="dataTab" style="display:none">Data</div>
   <div class="tab" data-t="dash" id="dashTab" style="display:none">Dashboard <span class="tab-badge" id="dashBadge" style="display:none"></span></div>
@@ -158,10 +159,14 @@
   <div class="section" style="margin-top:14px"><div class="section-hdr">Time in stage (active deals)</div><table id="tisTable"></table></div>
 </div>
 
+<div class="panel" id="p-gaps">
+  <div class="note muted" style="padding:8px 2px">Organisations in active contact with domain, street address, contact person or email missing. The daily run researches ten a day from the legal notice and contact page and sends the values back by patch. Largest cities first, then the oldest last contact.</div>
+  <div id="gapsBody"></div>
+</div>
+
 <div class="panel" id="p-locations">
   <div class="filterbar">
     <select id="locKind" data-change="renderLocations"><option value="">Everyone</option><option value="advisor">Advisors</option><option value="person">Contacts without firm record</option><option value="target">Targets</option></select>
-    <button class="sm" data-click="geocodeMissing">Geocode new cities</button>
     <span class="muted" id="locCount"></span>
   </div>
   <div id="locMap" style="height:440px;border:1px solid var(--lgray);border-radius:5px;margin-bottom:14px"></div>

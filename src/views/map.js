@@ -233,27 +233,34 @@ export function renderLocations(){
     lg.addTo(locMap);locMap._legend=lg;
   }
   const missing=cities.filter(c=>!S.geoCache[c.toLowerCase()]).length;
-  if(missing)toast(missing+' places not geocoded yet, click "Geocode new cities"');
+  if(missing)geocodeMissing(true); // new or changed places are geocoded in the background, one request per second
   try{renderClusters()}catch(e){}
   // Always frame Germany. Foreign records are listed under Abroad, they do not widen the map.
   if(!locMap._fitted){try{locMap.fitBounds([[47.3,5.9],[55.1,15.0]],{padding:[10,10]});locMap._fitted=1}catch(e){}}
   setTimeout(()=>locMap.invalidateSize(),120);
 }
-export async function geocodeMissing(){
-  S.geoCache=S.geoCache||{};
+let _geoRun=false;
+export async function geocodeMissing(quiet){
+  if(_geoRun)return;
+  S.geoCache=S.geoCache||{};S.geoMiss=S.geoMiss||{};
   const cities=[...new Set(allRecs().map(recCity).filter(Boolean))].filter(c=>!S.geoCache[c.toLowerCase()]);
   const addrs=[];allRecs().forEach(r=>{const k=addrKey(r);if(k&&!S.geoCache[k]&&!addrs.some(x=>x[0]===k))addrs.push([k,addrQuery(r)])});
-  if(!cities.length&&!addrs.length){toast('All cities and addresses geocoded');return}
-  toast('Geocoding '+cities.length+' cities and '+addrs.length+' addresses…');
-  for(const c of [...cities,...addrs]){
-    try{
-      const isA=Array.isArray(c);const q=isA?c[1]:c+', Europe';
-      const res=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q));
-      const j=await res.json();
-      if(j[0])S.geoCache[isA?c[0]:c.toLowerCase()]=[+j[0].lat,+j[0].lon];
+  // a place Nominatim did not find is not asked again for 30 days
+  const fresh=k=>{const t=S.geoMiss[k.replace(/[.#$\/\[\]]/g,'_')];return !t||Date.now()-new Date(t).getTime()>30*864e5};
+  const todo=[...cities.filter(c=>fresh(c.toLowerCase())),...addrs.filter(a=>fresh(a[0]))];
+  if(!todo.length){if(!quiet)toast('All cities and addresses geocoded');return}
+  _geoRun=true;if(!quiet)toast('Geocoding '+todo.length+' places…');let found=0;
+  try{
+    for(const c of todo){
+      try{
+        const isA=Array.isArray(c);const q=isA?c[1]:c+', Europe';const k=isA?c[0]:c.toLowerCase();
+        const res=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q));
+        const j=await res.json();
+        if(j[0]){S.geoCache[k]=[+j[0].lat,+j[0].lon];found++}else S.geoMiss[k.replace(/[.#$\/\[\]]/g,'_')]=new Date().toISOString().slice(0,10);
+      }catch(e){}
       await new Promise(r=>setTimeout(r,1100));
-    }catch(e){}
-  }
-  save();renderLocations();toast('Geocoding done');
+    }
+  }finally{_geoRun=false}
+  save();if(document.getElementById('p-locations')?.classList.contains('active'))renderLocations();if(!quiet||found)toast(found+' of '+todo.length+' places geocoded');
 }
 export function nearbyFor(city){const el=document.getElementById('locNear');if(el)el.value=city;nearbyBriefing()}

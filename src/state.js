@@ -1,5 +1,6 @@
+import {FREEMAIL} from './constants.js';
 import {CAD_STEPS, CHANNELS, CH_MAP, DEADREASONS, STAGE_ALIAS, STALE_DAYS, VERDICTS} from './constants.js';
-import {addDays, daysAgo, daysBetween, normName, toast, today, uid} from './util.js';
+import {addDays, daysAgo, daysBetween, normDomain, normName, toast, today, uid} from './util.js';
 import {renderAll} from './main.js';
 import {save} from './store/firebase.js';
 
@@ -217,6 +218,14 @@ export function splitPhones(r){ // 22.10.2026 (Leif): one number per field. 'Fes
   const dg=x=>(x.match(/\d/g)||[]).length;
   if(m&&dg(m[1])>=7&&dg(m[2])>=7){r.phone=m[1].trim();if(!r.mobile)r.mobile=m[2].trim();}
 }
+// The organisation's own domain: website field first, else the domain of its general email (never a freemail one).
+export function orgDomain(o){if(!o)return '';const d=normDomain(o.domain||o.website);if(d)return d;const e=normDomain((o.email||'').includes('@')?o.email:'');return e&&!FREEMAIL.has(e)?e:''}
+// Live organisation that owns a domain. viaPeople also counts the mail domains of its linked people (Inbox).
+export function orgByDomain(dom,o){dom=normDomain(dom);if(!dom||FREEMAIL.has(dom))return null;o=o||{};
+  const orgs=[...(S.companies||[]),...(S.advisors||[])].filter(x=>!x.archived&&!x.mergedInto&&x.id!==o.except);
+  const hit=orgs.find(x=>orgDomain(x)===dom);if(hit||!o.viaPeople)return hit||null;
+  const p=(S.people||[]).find(p=>!p.archived&&p.orgId&&normDomain((p.email||'').includes('@')?p.email:'')===dom);
+  return p?orgs.find(x=>x.id===p.orgId)||null:null}
 // The organisation a person belongs to: linked record, else a record whose name matches the firm text, else null.
 export function personOrg(p){
   if(p.orgId){const o=findRec(p.orgId);if(o)return o}

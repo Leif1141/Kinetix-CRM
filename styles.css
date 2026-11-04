@@ -442,3 +442,17 @@ table.ppl td{overflow:hidden}
 table.ppl .sub{font-size:10px;color:#000;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 table.ppl .nx{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 table.ppl .em{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* people box on organisation pages: one line per person, star marks the main contact */
+.pp-row{display:flex;gap:6px;align-items:flex-start;font-size:12px;padding:3px 0;cursor:pointer;border-bottom:1px solid #EEF0F4}
+.pp-row:last-child{border-bottom:0}
+.pp-star{color:#BBBBBB;font-size:14px;line-height:16px;cursor:pointer;flex:0 0 14px}
+.pp-star.on{color:#2E3C65;cursor:default}
+
+/* data gaps view */
+table.gaps{width:100%;border-collapse:collapse;font-size:12px}
+table.gaps th{text-align:left;font-weight:700;border-bottom:1px solid #595959;padding:4px 6px}
+table.gaps td{padding:4px 6px;border-bottom:1px solid #EEF0F4;vertical-align:top}
+table.gaps tbody tr{cursor:pointer}
+table.gaps tbody tr:hover{background:#F4F5F9}
+.miss{color:#C00000;font-size:11px}
