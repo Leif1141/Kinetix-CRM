@@ -116,7 +116,7 @@ function dueTxt(d){
   const c=n<0?'var(--red)':n===0?'#C6943E':'#2E7D32';
   return '<span class="duechip" style="background:'+c+'22;color:'+c+'">'+t+' · '+fmtDe(d)+'</span>';
 }
-function rowHtml(it){
+function rowHtml(it,sec){
   const r=it.rec;
   const lab=rowLabel(r),sub=lab.sub;
   const kindTag='<span class="qk qk-'+it.kind+'">'+QUEUE_KINDS[it.kind]+'</span>';
@@ -125,9 +125,9 @@ function rowHtml(it){
     ?'<button class="sm primary" data-act="revive" data-id="'+r.id+'">Zurückholen</button> <button class="sm" data-act="deadok" data-id="'+r.id+'">Ok</button>'
     :it.kind==='stale'||it.kind==='noaction'||it.kind==='revisit'
     ?'<button class="sm" data-act="set" data-id="'+r.id+'">Set action</button> <button class="sm" data-act="dismiss" data-id="'+r.id+'" data-key="'+it.key+'">Dismiss</button>'+deadBtn
-    :'<button class="sm primary" data-act="done" data-id="'+r.id+'" data-key="'+it.key+'" title="Log as done">Done</button> <button class="sm" data-act="1w" data-id="'+r.id+'" data-key="'+it.key+'">+1w</button> <button class="sm" data-act="1m" data-id="'+r.id+'" data-key="'+it.key+'">+1m</button> <button class="sm" data-act="ignore" data-id="'+r.id+'" data-key="'+it.key+'" title="bis zur nächsten Aktivität">Hide</button>'+deadBtn;
-  return '<div class="qrow" data-open="'+r.id+'">'
-    +'<div class="q-acts">'+acts+'</div>'
+    :'<button class="sm primary" data-act="done" data-id="'+r.id+'" data-key="'+it.key+'" title="Log as done">Done</button> <button class="sm" data-act="2w" data-id="'+r.id+'" data-key="'+it.key+'" title="Push by two weeks">+2w</button> <button class="sm" data-act="ignore" data-id="'+r.id+'" data-key="'+it.key+'" title="bis zur nächsten Aktivität">Hide</button>'+deadBtn;
+  return '<div class="qrow" data-open="'+r.id+'" data-key="'+esc(it.key)+'"'+(sec?' data-sec="'+sec+'" draggable="true"':'')+'>'
+    +'<div class="q-acts">'+(sec?'<span class="q-grip" title="Drag to reorder">⋮⋮</span>':'')+acts+'</div>'
     +'<div class="q-name"><b>'+esc(fixUml(lab.top))+'</b>'+(sub?'<div class="muted" style="font-size:10px">'+esc(fixUml(sub))+'</div>':'')+(r.kind==='target'?'<div>'+stagePill(r.stage)+'</div>':'')+'</div>'
     +'<div class="q-type">'+grpChip(r)+'</div>'
     +'<div class="q-step">'+kindTag+' '+esc(fixUml(it.text||''))+'</div>'
@@ -136,6 +136,28 @@ function rowHtml(it){
     +'</div>';
 }
 const URGENT_KINDS=['deadmail','overdue','promise','due','cadence'];
+const DECIDE_KINDS=['noaction','stale','revisit'];
+// Manual order (Leif 04.11.2026): rows are dragged up and down within Today and within Needs a decision.
+// S.homeOrder holds a rank per queue key. An item without a rank (new in the queue) keeps its default slot;
+// the ranked items fill the other slots in rank order. Done, +2w, Hide, Dismiss and Dead drop the rank.
+function ordered(list){
+  const o=S.homeOrder||{};
+  const ranked=list.filter(i=>o[i.key]!=null).sort((a,b)=>o[a.key]-o[b.key]);
+  let j=0;return list.map(i=>o[i.key]!=null?ranked[j++]:i);
+}
+export function moveQueueItem(from,to,after){
+  const items=buildQueue();
+  const sec=[URGENT_KINDS,DECIDE_KINDS].find(s=>items.some(i=>i.key===from&&s.includes(i.kind)));
+  if(!sec||from===to)return false;
+  const list=ordered(items.filter(i=>sec.includes(i.kind))).map(i=>i.key);
+  if(!list.includes(to))return false;
+  list.splice(list.indexOf(from),1);
+  list.splice(list.indexOf(to)+(after?1:0),0,from);
+  const o={};const old=S.homeOrder||{};
+  items.filter(i=>!sec.includes(i.kind)).forEach(i=>{if(old[i.key]!=null)o[i.key]=old[i.key]});
+  list.forEach((k,n)=>o[k]=n);
+  S.homeOrder=o;return true;
+}
 export function homeUrgentCount(){return buildQueue().filter(i=>URGENT_KINDS.includes(i.kind)).length}
 export function renderHome(){
   const body=document.getElementById('homeQueue');if(!body)return;
@@ -147,12 +169,12 @@ export function renderHome(){
   const bar=document.getElementById('homeGroups');
   if(bar)bar.innerHTML='<button class="sm'+(homeGrp?'':' vbtn on')+'" data-grp="">All ('+items.length+')</button>'+GRP_DEF.map(g=>'<button class="sm'+(homeGrp===g.k?' vbtn on':'')+'" style="border-left:4px solid '+g.c+'" data-grp="'+g.k+'">'+g.t+' ('+(counts[g.k]||0)+')</button>').join('');
   const shown=items.filter(matches);
-  const sections=[URGENT_KINDS,['noaction','stale','revisit']];
+  const sections=[URGENT_KINDS,DECIDE_KINDS];
   let h='';
-  const first=shown.filter(i=>sections[0].includes(i.kind)),rest=shown.filter(i=>sections[1].includes(i.kind));
+  const first=ordered(items.filter(i=>sections[0].includes(i.kind))).filter(matches),rest=ordered(items.filter(i=>sections[1].includes(i.kind))).filter(matches);
   const hd='<div class="qhead"><div></div><div>Name</div><div>Type</div><div>Step</div><div>Due</div><div>Last contact</div></div>';
-  h+='<div class="section"><div class="section-hdr">Today ('+first.length+')'+(homeKind?' <button class="sm" style="background:#fff" data-kind="">Clear filter: '+QUEUE_KINDS[homeKind]+'</button>':'')+'</div>'+(first.length?hd+first.map(rowHtml).join(''):'<p class="muted" style="padding:14px">Nothing due. '+(items.length?'':'Enjoy it.')+'</p>')+'</div>';
-  if(rest.length)h+='<div class="section"><div class="section-hdr" style="background:#434F80">Needs a decision ('+rest.length+')</div>'+hd+rest.map(rowHtml).join('')+'</div>';
+  h+='<div class="section"><div class="section-hdr">Today ('+first.length+')'+(homeKind?' <button class="sm" style="background:#fff" data-kind="">Clear filter: '+QUEUE_KINDS[homeKind]+'</button>':'')+'</div>'+(first.length?hd+first.map(i=>rowHtml(i,'t')).join(''):'<p class="muted" style="padding:14px">Nothing due. '+(items.length?'':'Enjoy it.')+'</p>')+'</div>';
+  if(rest.length)h+='<div class="section"><div class="section-hdr" style="background:#434F80">Needs a decision ('+rest.length+')</div>'+hd+rest.map(i=>rowHtml(i,'d')).join('')+'</div>';
   const later=laterThisWeek().filter(r=>!homeGrp||grpOf(r)===homeGrp);
   if(later.length)h+='<details class="psec"><summary>Later this week ('+later.length+')</summary>'+hd+later.map(r=>rowHtml({rec:r,kind:isPromise(r)?'promise':'due',key:'due_'+r.id,text:r.nextAction||'',due:r.nextDate})).join('')+'</details>';
   const ign=allRecs().filter(isIgnoredRec);
@@ -196,6 +218,7 @@ export function initHome(){
   panel.addEventListener('click',e=>{
     const b=e.target.closest('button[data-act]');
     if(b){e.stopPropagation();const id=b.dataset.id,key=b.dataset.key;
+      const rk=b.closest('.qrow')?.dataset.key;if(rk&&S.homeOrder&&S.homeOrder[rk]!=null&&b.dataset.act!=='set')delete S.homeOrder[rk];
       if(b.dataset.act==='set'){import('./actions.js').then(m=>m.quickSetAction(id))}
       else if(b.dataset.act==='dead')markDead(id);
       else if(b.dataset.act==='revive')reviveRec(id);
@@ -211,4 +234,15 @@ export function initHome(){
     const row=e.target.closest('[data-open]');if(row){const r=findRec(row.dataset.open);if(r)openProfile(r)}
   });
   const s=document.getElementById('homeSearch');if(s)s.addEventListener('input',renderHome);
+  let dragKey=null,dragSec=null;
+  const clearMarks=()=>panel.querySelectorAll('.dragging,.drop-a,.drop-b').forEach(x=>x.classList.remove('dragging','drop-a','drop-b'));
+  panel.addEventListener('dragstart',e=>{const r=e.target.closest&&e.target.closest('.qrow[data-sec]');if(!r)return;
+    dragKey=r.dataset.key;dragSec=r.dataset.sec;r.classList.add('dragging');e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',dragKey)}catch(_){}});
+  panel.addEventListener('dragover',e=>{const r=e.target.closest('.qrow[data-sec]');if(!dragKey||!r||r.dataset.sec!==dragSec)return;e.preventDefault();
+    if(r.dataset.key===dragKey)return;const after=e.clientY>r.getBoundingClientRect().top+r.offsetHeight/2;
+    panel.querySelectorAll('.drop-a,.drop-b').forEach(x=>x.classList.remove('drop-a','drop-b'));r.classList.add(after?'drop-a':'drop-b')});
+  panel.addEventListener('drop',e=>{const r=e.target.closest('.qrow[data-sec]');if(!dragKey||!r||r.dataset.sec!==dragSec)return;e.preventDefault();
+    const after=r.classList.contains('drop-a'),from=dragKey;dragKey=null;clearMarks();
+    if(moveQueueItem(from,r.dataset.key,after))import('../store/firebase.js').then(m=>{m.save();renderHome()})});
+  panel.addEventListener('dragend',()=>{dragKey=null;clearMarks()});
 }

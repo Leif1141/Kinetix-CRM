@@ -96,10 +96,10 @@ export function sugAct(kind,id,key,ev){if(ev)ev.stopPropagation();const r=findRe
     if(r.nextAction){completeAction(id);return}
     S.dismissed=S.dismissed||{};sugKeysOf(id).forEach(k=>S.dismissed[k]=today());save();renderAll();toast('Done');return}
   if(kind==='ignore'){ignoreRec(id);return}
-  const days=kind==='1m'?30:7;
+  const days=kind==='1m'?30:kind==='2w'?14:7;
   if(r.nextDate&&r.nextDate<=addDays(today(),days)){const d=new Date((r.nextDate>=today())?r.nextDate:today());d.setDate(d.getDate()+days);r.nextDate=d.toISOString().slice(0,10)}
   S.snoozeUntil=S.snoozeUntil||{};const until=addDays(today(),days);sugKeysOf(id).forEach(k=>S.snoozeUntil[k]=until);
   save();renderAll();toast('Pushed to '+fmtDe(until));
 }
-export function actBtns(id,key){key=key||('due_'+id);return '<span style="white-space:nowrap"><button class="sm primary" data-click="sugAct|done|'+id+'|'+key+'|$e" title="Log as done">Done</button> <button class="sm" data-click="sugAct|1w|'+id+'|'+key+'|$e">+1w</button> <button class="sm" data-click="sugAct|1m|'+id+'|'+key+'|$e">+1m</button> <button class="sm" data-click="sugAct|ignore|'+id+'|'+key+'|$e" title="bis zur nächsten Aktivität">Hide</button> <button class="sm" data-click="markDead|'+id+'|$e">Dead</button></span>'}
+export function actBtns(id,key){key=key||('due_'+id);return '<span style="white-space:nowrap"><button class="sm primary" data-click="sugAct|done|'+id+'|'+key+'|$e" title="Log as done">Done</button> <button class="sm" data-click="sugAct|2w|'+id+'|'+key+'|$e" title="Push by two weeks">+2w</button> <button class="sm" data-click="sugAct|ignore|'+id+'|'+key+'|$e" title="bis zur nächsten Aktivität">Hide</button> <button class="sm" data-click="markDead|'+id+'|$e">Dead</button></span>'}
 export function snoozeSugg(k,ev){if(ev)ev.stopPropagation();dismissSugg(k)}
