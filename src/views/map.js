@@ -17,9 +17,14 @@ export function cleanCity(s){
   return s;
 }
 export function recCity(r){return cleanCity(r.city||r.location||'')}
-// one spelling per city: München and Munich, Köln and Cologne, Frankfurt and Frankfurt am Main are the same place
-const CITY_EN={munich:'münchen',muenchen:'münchen',cologne:'köln',koeln:'köln',nuremberg:'nürnberg',duesseldorf:'düsseldorf',dusseldorf:'düsseldorf'};
-export function cityKey(c){const k=cleanCity(c).toLowerCase().replace(/\s+(am|a\.)\s*main$/,'').replace(/\s+a\.\s*m\.?$/,'').trim();return CITY_EN[k]||k}
+// one key per place: München and Munich, Malmö and Malmo, "Landau" and "Landau in der Pfalz", "Ulm" and "Ulm-Einsingen"
+const CITY_EN={munich:'munchen',cologne:'koln',nuremberg:'nurnberg',gothenburg:'goteborg'};
+export function cityKey(c){
+  const f=cleanCity(c).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/ae/g,'a').replace(/oe/g,'o').replace(/ue/g,'u').replace(/ß/g,'ss');
+  const t=f.split(/[\s\-.,()]+/).filter(Boolean);if(!t.length)return '';
+  const k=/^(bad|st|sankt|neu)$/.test(t[0])&&t[1]?t[0]+' '+t[1]:t[0];
+  return CITY_EN[k]||k;
+}
 export function locFocus(c){const g=cityLL(c);if(!g||!locMap){toast('No geocode for '+c);return}locMap.setView(g,12);document.getElementById('locMap').scrollIntoView({behavior:'smooth',block:'start'})}
 export function cityLL(c){return (S.geoCache||{})[(c||'').toLowerCase()]||null}
 export function addrKey(r){if(!r)return null;const a=(r.address||'').trim();if(!a||!/\d/.test(a))return null;const c=cleanCity(r.city||r.location||'');return ('addr:'+a+(c&&!a.toLowerCase().includes(c.toLowerCase())?', '+c:'')).toLowerCase().replace(/[.#$\/\[\]]/g,'_')}
