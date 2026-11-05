@@ -40,10 +40,23 @@ let _patchName='';
 const SRC_FIELDS=['domain','email','phone','mobile','street','zip','city','address','title','linkedin','contact','name'];
 function stampSrc(r,k,src,d){if(src&&SRC_FIELDS.includes(k)){r.src=r.src||{};r.src[k]={s:String(src),d:d||today()}}}
 // street, zip and city recompose the address line; a new address line replaces the parts it contains.
+// On a person the address is their own office; empty means the organisation's address (Leif 05.11.2026).
 function putVal(r,k,v){
-  if(r.kind!=='person'&&(k==='street'||k==='zip'||(k==='city'&&(r.street||r.zip)))){setAddrPart(r,k,v==null?'':String(v));return}
+  if(k==='street'||k==='zip'||(k==='city'&&(r.street||r.zip))){setAddrPart(r,k,v==null?'':String(v));return}
   r[k]=v;
-  if(k==='address'&&r.kind!=='person'){delete r.street;delete r.zip;const p=addrParts(Object.assign({},r,{city:''}));if(p.zip&&p.city)r.city=p.city}
+  if(k==='address'){delete r.street;delete r.zip;const p=addrParts(Object.assign({},r,{city:''}));if(p.zip&&p.city)r.city=p.city}
+}
+// Two records of the same person or organisation become one: the kept record takes the touches and fills its
+// empty contact fields, an organisation's people move over, the other record is archived with mergedInto.
+const MERGE_FILL=['email','phone','mobile','title','linkedin','street','zip','city','address','domain'];
+export function mergeRecs(dup,keep){
+  if(!dup||!keep||dup===keep||(dup.kind==='person')!==(keep.kind==='person'))return false;
+  keep.touches=keep.touches||{};Object.entries(dup.touches||{}).forEach(([k,t])=>{if(!keep.touches[k])keep.touches[k]=t});
+  MERGE_FILL.forEach(f=>{if(!keep[f]&&dup[f]){keep[f]=dup[f];if(dup.src&&dup.src[f]){keep.src=keep.src||{};keep.src[f]=dup.src[f]}}});
+  if(dup.kind!=='person'){(S.people||[]).forEach(p=>{if(p.orgId===dup.id)p.orgId=keep.id});if(!keep.primaryId&&dup.primaryId)keep.primaryId=dup.primaryId}
+  const sm=S.senderMap||{};Object.keys(sm).forEach(k=>{if(sm[k]===dup.id)sm[k]=keep.id});
+  dup.archived=true;dup.archivedAt=today();dup.archivedReason='Merged into '+dispName(keep);dup.mergedInto=keep.id;
+  return true;
 }
 function stampFin(r,k){if(r.kind==='target'&&FIN_FIELDS.includes(k))r.finSrc={file:_patchName,date:today()}}
 export function patchSet(r,set,src,d){
@@ -112,8 +125,11 @@ export function applyPatchOps(ops){
         if(t&&o.fields){['r','a','o','e','due','p','cat'].forEach(k=>{if(o.fields[k]!==undefined)t[k]=o.fields[k]});invalidateThreads();made++}else skipped++;
       }else if(o.op==='setField'){
         const r=patchFind(o.match);
-        const _ok=['street','zip','notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','mobile','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict','outreachChannel','stage','channel','channelVia','letterSent','letterStatus','fav','ignored','cadDone','archived','deadCat'];
+        const _ok=['street','zip','notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','mobile','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict','outreachChannel','stage','channel','channelVia','letterSent','letterStatus','fav','ignored','cadDone','archived','deadCat','primaryId'];
         if(r&&o.field&&_ok.includes(o.field)){if(o.field==='stage'&&r.stage!==o.value){r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.value,date:o.date||today()})}putVal(r,o.field,o.value);stampFin(r,o.field);stampSrc(r,o.field,o.source,o.date);if(o.field==='phone')splitPhones(r);made++}else skipped++;
+      }else if(o.op==='merge'){
+        const dup=o.match&&o.match.id?findRec(o.match.id):patchFind(o.match),keep=o.into&&o.into.id?findRec(o.into.id):patchFind(o.into);
+        if(mergeRecs(dup,keep))made++;else skipped++;
       }else if(o.op==='addList'){
         if(o.name){S.customLists=S.customLists||[];if(!S.customLists.includes(o.name))S.customLists.push(o.name);made++}else skipped++;
       }else if(o.op==='setAnalysed'){

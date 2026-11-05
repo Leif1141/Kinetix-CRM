@@ -43,7 +43,7 @@ function fieldSpecs(r){
     ],next};
   return {
     sections:[
-      ['Person',[F('name','Full name','text',{required:true}),F('title','Title'),F('ptype','Type','select',{options:PTYPES}),F('firm','Organisation','org',{get:p=>{const o=personOrg(p);return o?dispName(o):p.firm}}),F('email','Email'),F('phone','Phone (office)'),F('mobile','Mobile'),F('linkedin','LinkedIn'),F('city','City'),F('address','Address')]],
+      ['Person',[F('name','Full name','text',{required:true}),F('title','Title'),F('ptype','Type','select',{options:PTYPES}),F('firm','Organisation','org',{get:p=>{const o=personOrg(p);return o?dispName(o):p.firm}}),F('email','Email'),F('phone','Phone (office)'),F('mobile','Mobile'),F('linkedin','LinkedIn'),F('street','Office street and number','text',{get:c=>addrParts(c).rawStreet,addr:true,ph:'empty: organisation address'}),F('zip','Office postcode','text',{get:c=>addrParts(c).zip,addr:true}),F('city','Office city','text',{get:c=>addrParts(c).city,addr:true})]],
       ['Context',[F('angle','Angle / notes','textarea'),F('networkPath','Network path')]]
     ],next};
 }
@@ -56,6 +56,7 @@ const needsDomain=r=>r.kind==='target'&&r.stage!=='Dead'&&STAGES.indexOf(r.stage
 function display(r,s){
   const v=getVal(r,s);
   if((v===null||v===undefined||v==='')&&s.key==='domain'&&needsDomain(r))return '<span class="miss">missing, mails are not matched</span>';
+  if((v===null||v===undefined||v==='')&&s.addr&&r.kind==='person'){const o=personOrg(r);const ov=o?(s.key==='street'?addrParts(o).rawStreet:addrParts(o)[s.key]):'';if(ov)return '<span class="muted" title="No own office: the organisation address">'+esc(fixUml(ov))+' (organisation)</span>'}
   if(v===null||v===undefined||v==='')return '<span class="muted">-</span>';
   if(s.type==='date')return esc(fmtDe(v));
   if(s.type==='number')return esc(n1(v)===''?String(v):n1(v));

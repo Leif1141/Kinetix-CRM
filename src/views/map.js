@@ -17,6 +17,9 @@ export function cleanCity(s){
   return s;
 }
 export function recCity(r){return cleanCity(r.city||r.location||'')}
+// one spelling per city: München and Munich, Köln and Cologne, Frankfurt and Frankfurt am Main are the same place
+const CITY_EN={munich:'münchen',muenchen:'münchen',cologne:'köln',koeln:'köln',nuremberg:'nürnberg',duesseldorf:'düsseldorf',dusseldorf:'düsseldorf'};
+export function cityKey(c){const k=cleanCity(c).toLowerCase().replace(/\s+(am|a\.)\s*main$/,'').replace(/\s+a\.\s*m\.?$/,'').trim();return CITY_EN[k]||k}
 export function locFocus(c){const g=cityLL(c);if(!g||!locMap){toast('No geocode for '+c);return}locMap.setView(g,12);document.getElementById('locMap').scrollIntoView({behavior:'smooth',block:'start'})}
 export function cityLL(c){return (S.geoCache||{})[(c||'').toLowerCase()]||null}
 export function addrKey(r){if(!r)return null;const a=(r.address||'').trim();if(!a||!/\d/.test(a))return null;const c=cleanCity(r.city||r.location||'');return ('addr:'+a+(c&&!a.toLowerCase().includes(c.toLowerCase())?', '+c:'')).toLowerCase().replace(/[.#$\/\[\]]/g,'_')}
@@ -141,13 +144,20 @@ export function locGroups(kindFilter){
     add('o:'+o.id,{key:'o:'+o.id,rec:o,org:o,name:dispName(o),city:c,cat:locParty(o),contact:primaryName(o),people:[]});
   });
   liveOnly(S.people||[]).forEach(p=>{
-    const pc=recCity(p);if(!pc)return;
+    const pc=recCity(p);
     const o=personOrg(p);
     if(o&&wantOrg&&(!kindFilter||o.kind===kindFilter)){
-      const g=add('o:'+o.id,{key:'o:'+o.id,rec:o,org:o,name:dispName(o),city:effCity(o)||pc,cat:locParty(o),contact:primaryName(o),people:[]});
+      const oc=effCity(o);if(!pc&&!oc)return;
+      // a person in another city than the organisation is its own pin there: "who do I meet in Frankfurt" finds them
+      if(pc&&oc&&cityKey(pc)!==cityKey(oc)){
+        const k='o:'+o.id+'@'+cityKey(pc);
+        const g=add(k,{key:k,rec:o,org:o,office:pc,name:dispName(o)+' ('+pc+')',city:pc,cat:locParty(o),contact:'',people:[]});
+        g.people.push(p);if(!g.contact)g.contact=p.name;if(!g.pin&&addrParts(p).street)g.pin=p;return;
+      }
+      const g=add('o:'+o.id,{key:'o:'+o.id,rec:o,org:o,name:dispName(o),city:oc||pc,cat:locParty(o),contact:primaryName(o),people:[]});
       g.people.push(p);if(!g.contact)g.contact=p.name;return;
     }
-    if(!wantPerson)return;
+    if(!pc||!wantPerson)return;
     if(o)return; // belongs to an org of another kind than the filter
     const fn=normName(p.firm||'');
     const key=fn?'f:'+fn+'|'+pc.toLowerCase():'p:'+p.id;
@@ -217,10 +227,10 @@ export function renderLocations(){
       const ang=2*Math.PI*i/Math.max(n,1);
       const off=n>1?0.012:0;
       const [lbl,col]=gr.cat;
-      const ex=addrLL(gr.rec);const pos=ex?ex:[g[0]+off*Math.sin(ang),g[1]+off*Math.cos(ang)];
+      const pr=gr.pin||gr.rec;const ex=addrLL(pr);const pos=ex?ex:[g[0]+off*Math.sin(ang),g[1]+off*Math.cos(ang)];
       const m=L.circleMarker(pos,{radius:ex?7:8,color:ex?'#000':'#fff',weight:1.5,fillColor:col,fillOpacity:0.92}).addTo(locLayer);
       const ppl=gr.people.map(p=>fixUml(p.name)).join(', ')||fixUml(gr.contact||'');
-      m.bindPopup('<b>'+esc(gr.name)+'</b><br><span style="color:'+col+';font-weight:700">'+lbl+'</span> · '+esc(c)+(ppl?'<br>'+esc(ppl):'')+(ex?'<br><span style="font-size:10px">'+esc(gr.rec.address||'')+'</span>':(addrParts(gr.rec).street?'<br><span style="font-size:10px">'+esc(gr.rec.address||'')+' (pin at the city centre until the address is located)</span>':'<br><span style="font-size:10px">Only the city is known, no street address in the CRM</span>'))+'<br><a href="#" data-click="openRec|'+gr.rec.id+'|$e">Open profile →</a>');
+      m.bindPopup('<b>'+esc(gr.name)+'</b><br><span style="color:'+col+';font-weight:700">'+lbl+'</span> · '+esc(c)+(ppl?'<br>'+esc(ppl):'')+(ex?'<br><span style="font-size:10px">'+esc(pr.address||'')+'</span>':(addrParts(pr).street?'<br><span style="font-size:10px">'+esc(pr.address||'')+' (pin at the city centre until the address is located)</span>':'<br><span style="font-size:10px">Only the city is known, no street address in the CRM</span>'))+'<br><a href="#" data-click="openRec|'+gr.rec.id+'|$e">Open profile →</a>');
     });
   });
   if(!locMap._legend){
