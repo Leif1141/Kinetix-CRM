@@ -1,7 +1,7 @@
 import {openDialog, confirmDialog} from './dialog.js';
 import {invalidateThreads} from '../views/threads.js';
 import {ACT_TYPES, ADV_CATS, ADV_STATUS, CHANNELS, DEADREASONS, PRIORITIES, PTYPES, STAGES, VERDICTS} from '../constants.js';
-import {S, addTouch, allOrgs, chanOf, deadCatOf, dispName, findRec, fixUml, isDeadSelf, isSysNote, newPerson, orgByDomain, orgDomain, orgPeople, personOrg, primaryOf, splitPhones, tType, touchList, touchTomb, lastTouch} from '../state.js';
+import {S, addTouch, allOrgs, chanOf, deadCatOf, dispName, findRec, fixUml, isDeadSelf, isSysNote, newPerson, orgByDomain, orgDomain, orgPeople, personOrg, primaryOf, splitPhones, tType, touchList, touchTomb, lastTouch, meetMode, foldConv} from '../state.js';
 import {addDays, cleanPrev, esc, fmtAgo, fmtD, fmtDe, normDomain, normName, shortLoc, toast, today, uid} from '../util.js';
 import {fld, gv, n1, selFld, starHtml, stagePill} from './ui.js';
 import {letterBox} from './pipeline.js';
@@ -277,11 +277,11 @@ function donePromise(i){
 
 // ---- pieces reused from the former modal ----
 export function tlHtml(r){
-  const ts=touchList(r);
+  const ts=foldConv(touchList(r));
   const legend='<div style="font-size:10px;color:#595959;margin-bottom:6px;line-height:1.6"><span style="color:#2E3C65">●</span> Email sent &nbsp;<span style="color:#C6943E">●</span> Email received &nbsp;<span style="color:#008A3E">●</span> Meeting/Granola &nbsp;<span style="color:#7030A0">●</span> Call &nbsp;<span style="color:#8C97B8">●</span> Note/other</div>';
   return legend+'<div class="timeline">'+ts.slice(0,30).map(t=>{
-    const k=Object.keys(r.touches||{}).find(k=>(r.touches||{})[k]===t);
-    return '<div class="titem t'+tType(t)+(t.dir==='out'?' out':'')+'"><b>'+fmtD(t.date)+'</b> '+(t.link?'<a href="'+esc(t.link)+'" target="_blank" title="Open original">'+esc(fixUml(t.subject))+'</a>':esc(fixUml(t.subject)))+' <span class="chip">'+esc(srcLabel(t))+'</span>'+(t.who?' <span class="muted">- '+esc(fixUml(t.who))+'</span>':'')+(t.link?' <a href="'+esc(t.link)+'" target="_blank">↗</a>':'')+(k?'<br><button class="sm" data-click="editNote|'+r.id+'|'+k+'">Note</button> <button class="sm" data-click="removeTouch|'+r.id+'|'+k+'" title="Filed here by mistake">Remove</button>':'')+(t.note?'<div class="tnote">'+esc(fixUml(t.note))+'</div>':(t.prev?'<div class="tnote">'+esc(fixUml(cleanPrev(t.prev,400)))+'</div>':''))+'</div>'
+    const k=Object.keys(r.touches||{}).find(k=>(r.touches||{})[k]===(t._orig||t));
+    return '<div class="titem t'+tType(t)+(t.dir==='out'?' out':'')+'"><b>'+fmtD(t.date)+'</b> '+(t.link?'<a href="'+esc(t.link)+'" target="_blank" title="Open original">'+esc(fixUml(subjOf(t)))+'</a>':esc(fixUml(subjOf(t))))+' <span class="chip">'+esc(srcLabel(t))+'</span>'+(t.who?' <span class="muted">- '+esc(fixUml(t.who))+'</span>':'')+(t.link?' <a href="'+esc(t.link)+'" target="_blank">↗</a>':'')+(k?'<br><button class="sm" data-click="editNote|'+r.id+'|'+k+'">Note</button> <button class="sm" data-click="removeTouch|'+r.id+'|'+k+'" title="Filed here by mistake">Remove</button>':'')+(t.note?'<div class="tnote">'+esc(fixUml(t.note))+'</div>':(t.prev?'<div class="tnote">'+esc(fixUml(cleanPrev(t.prev,400)))+'</div>':''))+'</div>'
   }).join('')+'</div>';
 }
 export async function editNote(recId,key){
@@ -339,17 +339,19 @@ export function drawTimeline(r){
   if(typeof Chart==='undefined')return;
   profChart=new Chart(el,{type:'bar',data:{labels,datasets:[{label:'Out (sent)',data:out,backgroundColor:'#2E3C65'},{label:'In (received)',data:inn,backgroundColor:'#FFC000'},{label:'Calls / meetings',data:mtg,backgroundColor:'#2E7D32'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{font:{size:10}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
 }
-export function srcLabel(t){const s=t.src||'';if(s==='Granola'||s==='Meeting')return 'Call';if(s==='Kinetix'||s==='Gmail'||s==='Email')return 'Email';return s}
+export function srcLabel(t){const s=t.src||'';if(s==='Granola'||s==='Meeting'||s==='Call')return meetMode(t)==='meeting'?'Meeting':'Call';if(s==='Kinetix'||s==='Gmail'||s==='Email')return 'Email';return s}
 export function mailUrl(u){if(!u)return u;const m=String(u).match(/outlook\.office(?:365)?\.com\/owa\/\?ItemID=([^&]+)/i);if(m){const id=m[1];return 'https://outlook.cloud.microsoft/mail/deeplink/read/'+id}return u}
 export function linkWrap(t,inner){if(!t.link)return inner;const u=mailUrl(t.link),isMail=u!==t.link||/outlook\.office/.test(u);return '<a href="'+esc(u)+'" target="'+(isMail?'kinetixmail':'_blank')+'" title="Open original">'+inner+'</a>'}
 export function convTouches(r){
   let ts=touchList(r).filter(t=>!isSysNote(t));
   if(r.kind==='person'){const o=personOrg(r);if(o){const seen=new Set(ts.map(t=>(t.date||'')+'|'+(t.subject||'')));touchList(o).forEach(t=>{if(isSysNote(t))return;const k=(t.date||'')+'|'+(t.subject||'');if(!seen.has(k)){seen.add(k);ts.push(t)}});ts.sort((a,b)=>(b.date||'').localeCompare(a.date||''))}}
-  return ts;
+  return foldConv(ts);
 }
 // A call or meeting has no direction for the purpose of "who owes the next move".
-const isCallTouch=t=>srcLabel(t)==='Call';
-const dirWord=t=>isCallTouch(t)?'Call':(t.dir==='out'?'Sent':'Received');
+const isCallTouch=t=>!!meetMode(t);
+const dirWord=t=>isCallTouch(t)?srcLabel(t):(t.dir==='out'?'Sent':'Received');
+// The phone glyph the old Granola import put in front of every title says nothing about the conversation.
+const subjOf=t=>String(t.subject||'').replace(/^📞\s*/,'');
 export function wrapUpHtml(r){
   const ts=convTouches(r); // newest first
   if(!ts.length)return '';
@@ -357,19 +359,19 @@ export function wrapUpHtml(r){
   // "Kein offener Punkt: ..." is context, not a step of Leif's
   const open=(r.nextAction||'').trim()&&!/^kein offener punkt/i.test((r.nextAction||'').trim());
   const ball=(isCallTouch(newest)
-      ? 'Last contact: call '+fmtAgo(newest.date)
+      ? 'Last contact: '+srcLabel(newest).toLowerCase()+' '+fmtAgo(newest.date)
       : newest.dir==='in'
         ? 'Ball with you - they wrote last, '+fmtAgo(newest.date)
         : 'Ball with them - you wrote last, '+fmtAgo(newest.date))
     +(open?' <span class="muted" style="font-weight:400">&middot; your next step is set above</span>':'');
   const cut=(s,n)=>{s=(s||'').replace(/\s+/g,' ').trim();return s.length>n?s.slice(0,n)+' …':s};
-  const blk=t=>!t?'':'<div style="margin-bottom:9px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">'+dirWord(t)+' &middot; '+fmtD(t.date)+' &middot; '+fmtAgo(t.date)+' &middot; '+esc(srcLabel(t))+(t.who?' &middot; '+esc(fixUml(t.who)):'')+'</div><b style="font-size:12px">'+linkWrap(t,esc(fixUml(t.subject||'(no subject)')))+(t.link?' <span class="muted">&#8599;</span>':'')+'</b>'+((t.prev||t.note)?'<div class="tnote" style="margin-top:4px">'+esc(cut(fixUml(cleanPrev(t.prev||t.note,1200)),1200))+'</div>':'')+'</div>';
+  const blk=t=>!t?'':'<div style="margin-bottom:9px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">'+dirWord(t)+' &middot; '+fmtD(t.date)+' &middot; '+fmtAgo(t.date)+(isCallTouch(t)?'':' &middot; '+esc(srcLabel(t)))+(t.who?' &middot; '+esc(fixUml(t.who)):'')+'</div><b style="font-size:12px">'+linkWrap(t,esc(fixUml(subjOf(t)||'(no subject)')))+(t.link?' <span class="muted">&#8599;</span>':'')+'</b>'+((t.prev||t.note)?'<div class="tnote" style="margin-top:4px">'+esc(cut(fixUml(cleanPrev(t.prev||t.note,1200)),1200))+'</div>':'')+'</div>';
   const older=ts.slice(2,6);
   return '<div class="pbox" style="border-left:3px solid '+(!isCallTouch(newest)&&newest.dir==='in'?'#C6943E':'#2E3C65')+'">'+
     '<h4>Where we left things</h4>'+
     '<div style="font-size:12px;font-weight:bold;margin-bottom:9px">'+ball+'</div>'+
     blk(ts[0])+blk(ts[1])+
-    (older.length?'<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--lgray)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">Earlier in this thread</div>'+older.map(t=>'<div style="font-size:11px;margin-top:5px">'+fmtD(t.date)+' <span class="muted">'+(isCallTouch(t)?'call':(t.dir==='out'?'sent':'received')+' &middot; '+esc(srcLabel(t)))+'</span> <b>'+linkWrap(t,esc(fixUml(t.subject||'')))+'</b>'+(t.prev?'<div class="tnote" style="margin-top:2px">'+esc(cut(fixUml(cleanPrev(t.prev,400)),400))+'</div>':'')+'</div>').join('')+'</div>':'')+
+    (older.length?'<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--lgray)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">Earlier in this thread</div>'+older.map(t=>'<div style="font-size:11px;margin-top:5px">'+fmtD(t.date)+' <span class="muted">'+(isCallTouch(t)?srcLabel(t).toLowerCase():(t.dir==='out'?'sent':'received')+' &middot; '+esc(srcLabel(t)))+'</span> <b>'+linkWrap(t,esc(fixUml(subjOf(t))))+'</b>'+(t.prev?'<div class="tnote" style="margin-top:2px">'+esc(cut(fixUml(cleanPrev(t.prev,400)),400))+'</div>':'')+'</div>').join('')+'</div>':'')+
     '</div>';
 }
 export function setTlPeriod(w){tlPeriod=w;drawTimeline(profRec)}

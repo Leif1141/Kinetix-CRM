@@ -108,7 +108,32 @@ let _rc=null;
 export function withRenderCache(fn){const outer=_rc;if(!outer)_rc={last:new Map(),people:null};try{return fn()}finally{if(!outer)_rc=null}}
 function lastTouchRaw(r){const t=(r.kind==='person'?touchList(r).filter(x=>!isSysNote(x)):orgTouches(r))[0];return t?t.date:null}
 export function lastTouch(r){if(!_rc||!r)return lastTouchRaw(r);if(!_rc.last.has(r))_rc.last.set(r,lastTouchRaw(r));return _rc.last.get(r)}
-export function tType(t){if(t.src==='Granola'||t.src==='Meeting')return 'Meeting';if(t.src==='Call')return 'Call';if(t.src==='Kinetix'||t.src==='Gmail')return 'Email';if(t.src==='Note'||t.src==='Letter'||t.src==='LinkedIn')return t.src;return 'Email'}
+// A Granola or calendar touch is a call or an in-person meeting. t.mode ('call'|'meeting') from a patch wins;
+// otherwise in-person words decide (Fall CF-MB 06.11.2026: Kaffee bei Häming in Düsseldorf stand als Call).
+const INPERSON_SUBJ=/(kaffee|coffee|lunch|mittag|abendessen|dinner|fr[üu]hst[üu]ck|breakfast|vor ort|besuch|visit|treffen|in person|pers[öo]nlich|messe)/i;
+const INPERSON_NOTE=/(vor ort|in person|pers[öo]nlich getroffen|beim kaffee|beim mittagessen|in seinem b[üu]ro|in ihrem b[üu]ro)/i;
+export function meetMode(t){
+  if(!t)return '';if(t.mode==='meeting'||t.mode==='call')return t.mode;
+  if(t.src==='Call')return 'call';if(t.src!=='Granola'&&t.src!=='Meeting')return '';
+  return INPERSON_SUBJ.test(t.subject||'')||INPERSON_NOTE.test((t.prev||'')+' '+(t.note||''))?'meeting':'call';
+}
+// One conversation logged twice (Granola Drive note and the run's Meeting touch, same day) shows once:
+// the entry with the summary stays, it takes the other's link, and in person wins over call.
+// Unfolded touches come back as the stored objects; a folded one is a copy whose _orig is the stored touch kept.
+export function foldConv(ts){
+  const out=[],at={};
+  ts.forEach(t=>{
+    if(!meetMode(t)){out.push(t);return}
+    const d=String(t.date||'').slice(0,10);
+    if(!(d in at)){at[d]=out.length;out.push(t);return}
+    const o=out[at[d]],oo=o._orig||o;
+    const keep=(t.prev||t.note||'').length>(o.prev||o.note||'').length?t:oo;
+    const mode=(meetMode(o)==='meeting'||meetMode(t)==='meeting')?'meeting':'call';
+    out[at[d]]=Object.assign({},keep,{mode:mode,link:keep.link||o.link||t.link,_orig:keep});
+  });
+  return out;
+}
+export function tType(t){if(t.src==='Granola'||t.src==='Meeting')return meetMode(t)==='call'?'Call':'Meeting';if(t.src==='Call')return 'Call';if(t.src==='Kinetix'||t.src==='Gmail')return 'Email';if(t.src==='Note'||t.src==='Letter'||t.src==='LinkedIn')return t.src;return 'Email'}
 export function lastOfType(r,ty){const t=touchList(r).find(x=>tType(x)===ty);return t?t.date:null}
 export function isStale(c){const th=STALE_DAYS[c.stage];if(th==null)return false;const lt=lastTouch(c);return daysAgo(lt||(c.stageLog?.slice(-1)[0]?.date)||null)>th}
 export function stageDate(c){return c.stageLog?.slice(-1)[0]?.date||null}

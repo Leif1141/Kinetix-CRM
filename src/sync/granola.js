@@ -32,7 +32,7 @@ export async function syncGranolaCalls(){
       const m=(f.name||'').match(/^(\d{4})(\d{2})(\d{2})\s+(.+?)(\s*\[[0-9a-f-]+\])?\.docx$/i);
       const date=m?(m[1]+'-'+m[2]+'-'+m[3]+'T12:00:00Z'):(f.createdTime||new Date().toISOString());
       const title=m?m[4]:(f.name||'Call');
-      const t={date:date,dir:'out',subject:'\uD83D\uDCDE '+title,link:f.webViewLink||'',src:'Granola',who:''};
+      const t={date:date,dir:'out',subject:title,link:f.webViewLink||'',src:'Granola',who:''};
       let recs=[];
       const nt=normName(title);
       (S.people||[]).forEach(p=>{const pn=normName(p.name||'');if(pn&&pn.length>5&&nt.includes(pn)){recs.push(p);if(p.orgId){const o=findRec(p.orgId);if(o&&!recs.includes(o))recs.push(o)}}});

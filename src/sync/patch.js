@@ -113,6 +113,11 @@ export function applyPatchOps(ops){
         if(o.email){S.ignoredSenders[o.email.toLowerCase().replace(/\./g,'_')]=today();made++}
         else if(o.domain){S.ignoredDomains[o.domain.toLowerCase().replace(/\./g,'_')]=today();made++}
         else skipped++;
+      }else if(o.op==='setTouch'){
+        // corrects a logged touch: call or in-person meeting, subject, summary (Fall CF-MB 06.11.2026)
+        const r=o.match&&o.match.id?findRec(o.match.id):patchFind(o.match),t=r&&o.key&&(r.touches||{})[o.key],f=o.fields||{};let hit=0;
+        if(t){['mode','subject','prev','who','link'].forEach(k=>{if(f[k]!=null&&t[k]!==f[k]){t[k]=f[k];hit++}})}
+        if(hit)made++;else skipped++;
       }else if(o.op==='setTouchLink'){
         const r=patchFind(o.match);let hit=0;
         if(r&&o.link){const tl=r.touches||{};Object.keys(tl).forEach(k=>{const t=tl[k];if(t&&(!t.link||o.force)&&(!o.key||k===o.key)&&(!o.date||String(t.date||'').slice(0,10)===o.date)&&(!o.subject||String(t.subject||'').toLowerCase().indexOf(String(o.subject).toLowerCase())>=0)){t.link=o.link;hit++}})}
