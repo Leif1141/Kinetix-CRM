@@ -131,13 +131,17 @@ export function commitField(r,s,raw){
 }
 
 // ---- page rendering ----
-function headHtml(r){
+export function headHtml(r){
   const isT=r.kind==='target',isA=r.kind==='advisor';
   const kind=isT?'Target':isA?'Advisor':'Person';
   const status=isT?stagePill(r.stage):(isA?'<span class="chip">'+esc(r.status||'')+'</span>':(r.firm?'<span class="chip">'+esc(fixUml(r.firm))+'</span>':''));
   const org=r.kind==='person'?personOrg(r):null;
+  // An organisation names its people under the title, main contact first (Leif 07.11.2026, Board Advisors: Katja Kühnel only showed far down)
+  const pr=r.kind!=='person'&&!isNew?primaryOf(r):null,others=pr?orgPeople(r).filter(p=>p!==pr&&!isDeadSelf(p)):[];
+  const pLink=p=>'<a href="#rec/'+p.id+'">'+esc(fixUml(p.name||''))+'</a>';
+  const pplLine=pr?' &middot; '+pLink(pr)+' (main contact)'+others.slice(0,2).map(p=>', '+pLink(p)).join('')+(others.length>2?' +'+(others.length-2):''):'';
   return '<div class="rec-head"><button class="sm" id="recBack" title="Back (Esc)">&larr; Back</button>'
-    +'<div class="rec-title"><h2>'+(isNew?'<span class="muted">New '+kind.toLowerCase()+'</span>':esc(fixUml(dispName(r))))+'</h2><div class="muted" style="font-size:11px">'+kind+' &middot; '+status+(r.kind==='person'&&isDeadSelf(r)?' <span class="chip">Dead</span>':'')+(org?' &middot; <a href="#rec/'+org.id+'">'+esc(fixUml(dispName(org)))+'</a>':'')+' &middot; last contact '+(lastTouch(r)?fmtAgo(lastTouch(r)):'never')+'</div></div>'
+    +'<div class="rec-title"><h2>'+(isNew?'<span class="muted">New '+kind.toLowerCase()+'</span>':esc(fixUml(dispName(r))))+'</h2><div class="muted" style="font-size:11px">'+kind+' &middot; '+status+(r.kind==='person'&&isDeadSelf(r)?' <span class="chip">Dead</span>':'')+(org?' &middot; <a href="#rec/'+org.id+'">'+esc(fixUml(dispName(org)))+'</a>':'')+pplLine+' &middot; last contact '+(lastTouch(r)?fmtAgo(lastTouch(r)):'never')+'</div></div>'
     +'<div class="rec-tools">'+(isNew?'':(isDeadSelf(r)?'<button class="sm" data-click="reviveRec|'+r.id+'|$e">Zurückholen</button> ':'<button class="sm" data-click="markDead|'+r.id+'|$e">Dead</button> '))+starHtml(r)+'</div></div>';
 }
 function promisesHtml(r){
