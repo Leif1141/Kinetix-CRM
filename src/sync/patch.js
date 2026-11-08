@@ -34,7 +34,7 @@ export function patchFind(m){
   })||null;
 }
 // Fields owned by MASTER Scoring: a patch that writes one stamps the record with the file and date (finSrc).
-const FIN_FIELDS=['revenue','ebitda','ebit','gm','score','verdict','ownership','flag'];
+const FIN_FIELDS=['revenue','ebitda','ebit','gm','score','verdict','ownership','flag','metrics'];
 let _patchName='';
 // Contact data carries its source (legal notice, register, business card, mail signature) and date: op.source, op.date.
 const SRC_FIELDS=['domain','email','phone','mobile','street','zip','city','address','title','linkedin','contact','name'];
@@ -130,7 +130,7 @@ export function applyPatchOps(ops){
         if(t&&o.fields){['r','a','o','e','due','p','cat'].forEach(k=>{if(o.fields[k]!==undefined)t[k]=o.fields[k]});invalidateThreads();made++}else skipped++;
       }else if(o.op==='setField'){
         const r=patchFind(o.match);
-        const _ok=['street','zip','notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','mobile','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict','outreachChannel','stage','channel','channelVia','letterSent','letterStatus','fav','ignored','cadDone','archived','deadCat','primaryId'];
+        const _ok=['metrics','street','zip','notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','mobile','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict','outreachChannel','stage','channel','channelVia','letterSent','letterStatus','fav','ignored','cadDone','archived','deadCat','primaryId'];
         if(r&&o.field&&_ok.includes(o.field)){if(o.field==='stage'&&r.stage!==o.value){r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.value,date:o.date||today()})}putVal(r,o.field,o.value);stampFin(r,o.field);stampSrc(r,o.field,o.source,o.date);if(o.field==='phone')splitPhones(r);made++}else skipped++;
       }else if(o.op==='merge'){
         const dup=o.match&&o.match.id?findRec(o.match.id):patchFind(o.match),keep=o.into&&o.into.id?findRec(o.into.id):patchFind(o.into);
