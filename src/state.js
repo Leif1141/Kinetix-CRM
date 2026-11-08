@@ -21,16 +21,6 @@ export function setS(v){S=v}
 // ═══════════════════════════════════════════════════════════════
 // SEED + STATE
 // ═══════════════════════════════════════════════════════════════
-export function seedAdvisor(a){return {id:uid(),kind:'advisor',firm:a.firm,contact:a.contact||'',email:a.email||'',domain:'',category:a.category||a.type||'',geo:a.geo||'',market:'',status:a.status||'Active',ptype:a.type||'',introPath:a.intro_path||'',notes:a.notes||'',detail:a.detail||'',cadence:30,fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:'',links:[]}}
-export function seedCompany(t){return {id:uid(),kind:'target',name:t.company,geo:t.geo,revenue:t.revenue_eurm?+t.revenue_eurm:null,ebitda:t.ebitda_eurm?+t.ebitda_eurm:null,ebit:t.ebit_eurm?+t.ebit_eurm:null,gm:t.gross_margin?+t.gross_margin:null,description:t.description||'',ownership:t.ownership||'',flag:t.flag||'',stage:t.status==='Dead'?'Dead':t.status==='Active'?'Contacted':'Identified',channel:'',deadReason:'',revisitDate:'',stageLog:[{stage:'Identified',date:today()}],fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:'',links:[],location:t.location||''}}
-export function seedPerson(p,orgId){return {id:uid(),kind:'person',name:p.name,title:p.title||'',firm:p.firm||'',orgId:orgId||'',email:p.email||'',phone:p.phone||'',mobile:p.mobile||'',linkedin:p.linkedin||'',city:p.city||'',market:p.market||'',ptype:p.ptype||p.source||'',angle:p.angle||'',networkPath:p.networkPath||'',fav:false,lists:[],touches:{},nextDate:'',nextAction:'',priority:''}}
-export function orgByFirm(f){const nf=normName(f);if(!nf)return null;return S.companies.find(c=>normName(c.name)===nf||normName(c.description||'').includes(nf))||S.advisors.find(a=>normName(a.firm)===nf)}
-export function buildPeople(SEED){
-  const people=[];
-  SEED.people.forEach(p=>{const org=orgByFirm(p.firm);people.push(seedPerson(p,org?org.id:''))});
-  return people;
-}
-
 // Only for an empty database. No CRM data lives in the code (Leif 08.11.2026: the repository is public); an
 // empty database starts empty and is filled by Import or a patch from the Drive.
 export async function buildInitialState(){

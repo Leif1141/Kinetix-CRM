@@ -89,9 +89,13 @@ export function laterThisWeek(){
 // Meetings count one per organisation and day, so the Granola note and the run's entry of the same conversation
 // count once. Live deals is a standing count (Replied to Diligence), not a weekly one.
 const AUTO_RE=/automatische antwort|abwesend|abwesenheit|out of office|automatic reply|auto-reply|autoreply|unzustellbar|undeliverable/i;
-export function weekScore(){
-  const ws=weekStart(today());
-  const inWeek=t=>(t.date||'').slice(0,10)>=ws;
+// Any week, for the comparison box and the Reports table (Leif 08.11.2026); ws is that week's Monday.
+const LIVE_ST=['Replied','Meeting','NDA','LOI','Diligence'];
+function stageAt(c,day){const l=(c.stageLog||[]).filter(x=>(x.date||'')<day);return l.length?l[l.length-1].stage:''}
+export function weekScore(ws){
+  ws=ws||weekStart(today());
+  const we=addDays(ws,7),cur=ws===weekStart(today());
+  const inWeek=t=>{const d=(t.date||'').slice(0,10);return d>=ws&&d<we};
   const cos=(S.companies||[]).filter(c=>!c.archived&&!c.mergedInto);
   const lists={letters:[],replies:[],meetings:[],dealsIn:[],namesOut:[],live:[]};
   // Meetings and calls (Leif 08.11.2026): every conversation of the week, advisers and partners included, in person,
@@ -99,7 +103,8 @@ export function weekScore(){
   [...cos,...(S.advisors||[]).filter(a=>!a.archived&&!a.mergedInto)].forEach(o=>{
     foldConv(orgTouches(o).filter(t=>inWeek(t)&&meetMode(t))).forEach(t=>lists.meetings.push({rec:o,date:t.date,text:(meetMode(t)==='meeting'?'Meeting: ':'Call: ')+String(t.subject||'').replace(/^📞\s*/,'')}));
   });
-  cos.forEach(c=>{if(['Replied','Meeting','NDA','LOI','Diligence'].includes(c.stage))lists.live.push({rec:c,date:((c.stageLog||[]).slice(-1)[0]||{}).date||'',text:c.stage+(c.channelVia?' · '+c.channelVia:'')})});
+  // live deals at the end of that week: today's stage for the current week, the stage history for earlier weeks
+  cos.forEach(c=>{const st=cur?c.stage:stageAt(c,we);if(LIVE_ST.includes(st))lists.live.push({rec:c,date:((c.stageLog||[]).filter(x=>(x.date||'')<we).slice(-1)[0]||{}).date||'',text:st+(c.channelVia?' · '+c.channelVia:'')})});
   cos.forEach(c=>{
     const ts=orgTouches(c).filter(t=>inWeek(t)&&!isSysNote(t));
     // own letters only: a letter a partner sent does not count against Leif's weekly target
@@ -109,7 +114,7 @@ export function weekScore(){
     if(rep)lists.replies.push({rec:c,date:rep.date,text:rep.subject});
     // a partner brings a deal (teaser, project name, already past first contact) or Leif gives a partner a name
     const first=(c.stageLog||[])[0];
-    if(first&&first.date>=ws&&PARTNER_CH.includes(c.channel||'')){
+    if(first&&first.date>=ws&&first.date<we&&PARTNER_CH.includes(c.channel||'')){
       const inbound=/^proje[ck]t\b/i.test(c.name||'')||(first.stage&&first.stage!=='Identified');
       (inbound?lists.dealsIn:lists.namesOut).push({rec:c,date:first.date,text:c.channelVia||c.channel});
     }
@@ -118,8 +123,20 @@ export function weekScore(){
   const n=k=>lists[k].length;
   return {letters:n('letters'),target:LETTER_TARGET_WEEK,replies:n('replies'),meetings:n('meetings'),dealsIn:n('dealsIn'),namesOut:n('namesOut'),live:n('live'),weekStart:ws,lists};
 }
-let wkOpen='';
-export function toggleWeekList(k){wkOpen=wkOpen===k?'':k;renderScore()}
+let wkOpen='',wkOpenPrev='',prevWs='';
+export function toggleWeekList(k,box){if(box==='prev')wkOpenPrev=wkOpenPrev===k?'':k;else wkOpen=wkOpen===k?'':k;renderScore()}
+export function setPrevWeek(ws){prevWs=ws;wkOpenPrev='';prevCache=null;renderScore()}
+// A past week barely changes: its counts are kept for a minute so Today stays fast on every redraw
+let prevCache=null,firstDay='';
+function prevScore(ws){const now=Date.now();if(!prevCache||prevCache.ws!==ws||now-prevCache.at>60000)prevCache={ws,at:now,s:weekScore(ws)};return prevCache.s}
+// Mondays from the first recorded activity up to last week, newest first
+export function pastWeeks(){
+  let first=firstDay||today();
+  if(!firstDay){allRecs().forEach(r=>Object.values(r.touches||{}).forEach(t=>{const d=(t.date||'').slice(0,10);if(d&&d>='2026-01-01'&&d<first)first=d}));firstDay=first}
+  const out=[];let w=addDays(weekStart(today()),-7);const stop=weekStart(first);
+  while(w>=stop&&out.length<104){out.push(w);w=addDays(w,-7)}
+  return out;
+}
 
 export function resetHomeView(){homeGrp='';homeKind='';try{localStorage.setItem('kxHomeGrp','')}catch(e){}}
 export function setHomeGrp(g){homeGrp=homeGrp===g?'':g;try{localStorage.setItem('kxHomeGrp',homeGrp)}catch(e){}renderHome()}
@@ -207,21 +224,31 @@ export function renderHome(){
   renderScore();
   renderRecent();
 }
-function renderScore(){
-  const el=document.getElementById('homeScore');if(!el)return;
-  const s=weekScore();
-  const tile=(v,l,k,warn)=>'<div class="kpi'+(warn?' warn':'')+(wkOpen===k?' on':'')+'" data-wk="'+k+'" title="Show what this counts"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>';
-  const lst=wkOpen&&s.lists[wkOpen];
-  el.innerHTML='<div class="score">'
-    +tile(s.letters+' / '+s.target,'Companies lettered','letters',s.letters<s.target&&new Date().getDay()>=4)
+function scoreBox(s,open,box,lettersWarn){
+  const tile=(v,l,k,warn)=>'<div class="kpi'+(warn?' warn':'')+(open===k?' on':'')+'" data-wk="'+k+'" data-wb="'+box+'" title="Show what this counts"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>';
+  const lst=open&&s.lists[open];
+  return '<div class="score">'
+    +tile(s.letters+' / '+s.target,'Companies lettered','letters',lettersWarn)
     +tile(s.replies,'Replies','replies')
     +tile(s.meetings,'Meetings and calls','meetings')
     +tile(s.dealsIn,'Deals from partners','dealsIn')
     +tile(s.namesOut,'Names given to partners','namesOut')
     +tile(s.live,'Live deals','live')
     +'</div>'
-    +(lst?'<div class="wklist">'+(lst.length?lst.map(i=>'<div class="wkrow" data-open="'+i.rec.id+'"><span class="muted">'+fmtDe((i.date||'').slice(0,10))+'</span> <b>'+esc(fixUml(dispName(i.rec)))+'</b>'+(i.text?'<div class="muted">'+esc(fixUml(i.text))+'</div>':'')+'</div>').join(''):'<div class="muted">Nothing this week.</div>')+'</div>':'')
-    +'<div class="muted" style="font-size:10px;padding:4px 8px">Week of '+fmtDe(s.weekStart)+'</div>';
+    +(lst?'<div class="wklist">'+(lst.length?lst.map(i=>'<div class="wkrow" data-open="'+i.rec.id+'"><span class="muted">'+fmtDe((i.date||'').slice(0,10))+'</span> <b>'+esc(fixUml(dispName(i.rec)))+'</b>'+(i.text?'<div class="muted">'+esc(fixUml(i.text))+'</div>':'')+'</div>').join(''):'<div class="muted">Nothing in this week.</div>')+'</div>':'');
+}
+function renderScore(){
+  const el=document.getElementById('homeScore');if(!el)return;
+  const s=weekScore();
+  el.innerHTML=scoreBox(s,wkOpen,'cur',s.letters<s.target&&new Date().getDay()>=4)+'<div class="muted" style="font-size:10px;padding:4px 8px">Week of '+fmtDe(s.weekStart)+'</div>';
+  // the comparison box: last week by default, any earlier week from the picker
+  const ep=document.getElementById('homeScorePrev');if(!ep)return;
+  const weeks=pastWeeks();if(!weeks.length){ep.innerHTML='<p class="muted" style="padding:8px">No earlier week yet.</p>';return}
+  if(!prevWs||!weeks.includes(prevWs))prevWs=weeks[0];
+  const p=prevScore(prevWs);
+  ep.innerHTML='<div style="padding:6px 8px 0"><select id="homeWeekSel" class="sm" aria-label="Week to compare">'+weeks.map(w=>'<option value="'+w+'"'+(w===prevWs?' selected':'')+'>Week of '+fmtDe(w)+(w===weeks[0]?' (last week)':'')+'</option>').join('')+'</select></div>'
+    +scoreBox(p,wkOpenPrev,'prev',p.letters<p.target);
+  const sel=document.getElementById('homeWeekSel');if(sel)sel.addEventListener('change',()=>setPrevWeek(sel.value));
 }
 function renderRecent(){
   const el=document.getElementById('recentBody');if(!el)return;
@@ -257,7 +284,8 @@ export function initHome(){
       return}
     const g=e.target.closest('[data-grp]');if(g){setHomeGrp(g.dataset.grp);return}
     const k=e.target.closest('[data-kind]');if(k){setHomeKind(k.dataset.kind);return}
-    const wk=e.target.closest('[data-wk]');if(wk){toggleWeekList(wk.dataset.wk);return}
+    const wk=e.target.closest('[data-wk]');if(wk){toggleWeekList(wk.dataset.wk,wk.dataset.wb);return}
+    if(e.target.closest('#homeWeekSel'))return;
     const go=e.target.closest('[data-go]');if(go){goTab(go.dataset.go);return}
     const u=e.target.closest('a[data-unignore]');if(u){e.preventDefault();unignoreRec(u.dataset.unignore);return}
     if(e.target.closest('a[href]'))return;

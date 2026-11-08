@@ -1,7 +1,9 @@
 import {CHANNELS, DEADREASONS, LIVE, STAGES} from '../constants.js';
 import {S, allRecs, deadCatOf, dispName, fixUml, isSysNote, lastTouch, liveOnly, orgTouches, stageDate, tType, touchList} from '../state.js';
 import {catOf} from './lists.js';
-import {daysAgo, esc, fmtAgo, foldSearch} from '../util.js';
+import {daysAgo, esc, fmtAgo, foldSearch, fmtDe, today, weekStart} from '../util.js';
+import {weekScore, pastWeeks, setPrevWeek} from './home.js';
+import {goTab} from '../main.js';
 import {shareIndex, sharedByRec} from '../shares.js';
 import {stagePill} from './ui.js';
 
@@ -74,7 +76,22 @@ export function renderYield(){
 // ═══════════════════════════════════════════════════════════════
 // RENDER: REPORTS
 // ═══════════════════════════════════════════════════════════════
+// Week by week (Leif 08.11.2026): the This week counts for every week since the first activity, newest first,
+// with the average of the completed weeks, so what was done and what came of it can be compared.
+export function renderWeekTable(){
+  const el=document.getElementById('weekTable');if(!el)return;
+  const weeks=[weekStart(today()),...pastWeeks().slice(0,25)];
+  const cols=[['letters','Companies lettered'],['replies','Replies'],['meetings','Meetings and calls'],['dealsIn','Deals from partners'],['namesOut','Names given'],['live','Live deals']];
+  const rows=weeks.map(w=>weekScore(w));
+  const done=rows.slice(1),avg=k=>done.length?(done.reduce((a,s)=>a+s[k],0)/done.length):0;
+  const num=v=>'<td style="text-align:right">'+(v?v:'-')+'</td>';
+  el.innerHTML='<tr><th>Week</th>'+cols.map(c=>'<th style="text-align:right">'+c[1]+'</th>').join('')+'</tr>'
+    +rows.map((s,i)=>'<tr class="rowlink" data-wkrow="'+s.weekStart+'"><td>'+fmtDe(s.weekStart)+(i===0?' (this week)':'')+'</td>'+cols.map(c=>num(s[c[0]])).join('')+'</tr>').join('')
+    +(done.length?'<tr style="font-weight:bold;border-top:1px solid #595959"><td>Average of '+done.length+' weeks</td>'+cols.map(c=>'<td style="text-align:right">'+avg(c[0]).toFixed(1).replace('.',',')+'</td>').join('')+'</tr>':'');
+  el.querySelectorAll('tr[data-wkrow]').forEach(tr=>tr.addEventListener('click',()=>{const w=tr.dataset.wkrow;if(w!==weekStart(today()))setPrevWeek(w);goTab('home')}));
+}
 export function renderReports(){
+  try{renderWeekTable()}catch(e){console.warn('week table',e)}
   const live=(S.companies||[]).filter(c=>LIVE.includes(c.stage));
   const _seenT=new Set(),allT=[];allRecs().forEach(r=>Object.entries(r.touches||{}).forEach(([k,t])=>{if(!_seenT.has(k)){_seenT.add(k);allT.push(t)}}));
   const thisWeek=allT.filter(t=>daysAgo(t.date)<7);
