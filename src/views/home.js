@@ -91,6 +91,18 @@ export function laterThisWeek(){
 const AUTO_RE=/automatische antwort|abwesend|abwesenheit|out of office|automatic reply|auto-reply|autoreply|unzustellbar|undeliverable/i;
 // Any week, for the comparison box and the Reports table (Leif 08.11.2026); ws is that week's Monday.
 const LIVE_ST=['Replied','Meeting','NDA','LOI','Diligence'];
+// The day a name went to a partner or a deal came from one (Leif 09.11.2026: four names went to a partner on
+// 08.11.; one company had been in the CRM since October and the other three were dated the day the patch ran).
+// namedOn wins; otherwise the latest "DD.MM.YYYY: Name an ..." in notes or "Name ... DD.MM.YYYY" in flag; then
+// the first stage entry.
+export function namedDate(c){
+  if(c.namedOn)return String(c.namedOn).slice(0,10);
+  let best='';const iso=(d,m,y)=>y+'-'+m+'-'+d;
+  String(c.notes||'').replace(/(\d{2})\.(\d{2})\.(\d{4})\s*:\s*Name\b/g,(_,d,m,y)=>{const x=iso(d,m,y);if(x>best)best=x;return _});
+  String(c.flag||'').replace(/\bName\b[^|]{0,120}?(\d{2})\.(\d{2})\.(\d{4})/g,(_,d,m,y)=>{const x=iso(d,m,y);if(x>best)best=x;return _});
+  if(best)return best;
+  const f=(c.stageLog||[])[0];return f?f.date:'';
+}
 function stageAt(c,day){const l=(c.stageLog||[]).filter(x=>(x.date||'')<day);return l.length?l[l.length-1].stage:''}
 export function weekScore(ws){
   ws=ws||weekStart(today());
@@ -114,9 +126,10 @@ export function weekScore(ws){
     if(rep)lists.replies.push({rec:c,date:rep.date,text:rep.subject});
     // a partner brings a deal (teaser, project name, already past first contact) or Leif gives a partner a name
     const first=(c.stageLog||[])[0];
-    if(first&&first.date>=ws&&first.date<we&&PARTNER_CH.includes(c.channel||'')){
-      const inbound=/^proje[ck]t\b/i.test(c.name||'')||(first.stage&&first.stage!=='Identified');
-      (inbound?lists.dealsIn:lists.namesOut).push({rec:c,date:first.date,text:c.channelVia||c.channel});
+    const nd=namedDate(c);
+    if(nd&&nd>=ws&&nd<we&&PARTNER_CH.includes(c.channel||'')){
+      const inbound=/^proje[ck]t\b/i.test(c.name||'')||(first&&first.stage&&first.stage!=='Identified');
+      (inbound?lists.dealsIn:lists.namesOut).push({rec:c,date:nd,text:c.channelVia||c.channel});
     }
   });
   Object.values(lists).forEach(l=>l.sort((a,b)=>(b.date||'').localeCompare(a.date||'')));
