@@ -72,13 +72,26 @@ export function setPipeDrill(v){pipeDrill=pipeDrill===v?'':v;renderPipeline();co
 // Move a letter to another date. The first letter carries the cadence and the 'Contacted' date, so both follow.
 export function setLetterDate(id,key,old,v){
   const r=findRec(id);v=(v||'').trim();if(!r||!/^\d{4}-\d{2}-\d{2}$/.test(v)||v===old)return;
-  const t=key&&key!=='-'&&r.touches?r.touches[key]:null;
-  if(t)t.date=v+((t.date||'').length>10?t.date.slice(10):'T12:00:00Z');
+  // one row can stand for several letters of the same day (two recipients); they move together
+  const tl=key&&key!=='-'&&r.touches?String(key).split('~').map(k=>r.touches[k]).filter(Boolean):[],t=tl[0]||null;
+  tl.forEach(x=>{x.date=v+((x.date||'').length>10?x.date.slice(10):'T12:00:00Z')});
   const was=r.letterSent;
   const ds=Object.values(r.touches||{}).filter(x=>tType(x)==='Letter'&&x.dir!=='in').map(x=>(x.date||'').slice(0,10)).filter(Boolean).sort();
   if(!t)r.letterSent=v;else if(ds.length&&(!was||was===old||!ds.includes(was)))r.letterSent=ds[0];
   if(r.letterSent!==was)(r.stageLog||[]).forEach(l=>{if(l.stage==='Contacted'&&l.date===was)l.date=r.letterSent});
   save();renderAll();toast('Letter to '+fixUml(dispName(r))+' moved to '+fmtDe(v));
+}
+// Who a letter went to: the name in its subject ("Letter to X sent", "Brief an X (...)"), else the person in 'who'
+// unless that is the sending partner, else the record's contact. Several letters: every recipient once.
+function letterTo(c,keys){
+  const out=[];
+  keys.forEach(k=>{const t=k&&(c.touches||{})[k];let n='';
+    if(t){const s=String(t.subject||''),m=s.match(/^Letter to (.+?)(?: sent)?(?: \(|$)/i)||s.match(/Brief an (.+?)(?: \(|$)/i);
+      n=m?m[1].replace(/\s*\([^)]*\)\s*/g,' ').replace(/ sent$/i,'').trim():'';
+      if(!n&&t.who&&!(c.channelVia&&String(t.who).indexOf(c.channelVia)>=0))n=String(t.who)}
+    if(n&&!out.includes(n))out.push(n)});
+  if(!out.length&&c.contact)out.push(String(c.contact).split(';').map(x=>x.trim()).filter(Boolean).join(', '));
+  return out.join('; ');
 }
 function agoTxt(d){const n=daysAgo(d);return n===0?'today':n>0?n+(n===1?' day ago':' days ago'):'in '+(-n)+(n===-1?' day':' days')}
 function firstContact(c){const d=touchList(c).filter(t=>tType(t)!=='Note').map(t=>(t.date||'').slice(0,10)).filter(Boolean).sort()[0];const l=(c.stageLog||[]).find(x=>x.stage==='Contacted');return d||(l&&l.date)||''}
@@ -90,14 +103,17 @@ function drillHtml(cs){
   else{const g=cs.filter(c=>(chanOf(c)||'')===arg&&c.stage!=='Identified'&&wasApproached(c));rows=letterRows(g);const lc=new Set(rows.map(r=>r.c.id));
     g.filter(c=>!lc.has(c.id)).forEach(c=>rows.push({c,key:null,date:firstContact(c)}));rows.sort((a,b)=>(b.date||'').localeCompare(a.date||'')||dispName(a.c).localeCompare(dispName(b.c)));title=CH_DE[arg]||arg||'(no channel)'}
   const comps=[...new Map(rows.map(r=>[r.c.id,r.c])).values()];
+  // the table shows one row per company and day; two letters that day (two recipients) stay one row, named in it
+  const trows=[],seen=new Map();rows.forEach(r=>{if(r.key===null){trows.push(r);return}const g=r.c.id+'|'+r.date;if(seen.has(g)){const m=seen.get(g);m.keys.push(r.key);m.n++}else{const m=Object.assign({},r,{keys:[r.key],n:1});seen.set(g,m);trows.push(m)}});
   const nLet=rows.filter(r=>r.key!==null).length,cnt={};comps.forEach(c=>{const k=pipeStatus(c).k;cnt[k]=(cnt[k]||0)+1});
   const head=(nLet?nLet+' letter'+(nLet===1?'':'s')+' to ':'')+comps.length+' compan'+(comps.length===1?'y':'ies')+(comps.length?' &middot; '+['live','dead','hold','due','wait'].filter(k=>cnt[k]).map(k=>cnt[k]+' '+ST_LBL[k]).join(' &middot; '):'');
   const tabs=kind==='letters'?' <button class="sm'+(arg==='week'?' vbtn on':'')+'" data-click="setPipeDrill|letters:week">This week</button><button class="sm'+(arg==='all'?' vbtn on':'')+'" data-click="setPipeDrill|letters:all">All own letters</button><button class="sm'+(arg==='partner'?' vbtn on':'')+'" data-click="setPipeDrill|letters:partner">Via partners</button>':'';
   const byDate=new Map();rows.forEach(r=>{const k=r.date||'';if(!byDate.has(k))byDate.set(k,[]);byDate.get(k).push(r)});
   const via=rs=>{const v=[...new Set(rs.map(r=>r.c.channel==='Partner letter'&&r.c.channelVia?r.c.channelVia:(r.key!==null?'own':'')).filter(Boolean))];return v.length?' &middot; '+v.map(esc).join(', '):''};
   const tl='<div class="tl">'+[...byDate].map(([d,rs])=>'<div class="tl-row"><div class="tl-d"><b>'+(d?fmtDe(d):'no date')+'</b><div class="muted">'+(d?agoTxt(d):'')+'</div></div><div class="tl-dot"></div><div class="tl-c"><div class="muted" style="font-size:11px;margin-bottom:3px">'+rs.length+(nLet?' letter'+(rs.length===1?'':'s'):' compan'+(rs.length===1?'y':'ies'))+via(rs)+'</div>'+[...new Map(rs.map(r=>[r.c.id,r.c])).values()].map(c=>{const s=pipeStatus(c),n=rs.filter(r=>r.c===c).length;return '<span class="chch" style="cursor:pointer;'+ST_STYLE[s.k]+'" title="'+esc(s.t)+'" data-click="openRec|'+c.id+'|$e">'+esc(fixUml(dispName(c)))+(n>1?' ('+n+' letters)':'')+'</span>'}).join(' ')+'</div></div>').join('')+'</div>';
-  const dcell=r=>r.key===null?(r.date?fmtDe(r.date):'-'):'<input type="date" style="font-size:11px;padding:1px 3px" value="'+r.date+'" title="Change the date the letter went out" data-click="!" data-change="setLetterDate|'+r.c.id+'|'+(r.key||'-')+'|'+r.date+'|$v">';
-  const tbl='<table class="ps"><tr><th style="width:24%">Company</th><th>'+(nLet?'Sent':'First contact')+'</th><th>Via</th><th style="width:34%">Status</th><th>Last contact</th><th style="width:22%">Next step</th></tr>'+rows.map(r=>{const c=r.c,s=pipeStatus(c),lt=lastTouch(c);return '<tr class="rowlink" data-click="openRec|'+c.id+'|$e"><td><b>'+esc(fixUml(dispName(c)))+'</b>'+(c.location?'<div class="muted" style="font-size:10px">'+esc(c.location)+'</div>':'')+'</td><td>'+dcell(r)+'</td><td class="muted">'+esc(c.channel==='Partner letter'?(c.channelVia||'partner'):r.key!==null?'own letter':(c.channelVia||''))+'</td><td><span class="chch" style="white-space:normal;'+ST_STYLE[s.k]+'">'+esc(fixUml(s.t))+'</span></td><td class="muted">'+(lt?fmtDe(lt):'-')+'</td><td style="font-size:11px" title="'+esc(fixUml(c.nextAction||''))+'">'+esc(fixUml((c.nextAction||'').length>110?c.nextAction.slice(0,107)+' ...':(c.nextAction||'')))+'</td></tr>'}).join('')+'</table>';
+  const dcell=r=>r.key===null?(r.date?fmtDe(r.date):'-'):'<input type="date" style="font-size:11px;padding:1px 3px" value="'+r.date+'" title="Change the date the letter went out" data-click="!" data-change="setLetterDate|'+r.c.id+'|'+((r.keys||[r.key]).filter(Boolean).join('~')||'-')+'|'+r.date+'|$v">'+(r.n>1?'<div style="font-size:10px">'+r.n+' letters</div>':'');
+  const rcell=r=>{if(r.key===null)return '';const ns=letterTo(r.c,r.keys||[r.key]);return ns?'<div style="font-size:11px;margin-top:2px">To '+esc(fixUml(ns))+'</div>':''};
+  const tbl='<table class="ps"><tr><th style="width:24%">Company</th><th>'+(nLet?'Sent':'First contact')+'</th><th>Via</th><th style="width:34%">Status</th><th>Last contact</th><th style="width:22%">Next step</th></tr>'+trows.map(r=>{const c=r.c,s=pipeStatus(c),lt=lastTouch(c);return '<tr class="rowlink" data-click="openRec|'+c.id+'|$e"><td><b>'+esc(fixUml(dispName(c)))+'</b>'+(c.location?'<div class="muted" style="font-size:10px">'+esc(c.location)+'</div>':'')+rcell(r)+'</td><td>'+dcell(r)+'</td><td class="muted">'+esc(c.channel==='Partner letter'?(c.channelVia||'partner'):r.key!==null?'own letter':(c.channelVia||''))+'</td><td><span class="chch" style="white-space:normal;'+ST_STYLE[s.k]+'">'+esc(fixUml(s.t))+'</span></td><td class="muted">'+(lt?fmtDe(lt):'-')+'</td><td style="font-size:11px" title="'+esc(fixUml(c.nextAction||''))+'">'+esc(fixUml((c.nextAction||'').length>110?c.nextAction.slice(0,107)+' ...':(c.nextAction||'')))+'</td></tr>'}).join('')+'</table>';
   return '<div class="section" id="pipeDrill" style="border:1px solid #CFD1E2;border-radius:6px;padding:10px 12px;margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px"><b style="font-size:15px">'+esc(title)+'</b><span class="muted">'+head+'</span>'+tabs+'<span style="flex:1"></span><button class="sm" data-click="setPipeDrill|'+pipeDrill+'">Close</button></div>'+(rows.length?tl+tbl:'<p class="muted">None.</p>')+'</div>';
 }
 // Analysed and dropped without an approach: CRM records passed before any contact, plus the companies marked red
