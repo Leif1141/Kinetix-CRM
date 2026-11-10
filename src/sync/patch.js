@@ -44,7 +44,7 @@ function stampSrc(r,k,src,d){if(src&&SRC_FIELDS.includes(k)){r.src=r.src||{};r.s
 function putVal(r,k,v){
   if(k==='street'||k==='zip'||(k==='city'&&(r.street||r.zip))){setAddrPart(r,k,v==null?'':String(v));return}
   r[k]=v;
-  if(k==='address'){delete r.street;delete r.zip;const p=addrParts(Object.assign({},r,{city:''}));if(p.zip&&p.city)r.city=p.city}
+  if(k==='address'){delete r.street;delete r.zip;const p=addrParts(Object.assign({},r,{city:''}));if(p.rawStreet)r.street=p.rawStreet;if(p.zip)r.zip=p.zip;if(p.zip&&p.city)r.city=p.city}
 }
 // Two records of the same person or organisation become one: the kept record takes the touches and fills its
 // empty contact fields, an organisation's people move over, the other record is archived with mergedInto.
