@@ -173,7 +173,10 @@ export function letterDoneStep(r){return !!(r&&r.kind==='target'&&r.letterSent&&
 // the date that is actually due: the next step, or the cadence step when the letter replaced it
 export function effDue(r){if(!r)return '';if(!letterDoneStep(r))return r.nextDate||'';const cd=cadenceOf(r);return cd&&cd.next?cd.next.due:''}
 export function isDue(c){const t=today();return !!(c.nextDate&&c.nextDate<=t&&!letterDoneStep(c))||cadDue(c)}
-export function isIgnoredRec(r){if(!r||!r.ignored)return false;const lt=lastTouch(r);return !(lt&&lt.slice(0,10)>r.ignored)}
+export // Hide lasts until real activity: a mail, call, meeting or letter. Notes (imports, system notes) do not end it (Leif 10.11.2026).
+function isIgnoredRec(r){if(!r||!r.ignored)return false;const lt=touchList(r).find(t=>t.src!=='Note');return !(lt&&(lt.date||'').slice(0,10)>r.ignored)}
+// A partner letter that has drawn no answer yet: the partner follows up, nothing is due from Leif (Leif 10.11.2026).
+export function partnerQuiet(c){return !!(c&&c.channel==='Partner letter'&&c.stage==='Contacted')}
 // Dead (Leif 01.11.2026): for good, unlike Hide. A person hangs off their organisation: Dead there counts for them too.
 export function isDeadSelf(r){return !!(r&&(r.stage==='Dead'||r.status==='Dead'))}
 export function isDeadRec(r){if(isDeadSelf(r))return true;if(!r||r.kind!=='person'||!r.orgId)return false;return isDeadSelf(findRec(r.orgId))}

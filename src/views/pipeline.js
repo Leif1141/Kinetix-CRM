@@ -1,4 +1,4 @@
-import {letterDoneStep, effDue, primaryName} from '../state.js';
+import {letterDoneStep, effDue, primaryName, partnerQuiet} from '../state.js';
 import {logDone} from './actions.js';
 import {openDialog, confirmDialog} from './dialog.js';
 import {ACTIVE_STAGES, BOARD_COLS, CHANNELS, CH_DE, LETTER_TARGET_WEEK, LIVE, LS_DE, STAGES, ST_DE} from '../constants.js';
@@ -200,7 +200,7 @@ export function renderPipeline(){
   const kdef=[
     {k:'live',t:'Live',f:c=>LIVE.includes(c.stage)},
     {k:'due',t:'Due',f:c=>(LIVE.includes(c.stage)||isReady(c))&&isDue(c),warn:1},
-    {k:'nonext',t:'Without next step',f:c=>LIVE.includes(c.stage)&&!c.nextAction&&!(cadenceOf(c)&&(cadenceOf(c).next||cadenceOf(c).partner)),warn:1},
+    {k:'nonext',t:'Without next step',f:c=>LIVE.includes(c.stage)&&!c.nextAction&&!partnerQuiet(c)&&!(cadenceOf(c)&&(cadenceOf(c).next||cadenceOf(c).partner)),warn:1},
     {k:'replied',t:'Replied or further',f:c=>LIVE.includes(c.stage)&&c.stage!=='Contacted'},
     {k:'ready',t:'To contact',f:isReady},
     {k:'letters',t:'Own letters this week',v:lettersWeek+' / '+LETTER_TARGET_WEEK,f:c=>letterRows([c]).some(r=>isOwnLetter(r)&&r.date>=ws),drill:'letters:week'}
