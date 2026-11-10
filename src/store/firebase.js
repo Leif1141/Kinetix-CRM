@@ -202,7 +202,8 @@ export function saveDebounced(){
 // ── Undo: before each save the fields about to change are stored with their previous values (from the last
 // known server tree). An undo writes those values back as one small update instead of rewriting the state. ──
 export const _undoStack=[];let _undoBusy=false;
-function updateUndoBtn(){const b=document.getElementById('undoBtn');if(!b)return;b.textContent='Undo ('+_undoStack.length+')';b.style.display=_undoStack.length?'inline-block':'none'}
+// One plain Undo button, always shown: a click takes back the last change (Leif 10.11.2026).
+function updateUndoBtn(){const b=document.getElementById('undoBtn');if(!b)return;b.textContent='Undo';b.style.display='inline-block'}
 function recordUndo(ops){try{if(_undoBusy)return;const paths=Object.keys(ops);if(!paths.length)return;const inv={};for(const p of paths){const v=treeGet(p);inv[p]=v===undefined?null:JSON.parse(JSON.stringify(v))}_undoStack.push(inv);if(_undoStack.length>25)_undoStack.shift();updateUndoBtn()}catch(e){}}
 function treeApply(tree,path,value){const parts=path.split('/');let n=tree;for(const s of parts.slice(0,-1)){if(!isObj(n[s]))n[s]={};n=n[s]}const last=parts[parts.length-1];if(value===null||value===undefined)delete n[last];else n[last]=value}
 export function pushUndo(){} // kept for callers; undo entries are recorded inside save()
