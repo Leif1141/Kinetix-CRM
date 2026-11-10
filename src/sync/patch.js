@@ -63,6 +63,7 @@ export function patchSet(r,set,src,d){
   if(!set)return;
   for(const k of Object.keys(set)){
     if(['id','kind','touches','stageLog','stage'].includes(k))continue;
+    if(k==='email'&&r.kind!=='person'&&set[k])continue; // addresses live on people only (Leif 10.11.2026)
     if(k==='notes'&&r.notes&&set.notes){if(!r.notes.includes(set.notes))r.notes=(r.notes+' | '+set.notes).trim();continue}
     if(k==='nextAction'&&set[k]!==r[k])r.nextSet=today();
     putVal(r,k,set[k]);stampFin(r,k);stampSrc(r,k,src,d);
@@ -131,7 +132,7 @@ export function applyPatchOps(ops){
       }else if(o.op==='setField'){
         const r=patchFind(o.match);
         const _ok=['metrics','namedOn','street','zip','notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','mobile','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict','outreachChannel','stage','channel','channelVia','letterSent','letterStatus','fav','ignored','cadDone','archived','deadCat','primaryId'];
-        if(r&&o.field&&_ok.includes(o.field)){if(o.field==='stage'&&r.stage!==o.value){r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.value,date:o.date||today()})}putVal(r,o.field,o.value);stampFin(r,o.field);stampSrc(r,o.field,o.source,o.date);if(o.field==='phone')splitPhones(r);made++}else skipped++;
+        if(r&&o.field&&_ok.includes(o.field)&&!(o.field==='email'&&r.kind!=='person'&&o.value)){if(o.field==='nextAction'&&o.value&&o.value!==r.nextAction)r.nextSet=today();if(o.field==='stage'&&r.stage!==o.value){r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.value,date:o.date||today()})}putVal(r,o.field,o.value);stampFin(r,o.field);stampSrc(r,o.field,o.source,o.date);if(o.field==='phone')splitPhones(r);made++}else skipped++;
       }else if(o.op==='merge'){
         const dup=o.match&&o.match.id?findRec(o.match.id):patchFind(o.match),keep=o.into&&o.into.id?findRec(o.into.id):patchFind(o.into);
         if(mergeRecs(dup,keep))made++;else skipped++;

@@ -1,4 +1,4 @@
-import {letterDoneStep, effDue, primaryName, partnerQuiet} from '../state.js';
+import {letterDoneStep, effDue, primaryName, partnerQuiet, draftChip} from '../state.js';
 import {logDone} from './actions.js';
 import {openDialog, confirmDialog} from './dialog.js';
 import {ACTIVE_STAGES, BOARD_COLS, CHANNELS, CH_DE, LETTER_TARGET_WEEK, LIVE, LS_DE, STAGES, ST_DE} from '../constants.js';
@@ -182,7 +182,7 @@ export function bCard(c){
   return '<div class="bcard'+(isDue(c)?' due':'')+'" draggable="true" data-dragstart="pipeDragStart|$e|'+c.id+'" data-click="openRec|'+c.id+'|$e">'+
     '<div class="nm"><span class="star'+(c.fav?' on':'')+'" data-click="toggleFav|'+c.id+'|$e" title="Markieren">&#9733;</span> '+esc(fixUml(dispName(c)))+'</div>'+
     '<div class="muted">'+(c.ebit!=null&&c.ebit!==''?'EBIT '+fmtM(c.ebit):'')+(c.revenue?' · Revenue '+fmtM(c.revenue):'')+(c.location?' · '+esc(c.location):'')+'</div>'+
-    (ch?'<span class="chch">'+esc(chDe(c))+(c.channelVia&&(ch==='Partner letter'||ch==='M&A house / advisor'||ch==='Tax adviser / auditor'||ch==='Trade fair')?': '+esc(c.channelVia.split(/[ (]/)[0]):'')+'</span> ':'')+lsChip(c)+cadChip(c)+
+    (ch?'<span class="chch">'+esc(chDe(c))+(c.channelVia&&(ch==='Partner letter'||ch==='M&A house / advisor'||ch==='Tax adviser / auditor'||ch==='Trade fair')?': '+esc(c.channelVia.split(/[ (]/)[0]):'')+'</span> ':'')+lsChip(c)+cadChip(c)+draftChip(c)+
     (c.nextAction?'<div class="na"'+(letterDoneStep(c)?' style="color:#595959" title="Done by the letter; the cadence follows"':'')+'>'+(letterDoneStep(c)?'Letter sent '+fmtDe(c.letterSent)+'. ':'')+esc(c.nextAction)+'</div>':(['Contacted','Replied','Meeting','NDA','LOI','Diligence'].includes(c.stage)&&!cadenceOf(c)?'<div class="na" style="color:#9A3B12">No next step recorded</div>':''))+
     '<div style="margin-top:3px">'+(letterDoneStep(c)?'':dueDe(c.nextDate,c.id))+' <span class="mini" data-click="shiftDue|'+c.id+'|#7|$e" title="one week later">+1W</span><span class="mini" data-click="shiftDue|'+c.id+'|#30|$e" title="one month later">+1M</span>'+(c.stage==='Dead'?'':'<span class="mini" data-click="markDead|'+c.id+'|$e" title="Mark as dead">Dead</span>')+staleTxt(c)+'</div></div>'
 }

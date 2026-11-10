@@ -174,8 +174,11 @@ export function letterDoneStep(r){return !!(r&&r.kind==='target'&&r.letterSent&&
 export function effDue(r){if(!r)return '';if(!letterDoneStep(r))return r.nextDate||'';const cd=cadenceOf(r);return cd&&cd.next?cd.next.due:''}
 export function isDue(c){const t=today();return !!(c.nextDate&&c.nextDate<=t&&!letterDoneStep(c))||cadDue(c)}
 export // Hide lasts until real activity: a mail, call, meeting or letter. Notes (imports, system notes) do not end it (Leif 10.11.2026).
-function isIgnoredRec(r){if(!r||!r.ignored)return false;const lt=touchList(r).find(t=>t.src!=='Note');return !(lt&&(lt.date||'').slice(0,10)>r.ignored)}
+function isIgnoredRec(r){if(!r||!r.ignored)return false;if(r.nextSet&&r.nextSet>r.ignored)return false;const lt=touchList(r).find(t=>t.src!=='Note');return !(lt&&(lt.date||'').slice(0,10)>r.ignored)}
 // A partner letter that has drawn no answer yet: the partner follows up, nothing is due from Leif (Leif 10.11.2026).
+// A mail draft waiting in Outlook, read from the next step the morning run writes ("... liegt in Drafts"). Returns the recipient text or '' (Leif 10.11.2026).
+export function draftTo(r){const a=(r&&r.nextAction)||'';if(!/\bDrafts?\b|Entwurf liegt/i.test(a))return null;const m=a.match(/Mail an (.+?)(?= zur | zum | liegt|\s*\(|:|,)/);return m?m[1].trim():''}
+export function draftChip(r){const t=draftTo(r);if(t===null)return '';return '<span class="chch" style="background:#2E3C65;color:#fff" title="Draft waiting in Outlook Drafts">Draft ready'+(t?' &rarr; '+t.replace(/[<>&"]/g,''):'')+'</span> '}
 export function partnerQuiet(c){return !!(c&&c.channel==='Partner letter'&&c.stage==='Contacted')}
 // Dead (Leif 01.11.2026): for good, unlike Hide. A person hangs off their organisation: Dead there counts for them too.
 export function isDeadSelf(r){return !!(r&&(r.stage==='Dead'||r.status==='Dead'))}

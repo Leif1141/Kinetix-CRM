@@ -29,9 +29,11 @@ export async function createFromSignatures(msgs){
     done.add(dom);
     const firm=sig.firm||firmFromDomain(dom),d=(m.receivedDateTime||'').slice(0,10)||today();
     // a reply sent from a shared inbox (info@) names the person but is not their address: keep the link, not the email
-    const set={firm,domain:dom,category:'Other',status:'In dialogue',contact:sig.name,email:isGenericMail(a)?'':a,notes:'Aus Mail-Signatur angelegt am '+d+'; Kategorie und Firmenname prüfen'};
-    ['phone','mobile','title','linkedin','street','zip','city'].forEach(k=>{if(sig[k])set[k]=sig[k]});
+    // addresses belong to people, never to the organisation (Leif 10.11.2026)
+    const set={firm,domain:dom,category:'Other',status:'In dialogue',notes:'Aus Mail-Signatur angelegt am '+d+'; Kategorie und Firmenname prüfen'};
+    ['phone','street','zip','city'].forEach(k=>{if(sig[k])set[k]=sig[k]});
     ops.push({op:'upsertAdvisor',match:{firm},set,source:'Mail signature',date:d},{op:'mapEmail',email:a,match:{kind:'advisor',firm}});
+    if(sig.name){const ps={name:sig.name,firm,email:isGenericMail(a)?'':a};['mobile','title','linkedin'].forEach(k=>{if(sig[k])ps[k]=sig[k]});ops.push({op:'upsertPerson',match:{kind:'person',name:sig.name},set:ps,source:'Mail signature',date:d})}
   });
   if(!ops.length)return 0;
   const p=await import('./patch.js');

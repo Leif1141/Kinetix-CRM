@@ -1,4 +1,4 @@
-import {letterDoneStep, primaryName, partnerQuiet} from '../state.js';
+import {letterDoneStep, primaryName, partnerQuiet, draftChip} from '../state.js';
 import {ACTIVE_STAGES, LETTER_TARGET_WEEK, LIVE} from '../constants.js';
 import {S, allRecs, cadenceOf, cadDue, deadMail, dispName, findRec, fixUml, grpOf, GRP_DEF, isDeadRec, isDeadSelf, isDismissed, isIgnoredRec, isStale, isSysNote, lastTouch, liveOnly, orgPeople, orgTouches, rowLabel, tType, touchList, meetMode, foldConv} from '../state.js';
 import {addDays, cleanPrev, daysAgo, esc, fmtD, fmtDe, today, weekStart} from '../util.js';
@@ -182,7 +182,7 @@ function rowHtml(it,sec){
     :'<button class="sm primary" data-act="done" data-id="'+r.id+'" data-key="'+it.key+'" title="Log as done">Done</button> <button class="sm" data-act="2w" data-id="'+r.id+'" data-key="'+it.key+'" title="Push by two weeks">+2w</button> <button class="sm" data-act="ignore" data-id="'+r.id+'" data-key="'+it.key+'" title="bis zur nächsten Aktivität">Hide</button>'+deadBtn;
   return '<div class="qrow" data-open="'+r.id+'" data-key="'+esc(it.key)+'"'+(sec?' data-sec="'+sec+'" draggable="true"':'')+'>'
     +'<div class="q-acts">'+(sec?'<span class="q-grip" title="Drag to reorder">⋮⋮</span>':'')+acts+'</div>'
-    +'<div class="q-name"><b>'+esc(fixUml(lab.top))+'</b>'+(sub?'<div class="muted" style="font-size:10px">'+esc(fixUml(sub))+'</div>':'')+(r.kind==='target'?'<div>'+stagePill(r.stage)+'</div>':'')+'</div>'
+    +'<div class="q-name"><b>'+esc(fixUml(lab.top))+'</b>'+(draftChip(r)?'<div>'+draftChip(r)+'</div>':'')+(sub?'<div class="muted" style="font-size:10px">'+esc(fixUml(sub))+'</div>':'')+(r.kind==='target'?'<div>'+stagePill(r.stage)+'</div>':'')+'</div>'
     +'<div class="q-type">'+grpChip(r)+'</div>'
     +'<div class="q-step">'+kindTag+' '+(it.link?'<a href="'+esc(it.link)+'" target="_blank">'+esc(fixUml(it.text||''))+'</a>':esc(fixUml(it.text||'')))+'</div>'
     +'<div class="q-due">'+dueTxt(it.due)+'</div>'
