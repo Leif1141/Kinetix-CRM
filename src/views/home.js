@@ -302,10 +302,14 @@ export function initHome(){
     const go=e.target.closest('[data-go]');if(go){goTab(go.dataset.go);return}
     const u=e.target.closest('a[data-unignore]');if(u){e.preventDefault();unignoreRec(u.dataset.unignore);return}
     if(e.target.closest('a[href]'))return;
+    // a click that ends a text selection copies, it does not open the record (Leif 11.11.2026)
+    const sel=window.getSelection&&window.getSelection();if(sel&&!sel.isCollapsed&&sel.toString().trim()&&panel.contains(sel.anchorNode))return;
     const row=e.target.closest('[data-open]');if(row){const r=findRec(row.dataset.open);if(r)openProfile(r)}
   });
   const s=document.getElementById('homeSearch');if(s)s.addEventListener('input',renderHome);
   let dragKey=null,dragSec=null;
+  // name and step text select like text (Leif 11.11.2026); a row drags from the grip, buttons, type, due and last contact
+  panel.addEventListener('mousedown',e=>{const r=e.target.closest&&e.target.closest('.qrow[data-sec]');if(r)r.draggable=!e.target.closest('.q-name,.q-step')});
   const clearMarks=()=>panel.querySelectorAll('.dragging,.drop-a,.drop-b').forEach(x=>x.classList.remove('dragging','drop-a','drop-b'));
   panel.addEventListener('dragstart',e=>{const r=e.target.closest&&e.target.closest('.qrow[data-sec]');if(!r)return;
     dragKey=r.dataset.key;dragSec=r.dataset.sec;r.classList.add('dragging');e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',dragKey)}catch(_){}});
