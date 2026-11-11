@@ -37,6 +37,18 @@ export async function quickSetAction(id,ev){
   r.nextSet=today();
   save();renderAll();
 }
+// Note for the next run (Leif 11.11.2026): Leif writes what he did in his own words ("Mail an Haag heute
+// geschickt"); the daily run reads open notes from the backup, works them in (touch, stage, next action,
+// cadence) and closes each with the op noteDone. The note itself is never changed or deleted by a run.
+export async function noteForRun(id,ev){
+  if(ev)ev.stopPropagation();
+  const r=findRec(id);if(!r)return;
+  const v=await openDialog({title:'Note for the next run',text:dispName(r)+': what did you do or decide? The next run reads it and updates the record.',fields:[{key:'t',label:'Note',type:'textarea',value:'',required:true}],ok:'Save'});
+  if(!v||!v.t.trim())return;
+  r.runNotes=(r.runNotes||[]).concat([{date:today(),at:new Date().toISOString(),text:v.t.trim()}]);
+  save();renderAll();toast('Saved for the next run');
+}
+export function openRunNotes(r){return (r&&r.runNotes||[]).filter(n=>!n.done)}
 export function snoozeAction(id,ev,days){
   if(ev)ev.stopPropagation();
   const r=findRec(id);if(!r)return;days=days||7;

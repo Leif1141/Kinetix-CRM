@@ -135,6 +135,10 @@ export function applyPatchOps(ops){
         const r=patchFind(o.match);
         const _ok=['metrics','namedOn','street','zip','homeStreet','homeZip','homeCity','notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','mobile','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict','outreachChannel','stage','channel','channelVia','letterSent','letterStatus','fav','ignored','cadDone','archived','deadCat','primaryId'];
         if(r&&o.field&&_ok.includes(o.field)&&!(o.field==='email'&&r.kind!=='person'&&o.value)){if(o.field==='nextAction'&&o.value&&o.value!==r.nextAction)r.nextSet=today();if(o.field==='stage'&&r.stage!==o.value){r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.value,date:o.date||today()})}putVal(r,o.field,o.value);stampFin(r,o.field);stampSrc(r,o.field,o.source,o.date);if(o.field==='phone')splitPhones(r);made++}else skipped++;
+      }else if(o.op==='noteDone'){
+        // closes one of Leif's run notes by its timestamp; result says what the run did with it
+        const r=o.match&&o.match.id?findRec(o.match.id):patchFind(o.match),n=r&&(r.runNotes||[]).find(x=>x.at===o.at);
+        if(n&&!n.done){n.done=o.date||today();if(o.result)n.result=String(o.result);made++}else skipped++;
       }else if(o.op==='merge'){
         const dup=o.match&&o.match.id?findRec(o.match.id):patchFind(o.match),keep=o.into&&o.into.id?findRec(o.into.id):patchFind(o.into);
         if(mergeRecs(dup,keep))made++;else skipped++;

@@ -337,6 +337,7 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
 .qrow.drop-a{box-shadow:inset 0 -2px 0 #2E3C65}
 .q-step{min-width:0;overflow-wrap:anywhere}
 .qrow .q-name,.qrow .q-step{user-select:text}
+.q-note{margin-top:3px}.qk-note{background:#2E3C65}
 .qk{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;padding:0 5px;border-radius:3px;color:#fff;background:#8C97B8;margin-right:4px;vertical-align:middle}
 .qk-deadmail{background:#595959}.qk-overdue{background:var(--red)}.qk-due{background:#C6943E}.qk-promise{background:#7030A0}.qk-cadence{background:#B86E1B}.qk-noaction{background:#434F80}.qk-stale{background:#595959}.qk-revisit{background:var(--green)}.qk-reply{background:#2E3C65}
 .qhead.wrow,.qrow.wrow{grid-template-columns:196px minmax(120px,220px) minmax(0,1fr) 70px 70px}

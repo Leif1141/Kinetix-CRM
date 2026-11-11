@@ -167,6 +167,7 @@ function dueTxt(d){
   const c=n<0?'var(--red)':n===0?'#C6943E':'#2E7D32';
   return '<span class="duechip" style="background:'+c+'22;color:'+c+'">'+t+' · '+fmtDe(d)+'</span>';
 }
+function runNoteHtml(r){const n=(r.runNotes||[]).filter(x=>!x.done);return n.length?'<div class="q-note"><span class="qk qk-note">NOTE FOR NEXT RUN</span> '+n.map(x=>esc(fixUml(x.text))).join('; ')+'</div>':''}
 function rowHtml(it,sec){
   const r=it.rec;
   const lab=rowLabel(r),sub=lab.sub;
@@ -178,13 +179,13 @@ function rowHtml(it,sec){
     // same four buttons as every other row (Leif 08.11.2026): Done = answered, +2w = remind again in two weeks
     ?'<button class="sm primary" data-act="dismiss" data-id="'+r.id+'" data-key="'+it.key+'" title="Answered or nothing to answer">Done</button> <button class="sm" data-act="rsnooze" data-id="'+r.id+'" data-key="'+it.key+'" title="Remind me again in two weeks">+2w</button> <button class="sm" data-act="ignore" data-id="'+r.id+'" data-key="'+it.key+'" title="bis zur nächsten Aktivität">Hide</button>'+deadBtn
     :it.kind==='stale'||it.kind==='noaction'||it.kind==='revisit'
-    ?'<button class="sm" data-act="set" data-id="'+r.id+'">Set action</button> <button class="sm" data-act="dismiss" data-id="'+r.id+'" data-key="'+it.key+'">Dismiss</button>'+deadBtn
+    ?'<button class="sm" data-act="set" data-id="'+r.id+'">Set action</button> <button class="sm" data-act="note" data-id="'+r.id+'" title="Tell the next run what you did">Note</button> <button class="sm" data-act="dismiss" data-id="'+r.id+'" data-key="'+it.key+'">Dismiss</button>'+deadBtn
     :'<button class="sm primary" data-act="done" data-id="'+r.id+'" data-key="'+it.key+'" title="Log as done">Done</button> <button class="sm" data-act="2w" data-id="'+r.id+'" data-key="'+it.key+'" title="Push by two weeks">+2w</button> <button class="sm" data-act="ignore" data-id="'+r.id+'" data-key="'+it.key+'" title="bis zur nächsten Aktivität">Hide</button>'+deadBtn;
   return '<div class="qrow" data-open="'+r.id+'" data-key="'+esc(it.key)+'"'+(sec?' data-sec="'+sec+'" draggable="true"':'')+'>'
     +'<div class="q-acts">'+(sec?'<span class="q-grip" title="Drag to reorder">⋮⋮</span>':'')+acts+'</div>'
     +'<div class="q-name"><b>'+esc(fixUml(lab.top))+'</b>'+(draftChip(r)?'<div>'+draftChip(r)+'</div>':'')+(sub?'<div class="muted" style="font-size:10px">'+esc(fixUml(sub))+'</div>':'')+(r.kind==='target'?'<div>'+stagePill(r.stage)+'</div>':'')+'</div>'
     +'<div class="q-type">'+grpChip(r)+'</div>'
-    +'<div class="q-step">'+kindTag+' '+(it.link?'<a href="'+esc(it.link)+'" target="_blank">'+esc(fixUml(it.text||''))+'</a>':esc(fixUml(it.text||'')))+'</div>'
+    +'<div class="q-step">'+kindTag+' '+(it.link?'<a href="'+esc(it.link)+'" target="_blank">'+esc(fixUml(it.text||''))+'</a>':esc(fixUml(it.text||'')))+runNoteHtml(r)+'</div>'
     +'<div class="q-due">'+dueTxt(it.due)+'</div>'
     +'<div class="q-last muted">'+(lastTouch(r)?fmtDe(lastTouch(r)):'-')+'</div>'
     +'</div>';
@@ -288,6 +289,7 @@ export function initHome(){
     if(b){e.stopPropagation();const id=b.dataset.id,key=b.dataset.key;
       const rk=b.closest('.qrow')?.dataset.key;if(rk&&S.homeOrder&&S.homeOrder[rk]!=null&&b.dataset.act!=='set')delete S.homeOrder[rk];
       if(b.dataset.act==='set'){import('./actions.js').then(m=>m.quickSetAction(id))}
+      else if(b.dataset.act==='note'){import('./actions.js').then(m=>m.noteForRun(id))}
       else if(b.dataset.act==='dead')markDead(id);
       else if(b.dataset.act==='revive')reviveRec(id);
       else if(b.dataset.act==='deadok')deadMailOk(id);
