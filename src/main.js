@@ -1,7 +1,7 @@
 import {registerActions, initEvents, helperActions} from './events.js';
 import {invalidateShares} from './shares.js';
 import {ALLOWED_EMAILS} from './config.js';
-import {S, migrateChannels, migrateStages, withRenderCache} from './state.js';
+import {S, fixKinds, migrateChannels, migrateStages, withRenderCache} from './state.js';
 
 import {invalidateThreads, renderThreads, resetThreadsView, threadsMyMoveCount} from './views/threads.js';
 import {auth, currentUser, initFirebase, showApp} from './store/firebase.js';
@@ -84,7 +84,7 @@ export function renderAll(){
   try{if(!document.body.dataset.winit){document.body.dataset.winit='1';const w=localStorage.getItem('kxWide');if(w===null||w==='1'){document.body.classList.add('wide');const b=document.getElementById('wideBtn');if(b)b.textContent='Normal width'}}}catch(e){}
   try{const dt=document.getElementById('dataTab');if(dt&&(/[?#]data/.test(location.href)||localStorage.getItem('kxShowData')==='1'))dt.style.display=''}catch(e){}
   invalidateShares();invalidateThreads();
-  try{migrateStages()}catch(e){}try{migratePrevClean()}catch(e){}try{migrateChannels()}catch(e){}
+  try{fixKinds()}catch(e){}try{migrateStages()}catch(e){}try{migratePrevClean()}catch(e){}try{migrateChannels()}catch(e){}
   initHome();initRecordPage();initPalette();
   Object.keys(VIEWS).forEach(v=>_stale.add(v));
   withRenderCache(()=>{

@@ -5,6 +5,9 @@ import {renderAll} from './main.js';
 import {save} from './store/firebase.js';
 
 export function migrateStages(){let n=0;(S.companies||[]).forEach(c=>{if(STAGE_ALIAS[c.stage]){c.stage=STAGE_ALIAS[c.stage];n++}(c.stageLog||[]).forEach(l=>{if(STAGE_ALIAS[l.stage])l.stage=STAGE_ALIAS[l.stage]})});return n}
+// Each collection fixes its records' kind. On 10.11.2026 162 targets arrived as kind 'company' from outside the app,
+// showed as people and fell out of every target rule (cadence, pipeline, record page). Runs on every load.
+export function fixKinds(){let n=0;[['companies','target'],['advisors','advisor'],['people','person']].forEach(([c,k])=>(S[c]||[]).forEach(r=>{if(r&&r.kind!==k){r.kind=k;n++}}));if(n){console.warn('kind fixed on',n,'records');save()}return n}
 export function migrateChannels(){if(S.chanMigV1)return;let n=0;(S.companies||[]).forEach(c=>{const old=c.channel||'';if(CHANNELS.includes(old)&&old)return;let ch='',via='';if(old){if(/rettig/i.test(old)){ch='Partner letter';via=old}else if(/fakuma|messe|fair/i.test(old)){ch='Trade fair';via=old}else if(/network/i.test(old)){ch='Network / referral'}else if(CH_MAP[old]){ch=CH_MAP[old]}else{ch='M&A house / advisor';via=old}}else if(c.outreachChannel){ch=CH_MAP[c.outreachChannel]||'Other'}if(ch){c.channel=ch;if(via&&!c.channelVia)c.channelVia=via;n++}});S.chanMigV1=today();if(n)save();return n}
 export function chanOf(c){return c.channel||CH_MAP[c.outreachChannel]||''}
 // Structured dead category: the explicit deadCat wins, else the free-text deadReason is classified by keyword.
