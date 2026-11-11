@@ -161,8 +161,8 @@ export function cadenceOf(c){
   const replied=ts.some(t=>t.dir==='in'&&tType(t)!=='Note')||['Replied','Meeting','NDA','LOI','Diligence','Closed','Dead','On hold'].includes(c.stage);
   // a step is done by a click (cadDone) or by a matching touch after the previous step; the next step counts from that day
   const first=(f,from)=>{const t=ts.filter(t=>(t.date||'').slice(0,10)>=from&&f(t)).map(t=>(t.date||'').slice(0,10)).sort()[0];return t||''};
-  const match={email:t=>t.dir==='out'&&tType(t)==='Email',call:t=>tType(t)==='Call',m6:t=>t.dir==='out'&&tType(t)==='Email'};
-  let base=sent;const steps=CAD_STEPS.map((s,i)=>{const due=addDays(base,s.d);const from=i===0?sent:(s.k==='m6'?addDays(base,90):base);
+  const match={email:t=>t.dir==='out'&&tType(t)==='Email',call:t=>tType(t)==='Call',m6:t=>t.dir==='out'&&tType(t)==='Email',l12:t=>tType(t)==='Letter'&&daysBetween(sent,t.date)>330};
+  let base=sent;const steps=CAD_STEPS.map((s,i)=>{const due=addDays(s.abs?sent:base,s.d);const from=i===0?sent:(s.k==='m6'?addDays(base,90):base);
     const doneOn=(typeof done[s.k]==='string'&&done[s.k])||(done[s.k]?due:'')||first(match[s.k],from);base=doneOn||due;
     return {k:s.k,label:s.label,due,done:!!doneOn}});
   // a partner letter (e.g. via a sourcing partner) is followed up by the partner: no follow-up steps in the CRM (Leif 27.10.2026)

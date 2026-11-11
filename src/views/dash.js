@@ -114,7 +114,7 @@ export function renderDDTimeline(idx){const el=document.getElementById('dp'+idx)
 export function renderCadence(idx){const el=document.getElementById('dp'+idx);if(!el)return;
 const wk=[['Monday','30 min weekly plan from Today: overdue down to zero, pick the 10 letter targets of the week (Pipeline, column "To contact")','Leif','Result: list of the 10 letters, appointments of the week checked'],
 ['Tuesday','Shortlist review, 1 h (calendar 16:00 CEST)','Leif, Tim, Tommy','Discuss new profiles, verdict per company, letter yes/no; Tim enters the result in MASTER Scoring'],
-['Wednesday','Letter block: check and sign 5 letters, to Georg/Gabi; follow-up email day 10, call 3 weeks later, short email 6 months after the call (cadence on Today)','Leif','Record the letter as sent in the CRM, the cadence runs automatically'],
+['Wednesday','Letter block: check and sign 5 letters, to Georg/Gabi; follow-up email day 10, call 3 weeks later, short email 6 months after the call, annual letter (cadence on Today)','Leif','Record the letter as sent in the CRM, the cadence runs automatically'],
 ['Thursday','Shortlist review, 1 h (calendar 16:00 CEST); adviser and partner calls (sourcing partners, banks)','Leif, Tim, Tommy','Release the second half of the 10 letters; check partner names against the own list'],
 ['Friday','Numbers of the week: letters out (target 10), replies, meetings, channel rate (Pipeline, Channels); CRM hygiene (without next step = 0)','Leif, Tim','Short weekly update to Tommy; open promises from Granola checked']];
 const mo=[['Week 1','Pipeline report and investor update (lead investor), funnel numbers of the month','Leif','Short update, funnel snapshot'],
