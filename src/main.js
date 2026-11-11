@@ -121,6 +121,8 @@ document.addEventListener('keydown',e=>{
   const t=e.target;
   if(t&&t.tagName==='TEXTAREA'&&t.value.trim())return;
   if(t&&t.blur&&/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName))t.blur();
+  // the global search clears too, so its results go away (Leif 11.11.2026)
+  const gs=document.getElementById('gSearch');if(gs&&gs.value){gs.value='';try{renderGlobalSearch()}catch(err){}}
   const a=document.querySelector('.tab.active');if(a)a.click();
 });
 
