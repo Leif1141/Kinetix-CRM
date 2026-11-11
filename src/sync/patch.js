@@ -38,7 +38,8 @@ export function patchFind(m){
 const FIN_FIELDS=['revenue','ebitda','ebit','gm','score','verdict','ownership','flag','metrics'];
 let _patchName='';
 // Contact data carries its source (legal notice, register, business card, mail signature) and date: op.source, op.date.
-const SRC_FIELDS=['domain','email','phone','mobile','street','zip','city','address','title','linkedin','contact','name'];
+// homeStreet/homeZip/homeCity: an owner's private address, on the person (Leif 11.11.2026); the business address stays on the organisation
+const SRC_FIELDS=['domain','email','phone','mobile','street','zip','city','address','title','linkedin','contact','name','homeStreet','homeZip','homeCity'];
 function stampSrc(r,k,src,d){if(src&&SRC_FIELDS.includes(k)){r.src=r.src||{};r.src[k]={s:String(src),d:d||today()}}}
 // street, zip and city recompose the address line; a new address line replaces the parts it contains.
 // On a person the address is their own office; empty means the organisation's address (Leif 05.11.2026).
@@ -132,7 +133,7 @@ export function applyPatchOps(ops){
         if(t&&o.fields){['r','a','o','e','due','p','cat'].forEach(k=>{if(o.fields[k]!==undefined)t[k]=o.fields[k]});invalidateThreads();made++}else skipped++;
       }else if(o.op==='setField'){
         const r=patchFind(o.match);
-        const _ok=['metrics','namedOn','street','zip','notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','mobile','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict','outreachChannel','stage','channel','channelVia','letterSent','letterStatus','fav','ignored','cadDone','archived','deadCat','primaryId'];
+        const _ok=['metrics','namedOn','street','zip','homeStreet','homeZip','homeCity','notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','mobile','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict','outreachChannel','stage','channel','channelVia','letterSent','letterStatus','fav','ignored','cadDone','archived','deadCat','primaryId'];
         if(r&&o.field&&_ok.includes(o.field)&&!(o.field==='email'&&r.kind!=='person'&&o.value)){if(o.field==='nextAction'&&o.value&&o.value!==r.nextAction)r.nextSet=today();if(o.field==='stage'&&r.stage!==o.value){r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.value,date:o.date||today()})}putVal(r,o.field,o.value);stampFin(r,o.field);stampSrc(r,o.field,o.source,o.date);if(o.field==='phone')splitPhones(r);made++}else skipped++;
       }else if(o.op==='merge'){
         const dup=o.match&&o.match.id?findRec(o.match.id):patchFind(o.match),keep=o.into&&o.into.id?findRec(o.into.id):patchFind(o.into);

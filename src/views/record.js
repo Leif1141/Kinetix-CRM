@@ -43,13 +43,13 @@ function fieldSpecs(r){
     ],next};
   return {
     sections:[
-      ['Person',[F('name','Full name','text',{required:true}),F('title','Title'),F('ptype','Type','select',{options:PTYPES}),F('firm','Organisation','org',{get:p=>{const o=personOrg(p);return o?dispName(o):p.firm}}),F('email','Email'),F('phone','Phone (office)'),F('mobile','Mobile'),F('linkedin','LinkedIn'),F('street','Office street and number','text',{get:c=>addrParts(c).rawStreet,addr:true,ph:'empty: organisation address'}),F('city','Office city','text',{get:c=>addrParts(c).city,addr:true})]],
+      ['Person',[F('name','Full name','text',{required:true}),F('title','Title'),F('ptype','Type','select',{options:PTYPES}),F('firm','Organisation','org',{get:p=>{const o=personOrg(p);return o?dispName(o):p.firm}}),F('email','Email'),F('phone','Phone (office)'),F('mobile','Mobile'),F('linkedin','LinkedIn'),F('street','Office street and number','text',{get:c=>addrParts(c).rawStreet,addr:true,ph:'empty: organisation address'}),F('city','Office city','text',{get:c=>addrParts(c).city,addr:true}),F('homeStreet','Private street and number'),F('homeZip','Private postcode'),F('homeCity','Private city')]],
       ['Context',[F('angle','Angle / notes','textarea'),F('networkPath','Network path')]]
     ],next};
 }
 const getVal=(r,s)=>s.get?s.get(r):r[s.key];
 // Where a contact value came from (legal notice, register, business card, mail signature, entered in the CRM) and when.
-const SRC_FIELDS=['domain','email','phone','mobile','street','zip','city','address','title','linkedin','name'];
+const SRC_FIELDS=['domain','email','phone','mobile','street','zip','city','address','title','linkedin','name','homeStreet','homeZip','homeCity'];
 function srcTip(r,k){const x=r.src&&r.src[k];return x?'Source: '+x.s+(x.d?', '+fmtDe(x.d):''):''}
 // A target at Contacted or later needs its domain, otherwise its mails are not matched.
 const needsDomain=r=>r.kind==='target'&&r.stage!=='Dead'&&STAGES.indexOf(r.stage)>=STAGES.indexOf('Contacted')&&!orgDomain(r);
