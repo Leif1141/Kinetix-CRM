@@ -19,7 +19,8 @@ export function patchFind(m){
   const nn=normName(m.firm||m.name||'');
   if(!nn)return null;
   let pool=allRecs();
-  if(m.kind)pool=pool.filter(r=>r.kind===m.kind);
+  const mk=m.kind==='company'?'target':m.kind; // runs write 'company' for a target
+  if(mk)pool=pool.filter(r=>r.kind===mk);
   else if(m.firm)pool=pool.filter(r=>r.kind==='advisor');
   // Hardened 01.09.2026: plain substring matching merged one firm into another with a similar name
   // record because 'eura' sits inside 'eurazeo'. Require the shorter name's tokens to appear as
