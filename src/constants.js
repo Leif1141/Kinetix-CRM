@@ -24,8 +24,10 @@ export const PRIO_DEF={'Urgent':'act this week','High':'best fit, work actively'
 export const LEGAL=/\b(gmbh|co|kg|ag|kgaa|ohg|e\.k\.|ek|se|ltd|limited|plc|llp|inc|holding|group|gruppe|cie|handels|vertrieb|technik|techni[cs]|industrie|engineering|services?|gmbh\s*&\s*co\.?\s*kg)\b/gi;
 
 // Pipeline: board, clickable KPIs, inline due dates, drag and drop, letter cadence
-export const CAD_STEPS=[{k:'email',d:10,label:'Follow-up email'},{k:'call',d:20,label:'Follow-up call'},{k:'l6',d:182,label:'Second letter (6 months)'},{k:'l12',d:365,label:'Third letter (12 months)'}];
-export const CAD_LABEL={email:'Follow-up email',call:'Follow-up call',l6:'Second letter (6 months)',l12:'Third letter (12 months)'};
+// Own-letter cadence (Leif 11.11.2026): each step counts from the day the previous one was done (or fell due):
+// follow-up email 10 days after the letter, call 3 weeks after that email, short email 6 months after the call.
+export const CAD_STEPS=[{k:'email',d:10,label:'Follow-up email'},{k:'call',d:21,label:'Follow-up call'},{k:'m6',d:182,label:'Short email (6 months)'}];
+export const CAD_LABEL={email:'Follow-up email',call:'Follow-up call',m6:'Short email (6 months)'};
 export const CH_DE={'':'(no channel)'}; // channel names are shown as stored
 export const ST_DE={'NDA':'NDA / info'}; // stage names are shown as stored
 export const LS_DE={planned:'Letter planned',ready:'Letter drafted, to send',sent:'Letter sent'};

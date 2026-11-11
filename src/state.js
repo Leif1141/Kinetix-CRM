@@ -159,8 +159,12 @@ export function cadenceOf(c){
   const sent=c.letterSent.slice(0,10),done=c.cadDone||{};
   const ts=touchList(c).filter(t=>!isSysNote(t)&&(t.date||'').slice(0,10)>sent);
   const replied=ts.some(t=>t.dir==='in'&&tType(t)!=='Note')||['Replied','Meeting','NDA','LOI','Diligence','Closed','Dead','On hold'].includes(c.stage);
-  const auto={email:ts.some(t=>t.dir==='out'&&tType(t)==='Email'),call:ts.some(t=>tType(t)==='Call'),l6:ts.some(t=>tType(t)==='Letter'&&daysBetween(sent,t.date)>150),l12:ts.some(t=>tType(t)==='Letter'&&daysBetween(sent,t.date)>330)};
-  const steps=CAD_STEPS.map(s=>({k:s.k,label:s.label,due:addDays(sent,s.d),done:!!(done[s.k]||auto[s.k])}));
+  // a step is done by a click (cadDone) or by a matching touch after the previous step; the next step counts from that day
+  const first=(f,from)=>{const t=ts.filter(t=>(t.date||'').slice(0,10)>=from&&f(t)).map(t=>(t.date||'').slice(0,10)).sort()[0];return t||''};
+  const match={email:t=>t.dir==='out'&&tType(t)==='Email',call:t=>tType(t)==='Call',m6:t=>t.dir==='out'&&tType(t)==='Email'};
+  let base=sent;const steps=CAD_STEPS.map((s,i)=>{const due=addDays(base,s.d);const from=i===0?sent:(s.k==='m6'?addDays(base,90):base);
+    const doneOn=(typeof done[s.k]==='string'&&done[s.k])||(done[s.k]?due:'')||first(match[s.k],from);base=doneOn||due;
+    return {k:s.k,label:s.label,due,done:!!doneOn}});
   // a partner letter (e.g. via a sourcing partner) is followed up by the partner: no follow-up steps in the CRM (Leif 27.10.2026)
   const partner=c.channel==='Partner letter';
   const next=(replied||partner)?null:steps.find(s=>!s.done)||null;
@@ -168,7 +172,7 @@ export function cadenceOf(c){
 }
 export function cadDue(c){const cd=cadenceOf(c);return !!(cd&&cd.next&&cd.next.due<=today())}
 // A target whose letter went out on or after the date of its next step: the letter was that step and the
-// cadence takes over (follow-up email after 10 days, call after 20). Covers letters recorded by the morning run.
+// cadence takes over (follow-up email after 10 days, call 3 weeks later). Covers letters recorded by the morning run.
 export function letterDoneStep(r){return !!(r&&r.kind==='target'&&r.letterSent&&r.nextDate&&r.nextDate<=r.letterSent)}
 // the date that is actually due: the next step, or the cadence step when the letter replaced it
 export function effDue(r){if(!r)return '';if(!letterDoneStep(r))return r.nextDate||'';const cd=cadenceOf(r);return cd&&cd.next?cd.next.due:''}
