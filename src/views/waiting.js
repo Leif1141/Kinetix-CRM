@@ -40,6 +40,21 @@ function hasPlan(u,d){
   if(planOf(u,d))return true;
   return u.kind!=='person'&&orgPeople(u).some(p=>planOf(p,d));
 }
+// A thread can be split across records (Leif 12.11.2026, Projekt Horizon): the adviser's mail sits on the deal
+// record, Leif's answer on the adviser. Records linked by channelVia (deal -> adviser, adviser -> its deals) count as
+// one thread: a mail in the other direction on a linked record with the same subject (Re/AW stripped) after the
+// date answers it.
+const nm=s=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
+const subj=s=>nm(String(s||'').replace(/^[^\wÄÖÜäöü]+/,'').replace(/^((re|aw|wg|fw|fwd)\s*:\s*)+/i,''));
+function linked(u){
+  if(u.kind==='person')return [];
+  const own=nm(dispName(u)),via=nm(u.channelVia);
+  return allOrgs().filter(r=>r!==u&&((via&&nm(dispName(r))===via)||(own&&nm(r.channelVia)===own)));
+}
+function answeredElsewhere(u,t,dir){
+  const s=subj(t.subject);if(!s)return false;
+  return linked(u).some(r=>[r].concat(orgPeople(r)).some(x=>touchList(x).some(o=>o.dir===dir&&tType(o)==='Email'&&(o.date||'')>(t.date||'')&&subj(o.subject)===s)));
+}
 function whoOf(t,u){
   const p=t._rec&&t._rec.kind==='person'?t._rec:null;
   return fixUml(p?dispName(p):(rowLabel(u).sub||String(t.who||'').replace(/<.*>/,'').trim()));
@@ -49,6 +64,7 @@ export function replyOwedItems(){
   units().forEach(u=>{
     const t=lastReal(u);if(!t||t.dir!=='in'||tType(t)!=='Email')return;
     const d=(t.date||'').slice(0,10);if(!d||daysAgo(d)>REPLY_DAYS||hasPlan(u,d))return;
+    if(answeredElsewhere(u,t,'out'))return;
     const key='reply_'+u.id+'_'+d;
     if(S.dismissed&&S.dismissed[key])return;
     if(S.snoozeUntil&&S.snoozeUntil[key]&&S.snoozeUntil[key]>today())return; // +2w on Today
@@ -64,6 +80,7 @@ export function waitingItems(){
     const t=lastReal(u);if(!t||t.dir!=='out')return;
     const ty=tType(t);if(ty!=='Email'&&ty!=='Letter')return;
     const d=(t.date||'').slice(0,10);const n=daysAgo(d);if(!d||n<WAIT_MIN||n>WAIT_MAX||hasPlan(u,d))return;
+    if(answeredElsewhere(u,t,'in'))return;
     const key='wait_'+u.id+'_'+d;
     if(S.dismissed&&S.dismissed[key])return;
     if(snooze[key]&&snooze[key]>t0)return;

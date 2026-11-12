@@ -470,3 +470,9 @@ table.gaps td{padding:4px 6px;border-bottom:1px solid #EEF0F4;vertical-align:top
 table.gaps tbody tr{cursor:pointer}
 table.gaps tbody tr:hover{background:#F4F5F9}
 .miss{color:#C00000;font-size:11px}
+
+/* Organizations (Leif 12.11.2026): fixed columns, the name column no longer takes the spare width; detail gets it */
+#orgTable table.otab{table-layout:fixed;width:100%}
+#orgTable table.otab td{overflow:hidden}
+#orgTable table.otab td.oclip{text-overflow:ellipsis;white-space:nowrap}
+#orgTable table.otab td select{max-width:100%}

@@ -64,7 +64,7 @@ export function rowLabel(r){
 export function primaryOf(o){if(!o||o.kind==='person')return null;const ppl=orgPeople(o);return (o.primaryId&&ppl.find(p=>p.id===o.primaryId))||ppl[0]||null}
 export function primaryName(o){if(!o)return '';const p=primaryOf(o);return (p&&p.name)||o.contact||''}
 // How a contact came about (Kontaktherstellung): the person's own entry, else the entry on their organisation.
-export function introOf(r){if(!r)return '';const own=(r.networkPath||r.introPath||'').trim();if(own||r.kind!=='person')return own;const o=r.orgId?findRec(r.orgId):null;return o?((o.networkPath||o.introPath||'').trim()):''}
+export function introOf(r){if(!r)return '';const own=(r.networkPath||r.introPath||'').trim();if(own||r.kind!=='person')return own;const o=r.orgId?findRec(r.orgId):null;return o?((o.networkPath||o.introPath||o.channelVia||'').trim()):''} // channelVia: how the firm came in (Leif 12.11.2026, IHK-Inserat)
 // The reverse: records whose intro text names this person (a contact who introduced Leif to someone). Needs at least
 // two name parts, so a first name alone never matches. A firm and its own people are listed once, as the firm.
 const _fold=x=>(x||'').toLowerCase().replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss');
