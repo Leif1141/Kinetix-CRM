@@ -20,7 +20,8 @@ export function realTouch(t){
 }
 // the organisation with its people, or a person without an organisation
 function units(){
-  const out=allOrgs().filter(o=>!o.archived&&!o.mergedInto&&!isDeadRec(o)&&!isIgnoredRec(o));
+  // a target on hold is parked until its revisit date (Leif 13.11.2026, Oelde): no reply owed, no waiting
+  const out=allOrgs().filter(o=>!o.archived&&!o.mergedInto&&!isDeadRec(o)&&!isIgnoredRec(o)&&!(o.kind==='target'&&o.stage==='On hold'));
   (S.people||[]).forEach(p=>{if(!p.orgId&&!p.archived&&!p.mergedInto&&!isDeadRec(p)&&!isIgnoredRec(p))out.push(p)});
   return out;
 }
