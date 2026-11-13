@@ -32,5 +32,5 @@ export const CAD_LABEL={email:'Follow-up email',call:'Follow-up call',m6:'Short 
 export const CH_DE={'':'(no channel)'}; // channel names are shown as stored
 export const ST_DE={'NDA':'NDA / info'}; // stage names are shown as stored
 export const LS_DE={planned:'Letter planned',ready:'Letter drafted, to send',sent:'Letter sent'};
-export const BOARD_COLS=[{k:'ready',t:'To contact'},{k:'Contacted',t:'Contacted'},{k:'Replied',t:'Replied'},{k:'Meeting',t:'Meeting'},{k:'NDA',t:'NDA / info'},{k:'LOI',t:'LOI'},{k:'Diligence',t:'Diligence'}];
+export const BOARD_COLS=[{k:'ready',t:'To contact'},{k:'Contacted',t:'Contacted'},{k:'Replied',t:'Engaging (owner)'},{k:'Meeting',t:'Meeting'},{k:'NDA',t:'NDA / info'},{k:'LOI',t:'LOI'},{k:'Diligence',t:'Diligence'}];
 export const LETTER_TARGET_WEEK=10;

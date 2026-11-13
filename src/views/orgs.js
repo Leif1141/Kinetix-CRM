@@ -31,16 +31,27 @@ export function renderOrgs(){
   const hdr=(k,label)=>'<th data-click="sortOrgs|'+k+'">'+label+(sortK===k?' <span class="arr">'+(sortD>0?'▲':'▼')+'</span>':'')+'</th>';
   const geoDisp=g=>({'DE':'Germany','UK':'United Kingdom','EU':'','US':'United States','CH':'Switzerland','AT':'Austria','FR':'France','NL':'Netherlands','LU':'Luxembourg'}[g]||g||'');
   const typeShort=o=>o.kind==='target'?'Target':({'M&A sourcing intermediaries':'M&A / Sourcing','Financing partners':'Financing','DD advisors':'DD advisor','Investors & family office':'Investor / FO','HR, universities & interns':'HR / Talent','Admin & infrastructure':'Admin / Infra','Personal network':'Network'}[o.category]||o.category||'Advisor');
-  const detailCell=o=>{
-    if(o.kind==='advisor')return [o.city,(o.notes||o.detail||o.introPath||'').slice(0,110)].filter(Boolean).join(' · ');
-    return [o.location,(o.revenue?fmtM(o.revenue)+' rev / '+fmtM(o.ebit)+' EBIT (€m)':''),(o.description||o.ownership||'').slice(0,110)].filter(Boolean).join(' · ');
+  // Detail (Leif 13.11.2026): where things stand now, not how the contact came about, and no city (Address has it).
+  // The open next step first, else the last summary; targets lead with revenue and EBIT.
+  const nowText=o=>{const na=String(o.nextAction||'').replace(/^kein offener punkt:\s*/i,'').trim();return na||String(o.lastSummary||'').trim()||String(o.description||o.notes||'').trim()};
+  const detailCell=o=>[(o.kind==='target'&&o.revenue?fmtM(o.revenue)+' rev / '+fmtM(o.ebit)+' EBIT':''),nowText(o)].filter(Boolean).join(' · ');
+  // Contact (Leif 13.11.2026): the person of the most recent exchange, the primary contact only when there is none;
+  // someone from another firm (the sell-side adviser on a deal) shows with that firm
+  const byMail=new Map();(S.people||[]).forEach(p=>{if(p.email)byMail.set(String(p.email).toLowerCase(),p)});
+  const byDom=new Map();allOrgs().forEach(x=>{const d=String(x.domain||'').toLowerCase().replace(/^www\./,'');if(d)byDom.set(d,x)});
+  const contactCell=o=>{
+    const t=touchList(o).find(t=>!isSysNote(t)&&tType(t)!=='Note'&&/@/.test(t.who||''));
+    if(t){const em=String(t.who).toLowerCase().replace(/.*</,'').replace(/>.*/,'').trim(),p=byMail.get(em);
+      if(p){const po=p.orgId&&findRec(p.orgId);return dispName(p)+(po&&po!==o?' ('+dispName(po)+')':'')}
+      const d=byDom.get(em.split('@')[1]||'');if(d&&d!==o)return 'via '+dispName(d)}
+    return primaryName(o)||'-';
   };
   const statusSel=o=>{
     const opts=o.kind==='target'?STAGES:ADV_STATUS;
     const cur=statusOf(o)||'';
     return '<select class="stagesel" data-click="!" data-change="setStatusInline|'+o.id+'|$v">'+opts.map(s=>'<option'+(s===cur?' selected':'')+'>'+esc(s)+'</option>').join('')+(opts.includes(cur)?'':'<option selected>'+esc(cur||'-')+'</option>')+'</select>';
   };
-  document.getElementById('orgTable').innerHTML='<table class="otab"><colgroup><col style="width:20%"><col style="width:120px"><col style="width:110px"><col style="width:13%"><col style="width:82px"><col style="width:11%"><col><col style="width:64px"></colgroup>'+hdr('name','Organization')+hdr('status','Stage / Status')+'<th>Type</th><th>Contact</th>'+hdr('lastc','Last contact')+'<th>Address</th><th>Detail</th><th style="text-align:right">Priority</th>'+rows.map(o=>'<tr class="rowlink" data-click="openRec|'+o.id+'|$e"><td>'+starHtml(o)+' <b>'+esc(dispName(o))+'</b></td><td>'+statusSel(o)+'</td><td class="muted">'+esc(typeShort(o))+'</td><td class="muted">'+esc(primaryName(o)||'-')+'</td><td class="muted">'+fmtAgo(lastTouch(o))+'</td><td class="muted oclip">'+esc(shortLoc(o))+'</td><td class="muted oclip" title="'+esc(detailCell(o))+'">'+esc(detailCell(o))+'</td><td style="text-align:right">'+prioChip(o)+'</td></tr>').join('')+'</table>';
+  document.getElementById('orgTable').innerHTML='<table class="otab"><colgroup><col style="width:20%"><col style="width:120px"><col style="width:110px"><col style="width:13%"><col style="width:82px"><col style="width:11%"><col><col style="width:64px"></colgroup>'+hdr('name','Organization')+hdr('status','Stage / Status')+'<th>Type</th><th>Contact</th>'+hdr('lastc','Last contact')+'<th>Address</th><th>Detail</th><th style="text-align:right">Priority</th>'+rows.map(o=>'<tr class="rowlink" data-click="openRec|'+o.id+'|$e"><td>'+starHtml(o)+' <b>'+esc(dispName(o))+'</b></td><td>'+statusSel(o)+'</td><td class="muted">'+esc(typeShort(o))+'</td><td class="muted">'+esc(contactCell(o))+'</td><td class="muted">'+fmtAgo(lastTouch(o))+'</td><td class="muted oclip">'+esc(shortLoc(o))+'</td><td class="muted odet" title="'+esc(detailCell(o))+'"><div>'+esc(detailCell(o))+'</div></td><td style="text-align:right">'+prioChip(o)+'</td></tr>').join('')+'</table>';
 }
 export function sortOrgs(k){if(sortK===k)sortD*=-1;else{sortK=k;sortD=k==='name'?1:-1}renderOrgs()}
 export function setStatusInline(id,val){

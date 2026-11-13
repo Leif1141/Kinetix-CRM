@@ -185,7 +185,7 @@ function rowHtml(it,sec){
     +'<div class="q-acts">'+(sec?'<span class="q-grip" title="Drag to reorder">⋮⋮</span>':'')+acts+'</div>'
     +'<div class="q-name"><b>'+esc(fixUml(lab.top))+'</b>'+(draftChip(r)?'<div>'+draftChip(r)+'</div>':'')+(sub?'<div class="muted" style="font-size:10px">'+esc(fixUml(sub))+'</div>':'')+(r.kind==='target'?'<div>'+stagePill(r.stage)+'</div>':'')+'</div>'
     +'<div class="q-type">'+grpChip(r)+'</div>'
-    +'<div class="q-step">'+kindTag+' '+(it.link?'<a href="'+esc(it.link)+'" target="_blank">'+esc(fixUml(it.text||''))+'</a>':esc(fixUml(it.text||'')))+runNoteHtml(r)+'</div>'
+    +'<div class="q-step">'+kindTag+' '+esc(fixUml(it.text||''))+(it.link?'<a class="q-mail" href="'+esc(it.link)+'" target="_blank" title="Open the mail in Outlook">Mail ↗</a>':'')+runNoteHtml(r)+'</div>'
     +'<div class="q-due">'+dueTxt(it.due)+'</div>'
     +'<div class="q-last muted">'+(lastTouch(r)?fmtDe(lastTouch(r)):'-')+'</div>'
     +'</div>';
