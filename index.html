@@ -140,17 +140,10 @@
 
 <div class="panel" id="p-screening"><div id="scrBody"></div></div>
 <div class="panel" id="p-reports">
-  <div class="kpis" id="repKpis"></div>
-  <div class="section"><div class="section-hdr">Week by week <span style="font-weight:400;font-size:11px">same counts as the This week box on Today &middot; click a row to compare it there</span></div><div style="overflow-x:auto"><table id="weekTable"></table></div></div>
-  <div class="section"><div class="section-hdr">Where the time is paying off <span style="font-weight:400;font-size:11px">last 90 days &middot; sourcing yield by channel and by partner</span></div><div id="yieldBody"></div></div>
-  <div class="section"><div class="section-hdr">Weekly digest<button class="sm" style="background:#fff" id="dig_btn" data-click="weeklyDigest">Generate</button></div><div id="dig_out" style="padding:10px 12px;font-size:12px;white-space:pre-wrap;color:var(--gray)">Click Generate for a summary of the last 14 days, computed from the CRM.</div></div>
-  <div class="charts">
-    <div class="chartbox"><h4>Owner funnel (live deals by stage)</h4><canvas id="chFunnel"></canvas></div>
-    <div class="chartbox"><h4>Targets approached per week <span class="muted" style="font-weight:400">(first outbound contact, target line 10)</span></h4><canvas id="chActivity"></canvas></div>
-    <div class="chartbox"><h4>Pipeline by channel</h4><canvas id="chChannel"></canvas></div>
-    <div class="chartbox"><h4>Dead reasons</h4><canvas id="chDead"></canvas></div>
-  </div>
-  <div class="section" style="margin-top:14px"><div class="section-hdr">Time in stage (active deals)</div><table id="tisTable"></table></div>
+  <div id="rpRoot"></div>
+  <details class="rp-det"><summary>Week by week detail</summary><div style="overflow-x:auto"><table id="weekTable"></table></div></details>
+  <details class="rp-det"><summary>Weekly digest (text to copy)</summary><div class="section"><div class="section-hdr">Weekly digest<button class="sm" style="background:#fff" id="dig_btn" data-click="weeklyDigest">Generate</button></div><div id="dig_out" style="padding:10px 12px;font-size:12px;white-space:pre-wrap;color:var(--gray)">Click Generate for a summary of the last 14 days, computed from the CRM.</div></div></details>
+  <div id="rpDrill" class="rp-drill" hidden></div>
 </div>
 
 <div class="panel" id="p-gaps">

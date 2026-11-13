@@ -18,13 +18,11 @@ import {renderLocations} from './views/map.js';
 import {renderOrgs} from './views/orgs.js';
 import {renderPeople, resetPeopleView} from './views/people.js';
 import {renderPipeline, resetPipeView} from './views/pipeline.js';
-import {renderReports, renderYield} from './views/reports.js';
 import * as _m0 from './config.js';
 import * as _m2 from './constants.js';
 import * as _m3 from './state.js';
 import * as _m4 from './store/firebase.js';
 import * as _m5 from './views/record.js';
-import * as _m6 from './views/reports.js';
 import * as _m7 from './views/orgs.js';
 import * as _m8 from './views/people.js';
 import * as _m9 from './sync/google.js';
@@ -52,7 +50,7 @@ import * as _m31 from './views/map.js';
 import * as _m32 from './views/dash.js';
 // Actions for the data-click, data-change, data-input, data-enter, data-toggle and drag attributes
 // (src/events.js). Module exports are registered by name; nothing is put on window.
-[['config',_m0], ['constants',_m2], ['state',_m3], ['store/firebase',_m4], ['views/record',_m5], ['views/reports',_m6], ['views/orgs',_m7], ['views/people',_m8], ['sync/google',_m9], ['sync/outlook',_m10], ['util',_m11], ['sync/match',_m12], ['sync/triage',_m13], ['sync/granola',_m14], ['sync/index',_m15], ['views/ui',_m16], ['views/home',_m17], ['views/home',_m18], ['shares',_m19], ['views/search',_m20], ['views/lists',_m21], ['views/pipeline',_m22], ['views/actions',_m23], ['views/threads',_m25], ['views/inbox',_m26], ['views/data',_m27], ['store/export',_m28], ['sync/patch',_m29], ['sync/drive',_m30], ['views/map',_m31], ['views/dash',_m32]].forEach(([src,ns])=>registerActions(ns,src));
+[['config',_m0], ['constants',_m2], ['state',_m3], ['store/firebase',_m4], ['views/record',_m5], ['views/orgs',_m7], ['views/people',_m8], ['sync/google',_m9], ['sync/outlook',_m10], ['util',_m11], ['sync/match',_m12], ['sync/triage',_m13], ['sync/granola',_m14], ['sync/index',_m15], ['views/ui',_m16], ['views/home',_m17], ['views/home',_m18], ['shares',_m19], ['views/search',_m20], ['views/lists',_m21], ['views/pipeline',_m22], ['views/actions',_m23], ['views/threads',_m25], ['views/inbox',_m26], ['views/data',_m27], ['store/export',_m28], ['sync/patch',_m29], ['sync/drive',_m30], ['views/map',_m31], ['views/dash',_m32]].forEach(([src,ns])=>registerActions(ns,src));
 registerActions({goTab,renderAll,renderView,updateBadges,viewIsStale,activeView},'main');
 registerActions(helperActions,'events');
 // filter fields call these renderers directly; run them inside the render cache
@@ -63,10 +61,12 @@ initEvents();
 export function goTab(t){if(t==='followups'||t==='overview')t='home';document.querySelector('.tab[data-t="'+t+'"]')?.click()}
 // Views by tab. A change marks every view stale; only the visible one renders at once, the others
 // render when their tab is opened. Badges are counted separately so hidden tabs stay current.
+// Reports loads on first open (start-up size); its actions register then
+let _insReg=false;
 export const VIEWS={
   home:()=>{renderHome();renderGlobalSearch()},
   orgs:renderOrgs, people:renderPeople, pipeline:renderPipeline, threads:renderThreads, inbox:renderInbox,
-  locations:renderLocations, gaps:()=>import('./views/gaps.js').then(m=>withRenderCache(()=>m.renderGaps())), reports:()=>{renderYield();renderReports()}, screening:()=>import('./views/screening.js').then(m=>withRenderCache(()=>m.renderScreening())), data:renderData, dash:dashRefresh
+  locations:renderLocations, gaps:()=>import('./views/gaps.js').then(m=>withRenderCache(()=>m.renderGaps())), reports:()=>Promise.all([import('./views/insights.js'),import('./views/reports.js')]).then(([m,r])=>{if(!_insReg){registerActions(m,'views/insights');registerActions(r,'views/reports');_insReg=true}withRenderCache(()=>{m.renderInsights();try{r.renderWeekTable()}catch(e){console.warn('week table',e)}})}), screening:()=>import('./views/screening.js').then(m=>withRenderCache(()=>m.renderScreening())), data:renderData, dash:dashRefresh
 };
 const _stale=new Set(Object.keys(VIEWS));
 export function activeView(){const t=document.querySelector('#tabs .tab.active');return t?t.dataset.t:'home'}
@@ -101,7 +101,7 @@ document.getElementById('tabs').addEventListener('click',e=>{
   const v=t.dataset.t;
   ({home:['homeSearch'],orgs:['oSearch','oKind','oStage','oList'],people:['pSearch','pType','pHas'],pipeline:['fSearch','fChan'],threads:['thSearch','thCat'],locations:['locKind']}[v]||[]).forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
   if(v==='pipeline'){const f=document.getElementById('fFav');if(f)f.checked=false}
-  ({home:resetHomeView,people:resetPeopleView,pipeline:resetPipeView,threads:resetThreadsView}[v]||(()=>{}))();
+  ({home:resetHomeView,people:resetPeopleView,pipeline:resetPipeView,threads:resetThreadsView,reports:()=>{if(_insReg)import('./views/insights.js').then(m=>m.closeRepDrill())}}[v]||(()=>{}))();
   if(document.body.classList.contains('rec-open'))closeProfile();
   if(t.classList.contains('active')){renderAll();window.scrollTo(0,0);return}
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
