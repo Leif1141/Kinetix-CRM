@@ -347,10 +347,30 @@ export function drawTimeline(r){
 export function srcLabel(t){const s=t.src||'';if(s==='Granola'||s==='Meeting'||s==='Call')return meetMode(t)==='meeting'?'Meeting':'Call';if(s==='Kinetix'||s==='Gmail'||s==='Email')return 'Email';return s}
 export function mailUrl(u){if(!u)return u;const m=String(u).match(/outlook\.office(?:365)?\.com\/owa\/\?ItemID=([^&]+)/i);if(m){const id=m[1];return 'https://outlook.cloud.microsoft/mail/deeplink/read/'+id}return u}
 export function linkWrap(t,inner){if(!t.link)return inner;const u=mailUrl(t.link),isMail=u!==t.link||/outlook\.office/.test(u);return '<a href="'+esc(u)+'" target="'+(isMail?'kinetixmail':'_blank')+'" title="Open original">'+inner+'</a>'}
+// Person page (Leif 14.11.2026): only exchanges with this person count, their own touches and the firm's touches
+// whose sender or addressee is their address. Mails with others at the firm are listed apart and never set the ball.
+const addrOf=w=>String(w||'').toLowerCase().replace(/.*</,'').replace(/>.*/,'').trim();
+function personAddrs(r){return new Set([r.email,r.email2,...(r.emails||[])].filter(Boolean).map(x=>String(x).toLowerCase().trim()))}
+function splitFirm(r){
+  const own=touchList(r).filter(t=>!isSysNote(t)),other=[];
+  const o=personOrg(r);if(!o)return {own,other};
+  const mine=personAddrs(r),seen=new Set(own.map(t=>(t.date||'')+'|'+(t.subject||'')));
+  touchList(o).forEach(t=>{if(isSysNote(t))return;const k=(t.date||'')+'|'+(t.subject||'');if(seen.has(k))return;seen.add(k);
+    (mine.has(addrOf(t.who))?own:other).push(t)});
+  const by=(a,b)=>(b.date||'').localeCompare(a.date||'');own.sort(by);other.sort(by);
+  return {own,other,o};
+}
 export function convTouches(r){
-  let ts=touchList(r).filter(t=>!isSysNote(t));
-  if(r.kind==='person'){const o=personOrg(r);if(o){const seen=new Set(ts.map(t=>(t.date||'')+'|'+(t.subject||'')));touchList(o).forEach(t=>{if(isSysNote(t))return;const k=(t.date||'')+'|'+(t.subject||'');if(!seen.has(k)){seen.add(k);ts.push(t)}});ts.sort((a,b)=>(b.date||'').localeCompare(a.date||''))}}
-  return foldConv(ts);
+  if(r.kind==='person')return foldConv(splitFirm(r).own);
+  return foldConv(touchList(r).filter(t=>!isSysNote(t)));
+}
+// one line on the newest exchange with someone else at the person's firm
+function elsewhereHtml(r){
+  if(r.kind!=='person')return '';
+  const {other,o}=splitFirm(r);const t=other.find(x=>/@/.test(x.who||'')||meetMode(x));if(!t||!o)return '';
+  const em=addrOf(t.who),p=em&&(S.people||[]).find(x=>personAddrs(x).has(em));
+  const who=p?dispName(p):(em||'');
+  return '<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--lgray);font-size:11px"><span style="font-size:10px;text-transform:uppercase;letter-spacing:.4px">Elsewhere at '+esc(fixUml(dispName(o)))+'</span><br>'+fmtD(t.date)+' · '+(meetMode(t)?srcLabel(t).toLowerCase():(t.dir==='out'?'you wrote to ':'received from '))+esc(fixUml(who))+': '+linkWrap(t,esc(fixUml(subjOf(t)||'(no subject)')))+(other.length>1?' <span class="muted">and '+(other.length-1)+' more on the firm page</span>':'')+'</div>';
 }
 // A call or meeting has no direction for the purpose of "who owes the next move".
 const isCallTouch=t=>!!meetMode(t);
@@ -359,7 +379,7 @@ const dirWord=t=>isCallTouch(t)?srcLabel(t):(t.dir==='out'?'Sent':'Received');
 const subjOf=t=>String(t.subject||'').replace(/^📞\s*/,'');
 export function wrapUpHtml(r){
   const ts=convTouches(r); // newest first
-  if(!ts.length)return '';
+  if(!ts.length){const e=elsewhereHtml(r);return e?'<div class="pbox"><h4>Where we left things</h4><div style="font-size:12px">No exchange with this person yet.</div>'+e+'</div>':''}
   const newest=ts[0];
   // "Kein offener Punkt: ..." is context, not a step of Leif's
   const open=(r.nextAction||'').trim()&&!/^kein offener punkt/i.test((r.nextAction||'').trim());
@@ -376,7 +396,7 @@ export function wrapUpHtml(r){
     '<h4>Where we left things</h4>'+
     '<div style="font-size:12px;font-weight:bold;margin-bottom:9px">'+ball+'</div>'+
     blk(ts[0])+blk(ts[1])+
-    (older.length?'<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--lgray)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">Earlier in this thread</div>'+older.map(t=>'<div style="font-size:11px;margin-top:5px">'+fmtD(t.date)+' <span class="muted">'+(isCallTouch(t)?srcLabel(t).toLowerCase():(t.dir==='out'?'sent':'received')+' &middot; '+esc(srcLabel(t)))+'</span> <b>'+linkWrap(t,esc(fixUml(subjOf(t))))+'</b>'+(t.prev?'<div class="tnote" style="margin-top:2px">'+esc(cut(fixUml(cleanPrev(t.prev,400)),400))+'</div>':'')+'</div>').join('')+'</div>':'')+
+    (older.length?'<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--lgray)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">Earlier in this thread</div>'+older.map(t=>'<div style="font-size:11px;margin-top:5px">'+fmtD(t.date)+' <span class="muted">'+(isCallTouch(t)?srcLabel(t).toLowerCase():(t.dir==='out'?'sent':'received')+' &middot; '+esc(srcLabel(t)))+'</span> <b>'+linkWrap(t,esc(fixUml(subjOf(t))))+'</b>'+(t.prev?'<div class="tnote" style="margin-top:2px">'+esc(cut(fixUml(cleanPrev(t.prev,400)),400))+'</div>':'')+'</div>').join('')+'</div>':'')+elsewhereHtml(r)+
     '</div>';
 }
 export function setTlPeriod(w){tlPeriod=w;drawTimeline(profRec)}
