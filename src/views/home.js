@@ -172,7 +172,8 @@ function rowHtml(it,sec){
   const r=it.rec;
   const lab=rowLabel(r),sub=lab.sub;
   const kindTag='<span class="qk qk-'+it.kind+'">'+QUEUE_KINDS[it.kind]+'</span>';
-  const deadBtn=isDeadSelf(r)?'':' <button class="sm" data-act="dead" data-id="'+r.id+'">Dead</button>';
+  // advisers, partners and people are never Dead, only On hold (Leif 15.11.2026)
+  const deadBtn=isDeadSelf(r)?'':r.kind==='target'?' <button class="sm" data-act="dead" data-id="'+r.id+'">Dead</button>':' <button class="sm" data-act="dead" data-id="'+r.id+'" title="Advisers are never dead">Hold</button>';
   const acts=it.kind==='deadmail'
     ?'<button class="sm primary" data-act="revive" data-id="'+r.id+'">Zurückholen</button> <button class="sm" data-act="deadok" data-id="'+r.id+'">Ok</button>'
     :it.kind==='reply'

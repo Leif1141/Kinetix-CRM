@@ -64,6 +64,8 @@ function threadIdOf(r){const t=THREADS_LIVE().find(x=>x.id===r.id||(x.alias||[])
 export async function markDead(id,ev){
   if(ev&&ev.stopPropagation)ev.stopPropagation();
   const r=findRec(id);if(!r)return;
+  // advisers, partners and people are never Dead, only On hold (Leif 15.11.2026)
+  if(r.kind!=='target')return markHold(id);
   const fields=[{key:'why',label:'Reason (optional)',type:'text'}];
   if(r.kind==='target')fields.push({key:'cat',label:'Dead category',type:'select',options:[{value:'',label:'(not set)'}].concat(DEADREASONS),value:r.deadCat||''});
   const v=await openDialog({title:'Mark '+fixUml(dispName(r))+' as dead',fields,ok:'Mark dead'});
@@ -82,6 +84,18 @@ export async function markDead(id,ev){
   S.threadsState[tid]=Object.assign({},S.threadsState[tid],{v:'DEAD'});S.threadsDone[tid]=today();
   save();renderAll();toast(fixUml(dispName(r))+' is dead');
 }
+// On hold for an adviser, partner or person: next step cleared, a revisit date brings it back to Today.
+export async function markHold(id,ev){
+  if(ev&&ev.stopPropagation)ev.stopPropagation();
+  const r=findRec(id);if(!r)return;
+  const v=await openDialog({title:'Put '+fixUml(dispName(r))+' on hold',fields:[{key:'why',label:'Reason (optional)',type:'text'},{key:'rev',label:'Revisit on',type:'date',value:addDays(today(),182)}],ok:'On hold'});
+  if(!v)return;
+  const why=(v.why||'').trim(),day=today().split('-').reverse().join('.');
+  r.status='On hold';r.holdReason='Leif '+day+(why?': '+why:'');
+  if(v.rev)r.revisitDate=v.rev;
+  r.nextAction='';r.nextDate='';r.nextSet='';delete r.ignored;
+  save();renderAll();toast(fixUml(dispName(r))+' is on hold');
+}
 // Back to the previous stage, an adviser to In dialogue. A person has no status of their own.
 export function reviveRec(id,ev){
   if(ev&&ev.stopPropagation)ev.stopPropagation();
@@ -89,7 +103,7 @@ export function reviveRec(id,ev){
   if(r.kind==='target'){const prev=[...(r.stageLog||[])].reverse().find(l=>l.stage!=='Dead');r.stage=prev?prev.stage:'Identified';r.stageLog=r.stageLog||[];r.stageLog.push({stage:r.stage,date:today()})}
   else if(r.kind==='advisor')r.status='In dialogue';
   else delete r.status;
-  delete r.deadCat;delete r.deadReason;delete r.deadAt;delete r.deadSeen;
+  delete r.deadCat;delete r.holdReason;delete r.deadReason;delete r.deadAt;delete r.deadSeen;
   const tid=threadIdOf(r);
   if(S.threadsState&&S.threadsState[tid])delete S.threadsState[tid].v;
   if(S.threadsDone)delete S.threadsDone[tid];
