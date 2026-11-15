@@ -28,8 +28,12 @@ export function shareIndex(){
     touchList(r).filter(t=>!isSysNote(t)&&t.dir==='out').forEach(t=>{
       const hay=foldSearch((t.subject||'')+' '+(t.prev||'')+' '+(t.note||''));
       if(!hay)return;
+      // whole words only (Leif 15.11.2026): "permanente" is not perma-tec
+      // a token of 6+ letters also matches with up to two letters more ("werkstoff" in "werkstoffe")
+      const wl=hay.split(/[^a-z0-9]+/),words=new Set(wl);
+      const hit=k=>words.has(k)||(k.length>=6&&wl.some(w=>w.length<=k.length+2&&w.startsWith(k)));
       cos.forEach(x=>{
-        if(!x.tok.every(w=>hay.includes(w)))return;
+        if(!x.tok.every(hit))return;
         (idx[x.c.id]=idx[x.c.id]||[]).push({recId:r.id,date:(t.date||'').slice(0,10),subject:t.subject||'',auto:true,link:t.link||''});
       });
     });

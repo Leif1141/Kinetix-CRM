@@ -141,7 +141,7 @@ export function headHtml(r){
   const pLink=p=>'<a href="#rec/'+p.id+'">'+esc(fixUml(p.name||''))+'</a>';
   const pplLine=pr?' &middot; '+pLink(pr)+' (main contact)'+others.slice(0,2).map(p=>', '+pLink(p)).join('')+(others.length>2?' +'+(others.length-2):''):'';
   return '<div class="rec-head"><button class="sm" id="recBack" title="Back (Esc)">&larr; Back</button>'
-    +'<div class="rec-title"><h2>'+(isNew?'<span class="muted">New '+kind.toLowerCase()+'</span>':esc(fixUml(dispName(r))))+'</h2><div class="muted" style="font-size:11px">'+kind+' &middot; '+status+(r.kind==='person'&&isDeadSelf(r)?' <span class="chip">Dead</span>':'')+(org?' &middot; <a href="#rec/'+org.id+'">'+esc(fixUml(dispName(org)))+'</a>':'')+pplLine+' &middot; last contact '+(lastTouch(r)?fmtAgo(lastTouch(r)):'never')+'</div></div>'
+    +'<div class="rec-title"><h2>'+(isNew?'<span class="muted">New '+kind.toLowerCase()+'</span>':esc(fixUml(dispName(r))))+'</h2><div class="muted" style="font-size:11px">'+kind+' &middot; '+status+(r.kind==='person'&&isDeadSelf(r)?' <span class="chip">Dead</span>':'')+(org?' &middot; <a href="#rec/'+org.id+'">'+esc(fixUml(dispName(org)))+'</a>':'')+pplLine+' &middot; last contact '+(lastTouch(r)?fmtAgo(lastTouch(r)):'never')+callNotesLink(r)+'</div></div>'
     +'<div class="rec-tools">'+(isNew?'':(isDeadSelf(r)?'<button class="sm" data-click="reviveRec|'+r.id+'|$e">Zurückholen</button> ':'<button class="sm" data-click="markDead|'+r.id+'|$e">Dead</button> '))+starHtml(r)+'</div></div>';
 }
 function promisesHtml(r){
@@ -312,10 +312,10 @@ export function filesHtml(r){
   (r.links||[]).forEach((l,i)=>{h+='<div style="margin-bottom:4px"><a href="'+esc(l.url)+'" target="_blank">'+esc(l.title)+'</a> <button class="sm" data-click="removeLink|#'+i+'">×</button></div>'});
   (r.driveFiles||[]).forEach(f=>{h+='<div style="margin-bottom:4px"><a href="'+esc(f.link)+'" target="_blank">'+esc(f.name)+'</a> <span class="muted">'+esc(f.type||'')+'</span></div>'});
   const _seen=new Set();
-  touchList(r).forEach(t=>{(t.att||[]).forEach(n=>{if(_seen.has(n))return;_seen.add(n);h+='<div style="margin-bottom:4px">📎 '+esc(n)+' <span class="muted">'+fmtD(t.date)+(t.dir==='out'?' · sent':' · received')+'</span>'+(t.link?' <a href="'+esc(t.link)+'" target="_blank">↗</a>':'')+'</div>'})});
+  touchList(r).forEach(t=>{(t.att||[]).forEach(n=>{if(_seen.has(n)||CAL_FILE.test(n))return;_seen.add(n);h+='<div style="margin-bottom:4px">📎 '+esc(n)+' <span class="muted">'+fmtD(t.date)+(t.dir==='out'?' · sent':' · received')+'</span>'+(t.link?' <a href="'+esc(t.link)+'" target="_blank">↗</a>':'')+'</div>'})});
   if(r.kind==='person'){
     const o=personOrg(r);
-    if(o)touchList(o).forEach(t=>{(t.att||[]).forEach(n=>{if(_seen.has(n))return;_seen.add(n);h+='<div style="margin-bottom:4px">📎 '+esc(n)+' <span class="muted">'+fmtD(t.date)+(t.dir==='out'?' · sent':' · received')+' · via '+esc(dispName(o))+'</span>'+(t.link?' <a href="'+esc(t.link)+'" target="_blank">↗</a>':'')+'</div>'})});
+    if(o)touchList(o).forEach(t=>{(t.att||[]).forEach(n=>{if(_seen.has(n)||CAL_FILE.test(n))return;_seen.add(n);h+='<div style="margin-bottom:4px">📎 '+esc(n)+' <span class="muted">'+fmtD(t.date)+(t.dir==='out'?' · sent':' · received')+' · via '+esc(dispName(o))+'</span>'+(t.link?' <a href="'+esc(t.link)+'" target="_blank">↗</a>':'')+'</div>'})});
   }
   return h||'<span class="muted">No files linked</span>';
 }
@@ -359,6 +359,15 @@ function splitFirm(r){
     (mine.has(addrOf(t.who))?own:other).push(t)});
   const by=(a,b)=>(b.date||'').localeCompare(a.date||'');own.sort(by);other.sort(by);
   return {own,other,o};
+}
+// calendar invites and replies are not files (Leif 15.11.2026)
+const CAL_FILE=/\.(ics|vcs)$/i;
+// Call notes (Leif 15.11.2026): the newest call or meeting with notes behind a link, in the page header
+function callNotesLink(r){
+  if(!r||!r.id)return '';
+  const pool=[...touchList(r),...(r.kind==='person'?[]:orgPeople(r).flatMap(p=>touchList(p)))];
+  const t=pool.filter(t=>t.link&&(t.src==='Granola'||t.src==='Meeting'||t.src==='Call')&&!/outlook\.office|teams\.microsoft/i.test(t.link)).sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0];
+  return t?' &middot; <a href="'+esc(t.link)+'" target="_blank" style="font-weight:700" title="'+esc(fixUml(subjOf(t)))+'">Call notes '+fmtDe(t.date)+' ↗</a>':'';
 }
 export function convTouches(r){
   if(r.kind==='person')return foldConv(splitFirm(r).own);

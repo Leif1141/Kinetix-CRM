@@ -153,7 +153,8 @@ export async function syncOutlookEmails(){
       try{
         const ar=await fetch('https://graph.microsoft.com/v1.0/me/messages/'+q.id+'/attachments?$select=name,size',{headers:{Authorization:'Bearer '+outlookToken}});
         if(!ar.ok)continue;
-        const names=((await ar.json()).value||[]).map(a=>a.name||'').filter(n=>n&&!/\.(png|jpg|jpeg|gif)$/i.test(n));
+        // pictures and calendar invites are not files (Leif 15.11.2026)
+        const names=((await ar.json()).value||[]).map(a=>a.name||'').filter(n=>n&&!/\.(png|jpg|jpeg|gif|ics|vcs)$/i.test(n));
         if(names.length)q.holders.forEach(r=>{if(r.touches&&r.touches[q.key])r.touches[q.key].att=names});
       }catch(e){}
     }
