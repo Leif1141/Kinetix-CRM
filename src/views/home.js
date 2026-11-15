@@ -49,6 +49,15 @@ export const QUEUE_KINDS={deadmail:'Dead',reply:'Reply owed',overdue:'Overdue',p
 let homeGrp='',homeQ='',homeKind='';
 try{homeGrp=localStorage.getItem('kxHomeGrp')||''}catch(e){}
 
+// Leif 15.11.2026 (Winkler): a step stays as the run wrote it until the next morning run, even when Leif has
+// already replied. A mail Leif sent on or after the day the step was set, with nothing coming in after it,
+// marks the row "Answered" and moves it to the bottom of Today.
+export function answeredAfterStep(r){
+  if(!r||!r.nextSet)return null;
+  const ts=orgTouches(r).filter(t=>t.date&&tType(t)==='Email').sort((a,b)=>b.date.localeCompare(a.date));
+  const last=ts[0];
+  return last&&last.dir==='out'&&last.date.slice(0,10)>=r.nextSet?last:null;
+}
 export function buildQueue(){
   const t=today();
   const items=[];
@@ -59,7 +68,9 @@ export function buildQueue(){
   const all=allRecs().filter(r=>!isIgnoredRec(r));
   all.filter(r=>r.nextDate&&r.nextDate<=t&&!letterDoneStep(r)&&!isDeadRec(r)).forEach(r=>{
     const kind=isPromise(r)?'promise':(r.nextDate<t?'overdue':'due');
-    items.push({rec:r,kind,key:'due_'+r.id,text:r.nextAction||'follow up',due:r.nextDate,sort:(kind==='promise'?'0':'1')+r.nextDate});
+    const ans=answeredAfterStep(r);
+    // answered by mail after the step was set: kept on Today, at the bottom, until Done or the next run
+    items.push({rec:r,kind,key:'due_'+r.id,text:r.nextAction||'follow up',due:r.nextDate,answered:ans,sort:(ans?'6':kind==='promise'?'0':'1')+r.nextDate});
   });
   (S.companies||[]).filter(c=>!isIgnoredRec(c)&&cadDue(c)&&!(c.nextDate&&c.nextDate<=t&&!letterDoneStep(c))).forEach(c=>{
     const cd=cadenceOf(c);
@@ -186,7 +197,7 @@ function rowHtml(it,sec){
     +'<div class="q-acts">'+(sec?'<span class="q-grip" title="Drag to reorder">⋮⋮</span>':'')+acts+'</div>'
     +'<div class="q-name"><b>'+esc(fixUml(lab.top))+'</b>'+(draftChip(r)?'<div>'+draftChip(r)+'</div>':'')+(sub?'<div class="muted" style="font-size:10px">'+esc(fixUml(sub))+'</div>':'')+(r.kind==='target'?'<div>'+stagePill(r.stage)+'</div>':'')+'</div>'
     +'<div class="q-type">'+grpChip(r)+'</div>'
-    +'<div class="q-step">'+kindTag+' '+esc(fixUml(it.text||''))+(it.link?'<a class="q-mail" href="'+esc(it.link)+'" target="_blank" title="Open the mail in Outlook">Mail ↗</a>':'')+runNoteHtml(r)+'</div>'
+    +'<div class="q-step">'+(it.answered?'<span class="qk qk-ans" title="You wrote after this step was set; Done if it is settled">ANSWERED '+fmtDe(it.answered.date.slice(0,10))+'</span> ':'')+kindTag+' '+esc(fixUml(it.text||''))+(it.link?'<a class="q-mail" href="'+esc(it.link)+'" target="_blank" title="Open the mail in Outlook">Mail ↗</a>':'')+runNoteHtml(r)+'</div>'
     +'<div class="q-due">'+dueTxt(it.due)+'</div>'
     +'<div class="q-last muted">'+(lastTouch(r)?fmtDe(lastTouch(r)):'-')+'</div>'
     +'</div>';
@@ -214,12 +225,12 @@ export function moveQueueItem(from,to,after){
   list.forEach((k,n)=>o[k]=n);
   S.homeOrder=o;return true;
 }
-export function homeUrgentCount(){return buildQueue().filter(i=>URGENT_KINDS.includes(i.kind)).length}
+export function homeUrgentCount(){return buildQueue().filter(i=>URGENT_KINDS.includes(i.kind)&&!i.answered).length}
 export function renderHome(){
   const body=document.getElementById('homeQueue');if(!body)return;
   homeQ=((document.getElementById('homeSearch')||{}).value||'').toLowerCase().trim();
   const items=buildQueue();
-  const urgent=items.filter(i=>URGENT_KINDS.includes(i.kind));
+  const urgent=items.filter(i=>URGENT_KINDS.includes(i.kind)&&!i.answered);
   const badge=document.getElementById('homeBadge');if(badge){badge.style.display=urgent.length?'inline-block':'none';badge.textContent=urgent.length}
   const counts={};items.forEach(i=>{const g=grpOf(i.rec);counts[g]=(counts[g]||0)+1});
   const bar=document.getElementById('homeGroups');
