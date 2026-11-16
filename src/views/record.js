@@ -174,7 +174,7 @@ export function renderRecordPage(){
     +(isT?'<div class="pbox"><h4>Letter and cadence</h4>'+letterBox(r)+'</div>':'')
     +'<div class="pbox"><h4>Lists</h4>'+listChips(r)+'</div>'
     +'<div class="pbox"><h4>Files <button class="sm" data-click="addLink">+ Link</button></h4>'+filesHtml(r)+'</div>'
-    +(isT?'<details class="pbox"><summary style="font-size:11px;color:var(--deep);text-transform:uppercase;letter-spacing:.4px;cursor:pointer;font-weight:700">Deal maths</summary><div class="pgrid" style="margin-top:6px">'+fld('dm_e','EBITDA (€m)',r.ebitda,'number')+fld('dm_m','Multiple',6,'number')+fld('dm_d','Debt %',60,'number')+fld('dm_r','Interest rate %',5,'number')+fld('dm_t','Tenor (yrs)',7,'number')+'</div><button class="sm primary" data-click="calcMaths" style="margin-top:6px">Calculate</button><div id="dm_out" style="margin-top:8px"></div></details>':'')
+    // Deal maths removed (Leif 16.11.2026)
     +'</div><div class="rec-r">'
     +promisesHtml(r)
     +wrapUpHtml(r)
@@ -460,15 +460,5 @@ export function logActivity(){
   if(owe){const line='Promised ('+type+' '+fmtD(date)+'): '+owe;r.nextAction=r.nextAction&&r.nextAction.trim()?r.nextAction.trim()+' | '+line:line;if(!r.nextDate||oweBy<r.nextDate)r.nextDate=oweBy;r.nextSet=today();invalidateThreads()}
   ensureInState(r);
   save();renderRecordPage();toast(owe?'Logged, promise added as an open item':'Activity logged');
-}
-export function calcMaths(){
-  const r=profRec;if(!r)return;const el=document.getElementById('dm_out');if(!el)return;
-  const e=+gv('dm_e')||0,mm=+gv('dm_m')||0,d=(+gv('dm_d')||0)/100,rate=(+gv('dm_r')||0)/100,tn=+gv('dm_t')||7;
-  if(!e||!mm){el.innerHTML='<span class="muted">Enter EBITDA and multiple</span>';return}
-  const ev=e*mm,debt=ev*d,eq=ev-debt;
-  const svc=rate>0?debt*rate/(1-Math.pow(1+rate,-tn)):debt/tn;
-  const dscr=svc>0?e/svc:0;
-  const col=dscr>=1.5?'var(--green)':dscr>=1.2?'#8a6d00':'var(--red)';
-  el.innerHTML='<div class="dm-kpi"><b>€'+ev.toFixed(1)+'m</b><span>Enterprise value</span></div><div class="dm-kpi"><b>€'+eq.toFixed(1)+'m</b><span>Equity check</span></div><div class="dm-kpi"><b>€'+debt.toFixed(1)+'m</b><span>Debt</span></div><div class="dm-kpi"><b>€'+svc.toFixed(2)+'m/yr</b><span>Debt service</span></div><div class="dm-kpi"><b style="color:'+col+'">'+dscr.toFixed(2)+'x</b><span>DSCR</span></div>';
 }
 export function removeLink(i){if(!profRec||!profRec.links)return;profRec.links.splice(i,1);save();renderRecordPage()}
