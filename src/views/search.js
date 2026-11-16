@@ -1,5 +1,5 @@
 import {allRecs, dispName, fixUml, lastTouch, orgPeople, personOrg, rowLabel, primaryName} from '../state.js';
-import {esc, fmtAgo, foldSearch} from '../util.js';
+import {esc, fmtAgo, foldSearch, wordHas} from '../util.js';
 
 export function searchHay(r){
   return foldSearch([dispName(r),r.name,r.firm,primaryName(r),r.email,r.domain,r.city,r.location,r.title,r.category,r.ptype,r.stage,r.status,(r.lists||[]).join(' '),r.description,(r.notes||'').slice(0,600)].filter(Boolean).join(' '));
@@ -11,7 +11,7 @@ export function renderGlobalSearch(){
   if(q.length<2){wrap.style.display='none';return}
   wrap.style.display='';
   const terms=q.split(' ').filter(Boolean);
-  const hitRecs=allRecs().filter(r=>{const h=searchHay(r);return terms.every(t=>h.includes(t))});
+  const hitRecs=allRecs().filter(r=>{const h=searchHay(r);return terms.every(t=>wordHas(h,t))});
   // One row per organisation. A person who belongs to an org (linked or by firm name) is folded into that org's row,
   // even when only the person matched. People without any org record keep their own row.
   const rows={},order=[];

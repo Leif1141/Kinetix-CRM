@@ -1,7 +1,7 @@
 import {ADV_STATUS, STAGES} from '../constants.js';
 import {S, allOrgs, dispName, findRec, isSysNote, lastTouch, orgPeople, tType, touchList, primaryName} from '../state.js';
 import {autoCats, catOf} from './lists.js';
-import {esc, fmtAgo, fmtM, shortLoc, today} from '../util.js';
+import {esc, fmtAgo, fmtM, shortLoc, today, wordHit} from '../util.js';
 import {prioChip, starHtml, statusOf} from './ui.js';
 import {renderAll} from '../main.js';
 import {save} from '../store/firebase.js';
@@ -20,7 +20,7 @@ export function renderOrgs(){
   const q=(document.getElementById('oSearch').value||'').toLowerCase();
   const kind=document.getElementById('oKind').value,stg=sel.value,list=lsel.value;
   let rows=allOrgs().filter(o=>
-    (!q||dispName(o).toLowerCase().includes(q)||(o.description||'').toLowerCase().includes(q)||orgPeople(o).some(p=>(p.name||'').toLowerCase().includes(q)))&&
+    (!q||wordHit(dispName(o),q)||wordHit(o.description||'',q)||orgPeople(o).some(p=>wordHit(p.name||'',q)))&&
     (!kind||(kind==='target'?o.kind==='target':o.kind==='advisor'))&&
     (!stg||statusOf(o)===stg)&&
     (!list||(list==='__fav'?o.fav:list.slice(0,4)==='cat:'?catOf(o)===list.slice(4):(o.lists||[]).includes(list)))

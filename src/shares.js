@@ -42,10 +42,17 @@ export function shareIndex(){
   (S.companies||[]).forEach(c=>(c.sharedWith||[]).forEach(e=>{
     (idx[c.id]=idx[c.id]||[]).push({recId:e.recId,date:e.date||'',subject:e.note||'recorded by hand',auto:false});
   }));
-  // one row per counterparty, earliest date wins
+  // one row per organisation, earliest date wins (Leif 16.11.2026): a person with an organisation counts as that
+  // organisation and is named in brackets; a person without one counts on their own
+  const orgKey=id=>{const r=findRec(id);return r&&r.kind==='person'&&r.orgId&&findRec(r.orgId)?r.orgId:id};
   Object.keys(idx).forEach(k=>{
     const best={};
-    idx[k].forEach(e=>{const b=best[e.recId];if(!b||(e.date&&e.date<b.date))best[e.recId]=e});
+    idx[k].forEach(e=>{
+      const key=orgKey(e.recId),b=best[key],via=(b&&b.via)||[];
+      if(key!==e.recId&&!via.includes(e.recId))via.push(e.recId);
+      const n=(!b||(e.date&&(!b.date||e.date<b.date)))?Object.assign({},e,{recId:key}):b;
+      n.via=via;if(b&&b.link&&!n.link)n.link=b.link;if(b&&!b.auto)n.auto=false;best[key]=n;
+    });
     idx[k]=Object.values(best).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   });
   _shareIdx=idx;return idx;
@@ -53,7 +60,7 @@ export function shareIndex(){
 export function sharesFor(c){return shareIndex()[c.id]||[]}
 export function sharedByRec(r){
   const out=[];const idx=shareIndex();
-  (S.companies||[]).forEach(c=>{const e=(idx[c.id]||[]).find(x=>x.recId===r.id);if(e)out.push({c,e})});
+  (S.companies||[]).forEach(c=>{const e=(idx[c.id]||[]).find(x=>x.recId===r.id||(x.via||[]).includes(r.id));if(e)out.push({c,e})});
   return out.sort((a,b)=>(b.e.date||'').localeCompare(a.e.date||''));
 }
 export function shareHtml(rec){
@@ -63,7 +70,7 @@ export function shareHtml(rec){
     const warn=sh.length>1?'<div style="font-size:11px;margin-bottom:4px"><b>'+sh.length+' parties have this name.</b> Check before you promise exclusivity.</div>':'';
     return warn+sh.map(e=>{
       const r=findRec(e.recId);
-      return '<div style="font-size:11px;margin-bottom:2px">'+(e.date?'<span class="muted">'+fmtD(e.date)+'</span> ':'')+'<b style="cursor:pointer" data-click="openRec|'+e.recId+'|$e">'+esc(fixUml(r?dispName(r):e.recId))+'</b>'+(e.auto?'':' <span class="chip">by hand</span>')+(e.subject?' <span class="muted">'+esc(fixUml(e.subject.slice(0,70)))+'</span>':'')+'</div>';
+      return '<div style="font-size:11px;margin-bottom:2px">'+(e.date?'<span class="muted">'+fmtD(e.date)+'</span> ':'')+'<b style="cursor:pointer" data-click="openRec|'+e.recId+'|$e">'+esc(fixUml(r?dispName(r):e.recId))+'</b>'+((e.via||[]).length?' ('+e.via.map(id=>{const p=findRec(id);return p?esc(fixUml(dispName(p))):''}).filter(Boolean).join(', ')+')':'')+(e.auto?'':' <span class="chip">by hand</span>')+(e.subject?' <span class="muted">'+esc(fixUml(e.subject.slice(0,70)))+'</span>':'')+'</div>';
     }).join('');
   }
   const names=sharedByRec(rec);

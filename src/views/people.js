@@ -1,5 +1,5 @@
 import {GRP_DEF, S, allOrgs, dispName, grpOf, introOf, introducedBy, lastTouch, personOrg, resetIntroIndex, tType} from '../state.js';
-import {esc, fmtAgo, normName} from '../util.js';
+import {esc, fmtAgo, normName, wordHit} from '../util.js';
 import {starHtml, dueChip} from './ui.js';
 
 export let psortK='lastc';
@@ -109,7 +109,7 @@ export function renderPeople(){
   const ty=tsel.value,has=document.getElementById('pHas').value;
   const BASE=allPeopleRows();
   let rows=BASE.filter(p=>
-    (!q||(p.name||'').toLowerCase().includes(q)||(p.firm||'').toLowerCase().includes(q)||(p.title||'').toLowerCase().includes(q))&&
+    (!q||wordHit(p.name||'',q)||wordHit(p.firm||'',q)||wordHit(p.title||'',q))&&
     (!ty||p.ptype===ty)&&(!pGrp||personGrp(p)===pGrp)&&
     (!has||(has==='email'&&p.email)||(has==='linkedin'&&p.linkedin)||(has==='path'&&p.networkPath)||(has==='touch'&&Object.keys(p.touches||{}).length))
   );

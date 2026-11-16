@@ -3,7 +3,7 @@ import {logDone} from './actions.js';
 import {openDialog, confirmDialog} from './dialog.js';
 import {ACTIVE_STAGES, BOARD_COLS, CHANNELS, CH_DE, LETTER_TARGET_WEEK, LIVE, LS_DE, STAGES, ST_DE} from '../constants.js';
 import {S, addTouch, cadenceOf, chanOf, dispName, findRec, fixUml, isDue, lastTouch, tType, touchList} from '../state.js';
-import {addDays, daysAgo, daysBetween, esc, fmtDe, fmtM, normName, toast, today, uid, weekStart} from '../util.js';
+import {addDays, daysAgo, daysBetween, esc, fmtDe, fmtM, normName, toast, today, uid, weekStart, wordHit} from '../util.js';
 import {openProfile, profRec, renderRecordPage} from './record.js';
 import {renderAll} from '../main.js';
 import {save} from '../store/firebase.js';
@@ -12,7 +12,7 @@ export let pipeView=null,pipeSort={},pipeExpand={},pipeMore={},pipeKpi='',pipeDr
 // Tab click: back to the base view (Leif 29.10.2026)
 export function resetPipeView(){pipeKpi='';pipeDrill='';pipeMore={};pipeExpand={}}
 export function chDe(c){return CH_DE[chanOf(c)]||chanOf(c)||'(no channel)'}
-export function cadChip(c){const cd=cadenceOf(c);if(!cd)return '';if(cd.replied)return '<span class="chch" style="background:#E3F1E4;color:#2E7D32">Reply received</span>';if(!cd.next)return '<span class="chch">Cadence complete</span>';const od=cd.next.due<=today();return '<span class="chch" title="Letter of '+fmtDe(cd.sent)+'" style="'+(od?'background:#FBE3D6;color:#9A3B12':'')+'">'+cd.next.label+' by '+fmtDe(cd.next.due)+'</span>'}
+export function cadChip(c){const cd=cadenceOf(c);if(!cd)return '';if(cd.replied)return '<span class="chch" style="background:#E3F1E4;color:#2E7D32">Reply received</span>';if(cd.paused)return '<span class="chch">Cadence paused</span>';if(!cd.next)return '<span class="chch">Cadence complete</span>';const od=cd.next.due<=today();return '<span class="chch" title="Letter of '+fmtDe(cd.sent)+'" style="'+(od?'background:#FBE3D6;color:#9A3B12':'')+'">'+cd.next.label+' by '+fmtDe(cd.next.due)+'</span>'}
 export function lsChip(c){if(c.letterSent)return '';const v=c.letterStatus;if(!v||!LS_DE[v])return '';return '<span class="chch" style="'+(v==='ready'?'background:#E3F1E4;color:#2E7D32':'')+'">'+LS_DE[v]+'</span>'}
 export function dueDe(d,id){
   const edit=id?' data-click="!editDue|'+id+'|$el" title="Click to change"':'';
@@ -32,7 +32,7 @@ export function shiftDue(id,days,ev){if(ev)ev.stopPropagation();const r=findRec(
 export function toggleFav(id,ev){if(id&&typeof id==='object'&&id.stopPropagation){const t=id;id=ev;ev=t}if(ev&&ev.stopPropagation)ev.stopPropagation();const r=findRec(id);if(!r)return;r.fav=!r.fav;save();renderAll();if(profRec&&profRec.id===id)openProfile(r)}
 export function letterBox(rec){
   const cd=cadenceOf(rec);
-  const st=cd?('Letter sent on '+fmtDe(cd.sent)+(cd.via?' via '+esc(cd.via):'')+' · '+(cd.replied?'Reply received, cadence ended':cd.partner?'follow-up by the partner, no cadence in the CRM':cd.next?'next step: '+cd.next.label+' by '+fmtDe(cd.next.due):'Cadence complete')):(LS_DE[rec.letterStatus]||'No letter yet');
+  const st=cd?('Letter sent on '+fmtDe(cd.sent)+(cd.via?' via '+esc(cd.via):'')+' · '+(cd.replied?'Reply received, cadence ended':cd.paused?'Cadence paused (On hold)':cd.partner?'follow-up by the partner, no cadence in the CRM':cd.next?'next step: '+cd.next.label+' by '+fmtDe(cd.next.due):'Cadence complete')):(LS_DE[rec.letterStatus]||'No letter yet');
   const steps=cd&&!cd.partner?'<div style="font-size:11px;margin-top:4px">'+cd.steps.map(s=>(s.done?'&#10003; ':'&#9675; ')+s.label+' '+fmtDe(s.due)).join(' &nbsp; ')+'</div>':'';
   const b=(v,t)=>'<button class="sm'+(rec.letterStatus===v?' vbtn on':'')+'" data-click="setLetterStatus|'+rec.id+'|'+v+'">'+t+'</button> ';
   return '<div style="margin-top:8px;padding:8px;border:1px solid #E3E5EC;border-radius:5px"><label style="margin:0">Letter and cadence</label><div style="font-size:12px">'+st+'</div>'+steps+
@@ -120,7 +120,7 @@ function drillHtml(cs){
 // (drop) in MASTER Scoring, which the daily run mirrors into S.analysed. Collapsed by default.
 function analysedSec(recs,q){
   const have=new Set((S.companies||[]).map(c=>normName(dispName(c))));
-  const ext=((S.analysed&&S.analysed.items)||[]).filter(x=>x&&x.name&&!have.has(normName(x.name))&&(!q||x.name.toLowerCase().includes(q)));
+  const ext=((S.analysed&&S.analysed.items)||[]).filter(x=>x&&x.name&&!have.has(normName(x.name))&&(!q||wordHit(x.name,q)));
   const rows=recs.map(c=>({id:c.id,name:dispName(c),loc:c.location||'',ebit:c.ebit,score:c.score,why:c.deadReason||c.flag||'',src:'CRM'}))
     .concat(ext.map(x=>({name:x.name,loc:x.loc||'',ebit:x.ebit,score:x.score,why:x.reason||'',src:x.src||'MASTER Scoring'})))
     .sort((a,b)=>a.name.localeCompare(b.name));
@@ -194,7 +194,7 @@ export function renderPipeline(){
   const q=(document.getElementById('fSearch').value||'').toLowerCase(),fch=fc?fc.value:'',onlyFav=!!(document.getElementById('fFav')||{}).checked;
   const t=today(),ws=weekStart(t);
   const LIVE=ACTIVE_STAGES;
-  const base=cs.filter(c=>(!q||(c.name||'').toLowerCase().includes(q)||(c.location||'').toLowerCase().includes(q)||primaryName(c).toLowerCase().includes(q)||(c.channelVia||'').toLowerCase().includes(q))&&(!fch||chanOf(c)===fch)&&(!onlyFav||c.fav));
+  const base=cs.filter(c=>(!q||wordHit(c.name||'',q)||wordHit(c.location||'',q)||wordHit(primaryName(c),q)||wordHit(c.channelVia||'',q))&&(!fch||chanOf(c)===fch)&&(!onlyFav||c.fav));
   const isReady=c=>c.stage==='Identified'&&(c.letterStatus==='ready'||c.letterStatus==='planned'||c.fav);
   const lettersWeek=letterRows(cs).filter(r=>isOwnLetter(r)&&r.date>=ws).length;
   const kdef=[

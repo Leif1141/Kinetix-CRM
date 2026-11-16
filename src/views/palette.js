@@ -1,5 +1,5 @@
 import {S, allRecs, addTouch, dispName, findRec, fixUml, lastTouch, rowLabel} from '../state.js';
-import {addDays, esc, fmtAgo, foldSearch, toast, today, uid} from '../util.js';
+import {addDays, esc, fmtAgo, foldSearch, toast, today, uid, wordHas} from '../util.js';
 import {searchHay} from './search.js';
 import {openProfile} from './record.js';
 import {save} from '../store/firebase.js';
@@ -23,8 +23,10 @@ export function initPalette(){
   inp.addEventListener('keydown',onKey);
   document.getElementById('palBody').addEventListener('click',e=>{
     const a=e.target.closest('[data-act]');const row=e.target.closest('[data-i]');
-    if(a&&row){sel=+row.dataset.i;runAction(a.dataset.act);return}
-    if(row){sel=+row.dataset.i;runAction('open')}
+    // the row carries its record id; the index alone can point at another record once the list changed (Leif 16.11.2026)
+    const pick=row=>{const k=hits.findIndex(h=>h.id===row.dataset.id);sel=k>=0?k:+row.dataset.i;return k>=0};
+    if(a&&row){if(pick(row))runAction(a.dataset.act);return}
+    if(row&&pick(row))runAction('open')
   });
   document.addEventListener('keydown',e=>{
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();togglePalette();return}
@@ -45,8 +47,8 @@ function search(q){
   const scored=allRecs().map(r=>{
     const name=foldSearch(dispName(r)||'');
     let score=0;
-    if(name===q)score=100;else if(name.startsWith(q))score=80;else if(name.includes(q))score=60;
-    else{const h=searchHay(r);if(terms.every(t=>h.includes(t)))score=terms.every(t=>name.includes(t))?50:20}
+    if(name===q)score=100;else if(name.startsWith(q))score=80;else if(wordHas(name,q))score=60;
+    else{const h=searchHay(r);if(terms.every(t=>wordHas(h,t)))score=terms.every(t=>wordHas(name,t))?50:20}
     if(!score)return null;
     return {r,score:score+(lastTouch(r)?1:0)};
   }).filter(Boolean).sort((a,b)=>b.score-a.score||(lastTouch(b.r)||'').localeCompare(lastTouch(a.r)||''));
@@ -59,7 +61,7 @@ function renderHits(){
   if(!q.trim()){body.innerHTML='<div class="pal-empty muted">Start typing a company, firm or person.</div>';return}
   if(!hits.length){body.innerHTML='<div class="pal-empty muted">No match.</div>';return}
   const kindLbl={target:'Target',advisor:'Advisor',person:'Person'};
-  body.innerHTML=hits.map((r,i)=>'<div class="pal-row'+(i===sel?' sel':'')+'" data-i="'+i+'"><div class="pal-main"><b>'+esc(fixUml(rowLabel(r).top))+'</b> <span class="muted">'+kindLbl[r.kind]+(r.kind==='person'&&rowLabel(r).sub?' · '+esc(fixUml(rowLabel(r).sub)):r.kind==='target'?' · '+esc(r.stage||''):r.status?' · '+esc(r.status):'')+'</span>'+(r.nextAction?'<div class="muted" style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(fixUml(r.nextAction))+'</div>':'')+'</div>'
+  body.innerHTML=hits.map((r,i)=>'<div class="pal-row'+(i===sel?' sel':'')+'" data-i="'+i+'" data-id="'+r.id+'"><div class="pal-main"><b>'+esc(fixUml(rowLabel(r).top))+'</b> <span class="muted">'+kindLbl[r.kind]+(r.kind==='person'&&rowLabel(r).sub?' · '+esc(fixUml(rowLabel(r).sub)):r.kind==='target'?' · '+esc(r.stage||''):r.status?' · '+esc(r.status):'')+'</span>'+(r.nextAction?'<div class="muted" style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(fixUml(r.nextAction))+'</div>':'')+'</div>'
     +'<div class="pal-acts">'+ACTIONS.map((a,j)=>'<span class="pal-act'+(i===sel&&j===act?' on':'')+'" data-act="'+a.k+'">'+a.t+'</span>').join('')+'</div>'
     +'<div class="muted" style="font-size:10px;white-space:nowrap">'+(lastTouch(r)?fmtAgo(lastTouch(r)):'')+'</div></div>').join('');
   const s=body.querySelector('.pal-row.sel');if(s)s.scrollIntoView({block:'nearest'});

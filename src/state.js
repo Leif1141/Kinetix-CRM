@@ -161,7 +161,9 @@ export function cadenceOf(c){
   if(!c||!c.letterSent)return null;
   const sent=c.letterSent.slice(0,10),done=c.cadDone||{};
   const ts=touchList(c).filter(t=>!isSysNote(t)&&(t.date||'').slice(0,10)>sent);
-  const replied=ts.some(t=>t.dir==='in'&&tType(t)!=='Note')||['Replied','Meeting','NDA','LOI','Diligence','Closed','Dead','On hold'].includes(c.stage);
+  const replied=ts.some(t=>t.dir==='in'&&tType(t)!=='Note')||['Replied','Meeting','NDA','LOI','Diligence','Closed','Dead'].includes(c.stage);
+  // On hold is not a reply (Leif 16.11.2026): the cadence pauses, its due dates stay visible, nothing comes due
+  const paused=!replied&&c.stage==='On hold';
   // a step is done by a click (cadDone) or by a matching touch after the previous step; the next step counts from that day
   const first=(f,from)=>{const t=ts.filter(t=>(t.date||'').slice(0,10)>=from&&f(t)).map(t=>(t.date||'').slice(0,10)).sort()[0];return t||''};
   const match={email:t=>t.dir==='out'&&tType(t)==='Email',call:t=>tType(t)==='Call',m6:t=>t.dir==='out'&&tType(t)==='Email',l12:t=>tType(t)==='Letter'&&daysBetween(sent,t.date)>330};
@@ -170,8 +172,8 @@ export function cadenceOf(c){
     return {k:s.k,label:s.label,due,done:!!doneOn}});
   // a partner letter (e.g. via a sourcing partner) is followed up by the partner: no follow-up steps in the CRM (Leif 27.10.2026)
   const partner=c.channel==='Partner letter';
-  const next=(replied||partner)?null:steps.find(s=>!s.done)||null;
-  return {sent,via:partner?(c.channelVia||''):'',partner,replied,steps,next};
+  const next=(replied||partner||paused)?null:steps.find(s=>!s.done)||null;
+  return {sent,via:partner?(c.channelVia||''):'',partner,replied,paused,steps,next};
 }
 export function cadDue(c){const cd=cadenceOf(c);return !!(cd&&cd.next&&cd.next.due<=today())}
 // A target whose letter went out on or after the date of its next step: the letter was that step and the
