@@ -1,7 +1,7 @@
 import {openDialog, confirmDialog} from '../views/dialog.js';
-import {addrParts, setAddrPart} from '../addr.js';
+import {addrParts, composeAddress, setAddrPart} from '../addr.js';
 import {S, addTouch, allRecs, dispName, findRec, newAdvisor, newCompany, newPerson, orgByDomain, splitPhones} from '../state.js';
-import {STAGES} from '../constants.js';
+import {CONTRACT, fieldAllowed} from '../contract.js';
 import {autoThread, invalidateThreads, seedThreads} from '../views/threads.js';
 import {backfillPersonTouches, retriageUnmatched} from './triage.js';
 import {dashApplyOp} from '../views/dash.js';
@@ -44,10 +44,13 @@ function stampSrc(r,k,src,d){if(src&&SRC_FIELDS.includes(k)){r.src=r.src||{};r.s
 // street, zip and city recompose the address line; a new address line replaces the parts it contains.
 // On a person the address is their own office; empty means the organisation's address (Leif 05.11.2026).
 function putVal(r,k,v){
-  if(k==='street'||k==='zip'||(k==='city'&&(r.street||r.zip))){setAddrPart(r,k,v==null?'':String(v));return}
+  if(k==='street'||k==='zip'||(k==='city'&&(r.street||r.zip))){setAddrPart(r,k,v==null?'':String(v));fillAddress(r);return}
   r[k]=v;
   if(k==='address'){delete r.street;delete r.zip;const p=addrParts(Object.assign({},r,{city:''}));if(p.rawStreet)r.street=p.rawStreet;if(p.zip)r.zip=p.zip;if(p.zip&&p.city)r.city=p.city}
+  fillAddress(r);
 }
+// An organisation with street, zip and city but no address line gets one composed (Leif 16.11.2026).
+export function fillAddress(r){if(r&&r.kind!=='person'&&r.street&&r.zip&&r.city&&!r.address){r.address=composeAddress({street:r.street,zip:r.zip,city:r.city});return true}return false}
 // Two records of the same person or organisation become one: the kept record takes the touches and fills its
 // empty contact fields, an organisation's people move over, the other record is archived with mergedInto.
 const MERGE_FILL=['email','phone','mobile','title','linkedin','street','zip','city','address','domain'];
@@ -81,11 +84,20 @@ export async function normaliseContacts(){
   applyContactPlan(S,plan);
   return plan.create.length+plan.link.length+plan.orgSet.length;
 }
+// Each op that did nothing is listed with a reason from CONTRACT.skipReasons (Leif 16.11.2026).
+const isArchTarget=r=>!!(r&&r.kind==='target'&&r.archived);
+const same=(a,b)=>{const n=v=>v===undefined||v===null?'':v;a=n(a);b=n(b);return typeof a==='object'||typeof b==='object'?JSON.stringify(a)===JSON.stringify(b):String(a)===String(b)};
 export function applyPatchOps(ops){
-  let made=0,skipped=0;
-  for(const o of (ops||[])){
+  let made=0;const skippedList=[],redirected=[];
+  (ops||[]).forEach((o,i)=>{
+    o=o||{};
+    const mid=o.match&&o.match.id;
+    const skip=(reason,extra)=>{skippedList.push(Object.assign({i,op:o.op||''},mid?{id:mid}:{},extra||{},{reason}))};
     try{
-      if(o.op&&String(o.op).indexOf('dash')===0){if(dashApplyOp(o))made++;else skipped++;continue}
+      if(o.op&&String(o.op).indexOf('dash')===0){
+        if(!CONTRACT.ops[o.op])skip('unknown_op');else if(dashApplyOp(o))made++;else skip('no_match');
+        return;
+      }
       if(o.op==='upsertAdvisor'){
         let r=patchFind(Object.assign({kind:'advisor'},o.match));
         if(!r&&o.set&&o.set.domain){const d=orgByDomain(o.set.domain);if(d&&d.kind==='advisor')r=d} // one organisation per domain
@@ -102,68 +114,101 @@ export function applyPatchOps(ops){
         patchSet(r,o.set,o.source,o.date);made++;
       }else if(o.op==='addTouch'){
         const r=patchFind(o.match);
-        if(r&&o.key&&o.touch){addTouch(r,o.key,o.touch);made++}else skipped++;
+        if(!r)skip('no_match');else if(isArchTarget(r))skip('archived_target');else if(!o.key||!o.touch)skip('field_rejected');
+        else{addTouch(r,o.key,o.touch);made++}
       }else if(o.op==='setStage'){
         const r=patchFind(Object.assign({kind:'target'},o.match));
-        if(r&&o.stage&&STAGES.includes(o.stage)&&r.stage!==o.stage){r.stage=o.stage;r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.stage,date:o.date||today()});made++}else skipped++;
+        if(!r)skip('no_match');else if(isArchTarget(r))skip('archived_target');else if(!o.stage||!CONTRACT.enums.targetStage.includes(o.stage))skip('field_rejected');
+        else if(r.stage===o.stage)skip('noop');
+        else{r.stage=o.stage;r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.stage,date:o.date||today()});made++}
       }else if(o.op==='thread'){
-        if(o.id){S.threadsState=S.threadsState||{};S.threadsDone=S.threadsDone||{};const st=S.threadsState[o.id]||{};if(o.v)st.v=o.v;if(o.note){st.note=o.note;st.noteDate=o.date||today()}S.threadsState[o.id]=st;if(o.done)S.threadsDone[o.id]=o.date||today();made++}else skipped++;
+        if(o.id){S.threadsState=S.threadsState||{};S.threadsDone=S.threadsDone||{};const st=S.threadsState[o.id]||{};if(o.v)st.v=o.v;if(o.note){st.note=o.note;st.noteDate=o.date||today()}S.threadsState[o.id]=st;if(o.done)S.threadsDone[o.id]=o.date||today();made++}else skip('field_rejected');
       }else if(o.op==='mapEmail'){
         const r=patchFind(o.match);
-        if(r&&o.email){S.senderMap=S.senderMap||{};S.senderMap[o.email.toLowerCase().replace(/\./g,'_')]=r.id;made++}else skipped++;
+        if(!r)skip('no_match');else if(!o.email)skip('field_rejected');
+        else{S.senderMap=S.senderMap||{};S.senderMap[o.email.toLowerCase().replace(/\./g,'_')]=r.id;made++}
       }else if(o.op==='ignore'){
         S.ignoredSenders=S.ignoredSenders||{};S.ignoredDomains=S.ignoredDomains||{};
         if(o.email){S.ignoredSenders[o.email.toLowerCase().replace(/\./g,'_')]=today();made++}
         else if(o.domain){S.ignoredDomains[o.domain.toLowerCase().replace(/\./g,'_')]=today();made++}
-        else skipped++;
+        else skip('field_rejected');
       }else if(o.op==='setTouch'){
         // corrects a logged touch: call or in-person meeting, subject, summary (06.11.2026)
         const r=o.match&&o.match.id?findRec(o.match.id):patchFind(o.match),t=r&&o.key&&(r.touches||{})[o.key],f=o.fields||{};let hit=0;
-        if(t){['mode','subject','prev','who','link'].forEach(k=>{if(f[k]!=null&&t[k]!==f[k]){t[k]=f[k];hit++}})}
-        if(hit)made++;else skipped++;
+        if(t&&!isArchTarget(r)){['mode','subject','prev','who','link'].forEach(k=>{if(f[k]!=null&&t[k]!==f[k]){t[k]=f[k];hit++}})}
+        if(!r||!t)skip('no_match');else if(isArchTarget(r))skip('archived_target');else if(hit)made++;else skip('noop');
       }else if(o.op==='setTouchLink'){
         const r=patchFind(o.match);let hit=0;
-        if(r&&o.link){const tl=r.touches||{};Object.keys(tl).forEach(k=>{const t=tl[k];if(t&&(!t.link||o.force)&&(!o.key||k===o.key)&&(!o.date||String(t.date||'').slice(0,10)===o.date)&&(!o.subject||String(t.subject||'').toLowerCase().indexOf(String(o.subject).toLowerCase())>=0)){t.link=o.link;hit++}})}
-        if(hit)made++;else skipped++;
+        if(r&&o.link&&!isArchTarget(r)){const tl=r.touches||{};Object.keys(tl).forEach(k=>{const t=tl[k];if(t&&(!t.link||o.force)&&(!o.key||k===o.key)&&(!o.date||String(t.date||'').slice(0,10)===o.date)&&(!o.subject||String(t.subject||'').toLowerCase().indexOf(String(o.subject).toLowerCase())>=0)){t.link=o.link;hit++}})}
+        if(!r)skip('no_match');else if(isArchTarget(r))skip('archived_target');else if(!o.link)skip('field_rejected');else if(hit)made++;else skip('noop');
       }else if(o.op==='dismissUnmatched'){
-        if(o.key){S.dismissedUnmatched=S.dismissedUnmatched||{};S.dismissedUnmatched[o.key.replace(/\./g,'_')]=today();S.unmatched=(S.unmatched||[]).filter(u=>u.key!==o.key);made++}else skipped++;
+        if(o.key){S.dismissedUnmatched=S.dismissedUnmatched||{};S.dismissedUnmatched[o.key.replace(/\./g,'_')]=today();S.unmatched=(S.unmatched||[]).filter(u=>u.key!==o.key);made++}else skip('field_rejected');
       }else if(o.op==='setThread'){
         seedThreads();let t=S.threads.find(x=>x.id===o.id||(x.alias||[]).includes(o.id));
         if(!t){const r=findRec(o.id);if(r){t=autoThread(r);delete t.auto;S.threads.push(t)}}
-        if(t&&o.fields){['r','a','o','e','due','p','cat'].forEach(k=>{if(o.fields[k]!==undefined)t[k]=o.fields[k]});invalidateThreads();made++}else skipped++;
+        if(!t)skip('no_match',{id:o.id});else if(!o.fields)skip('field_rejected',{id:o.id});
+        else{CONTRACT.threadFields.forEach(k=>{if(o.fields[k]!==undefined)t[k]=o.fields[k]});invalidateThreads();made++}
       }else if(o.op==='setField'){
-        const r=patchFind(o.match);
-        const _ok=['metrics','namedOn','street','zip','homeStreet','homeZip','homeCity','notes','nextAction','nextDate','nextSet','angle','flag','description','contact','email','domain','title','city','address','networkPath','introPath','ptype','market','geo','status','category','ownership','location','priority','firm','cadence','orgId','linkedin','phone','mobile','detail','lastSummary','lastSummaryDate','deadReason','revisitDate','revenue','ebitda','ebit','gm','industry','tier','website','rationale','score','verdict','outreachChannel','stage','channel','channelVia','letterSent','letterStatus','fav','ignored','cadDone','archived','deadCat','primaryId'];
-        if(r&&o.field&&_ok.includes(o.field)&&!(o.field==='email'&&r.kind!=='person'&&o.value)){if(o.field==='nextAction'&&o.value&&o.value!==r.nextAction)r.nextSet=today();if(o.field==='stage'&&r.stage!==o.value){r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.value,date:o.date||today()})}putVal(r,o.field,o.value);stampFin(r,o.field);stampSrc(r,o.field,o.source,o.date);if(o.field==='phone')splitPhones(r);made++}else skipped++;
+        const r=patchFind(o.match),f=o.field;
+        if(!r)skip('no_match',{field:f});
+        else if(isArchTarget(r)&&f!=='archived')skip('archived_target',{id:r.id,field:f});
+        else if(!f||!fieldAllowed(r.kind,f)||(f==='email'&&r.kind!=='person'&&o.value))skip('field_rejected',{id:r.id,field:f});
+        else if(same(r[f],o.value))skip('noop',{id:r.id,field:f});
+        else{
+          if(f==='nextAction'&&o.value&&o.value!==r.nextAction)r.nextSet=today();
+          if(f==='stage'&&r.stage!==o.value){r.stageLog=r.stageLog||[];r.stageLog.push({stage:o.value,date:o.date||today()})}
+          putVal(r,f,o.value);stampFin(r,f);stampSrc(r,f,o.source,o.date);if(f==='phone')splitPhones(r);
+          // contact on an organisation becomes people (normaliseContacts): redirected, not applied
+          if(f==='contact'&&r.kind!=='person'&&o.value&&S.contactsMigV1)redirected.push({i,op:'setField',field:'contact',id:r.id,reason:'contact_to_person',personIds:[],_value:String(o.value)});
+          else made++;
+        }
       }else if(o.op==='noteDone'){
         // closes one of Leif's run notes by its timestamp; result says what the run did with it
         const r=o.match&&o.match.id?findRec(o.match.id):patchFind(o.match),n=r&&(r.runNotes||[]).find(x=>x.at===o.at);
-        if(n&&!n.done){n.done=o.date||today();if(o.result)n.result=String(o.result);made++}else skipped++;
+        if(!n)skip('no_match');else if(n.done)skip('noop');else{n.done=o.date||today();if(o.result)n.result=String(o.result);made++}
       }else if(o.op==='merge'){
         const dup=o.match&&o.match.id?findRec(o.match.id):patchFind(o.match),keep=o.into&&o.into.id?findRec(o.into.id):patchFind(o.into);
-        if(mergeRecs(dup,keep))made++;else skipped++;
+        if(mergeRecs(dup,keep))made++;else skip('no_match');
       }else if(o.op==='addList'){
-        if(o.name){S.customLists=S.customLists||[];if(!S.customLists.includes(o.name))S.customLists.push(o.name);made++}else skipped++;
+        S.customLists=S.customLists||[];
+        if(!o.name)skip('field_rejected');else if(S.customLists.includes(o.name))skip('noop');else{S.customLists.push(o.name);made++}
       }else if(o.op==='addToList'||o.op==='removeFromList'){
         // a record joins or leaves one existing list (Leif 16.11.2026); unknown list names are skipped, never created here
         const r=patchFind(o.match);
-        if(r&&o.name&&(S.customLists||[]).includes(o.name)){
+        if(!r)skip('no_match');else if(isArchTarget(r))skip('archived_target');
+        else if(!o.name||!(S.customLists||[]).includes(o.name))skip('field_rejected',{field:'lists'});
+        else{
           const has=(r.lists||[]).includes(o.name);
           if(o.op==='addToList'&&!has){r.lists=(r.lists||[]).concat([o.name]);made++}
           else if(o.op==='removeFromList'&&has){r.lists=r.lists.filter(x=>x!==o.name);made++}
-          else skipped++;
-        }else skipped++;
+          else skip('noop');
+        }
       }else if(o.op==='setAnalysed'){
         // analysed and dropped without an approach (red in MASTER Scoring); replaced as a whole on every refresh
-        if(Array.isArray(o.items)){S.analysed={source:o.source||'',date:o.date||today(),items:o.items.filter(x=>x&&x.name).map(x=>({name:String(x.name),loc:x.loc||'',ebit:x.ebit??null,score:x.score??null,reason:x.reason||'',src:x.src||o.source||''}))};made++}else skipped++;
+        if(Array.isArray(o.items)){S.analysed={source:o.source||'',date:o.date||today(),items:o.items.filter(x=>x&&x.name).map(x=>({name:String(x.name),loc:x.loc||'',ebit:x.ebit??null,score:x.score??null,reason:x.reason||'',src:x.src||o.source||''}))};made++}else skip('field_rejected');
       }else if(o.op==='renameList'){
-        if(o.from&&o.to&&(S.customLists||[]).includes(o.from)){S.customLists=S.customLists.map(x=>x===o.from?o.to:x);allRecs().forEach(r=>{if(r.lists)r.lists=r.lists.map(x=>x===o.from?o.to:x)});made++}else skipped++;
+        if(o.from&&o.to&&(S.customLists||[]).includes(o.from)){S.customLists=S.customLists.map(x=>x===o.from?o.to:x);allRecs().forEach(r=>{if(r.lists)r.lists=r.lists.map(x=>x===o.from?o.to:x)});made++}else skip('no_match');
       }else if(o.op==='removeList'){
-        if(o.name&&(S.customLists||[]).includes(o.name)){S.customLists=S.customLists.filter(x=>x!==o.name);allRecs().forEach(r=>{if(r.lists)r.lists=r.lists.filter(x=>x!==o.name)});made++}else skipped++;
-      }else skipped++;
-    }catch(e){skipped++}
-  }
-  return {made,skipped};
+        if(o.name&&(S.customLists||[]).includes(o.name)){S.customLists=S.customLists.filter(x=>x!==o.name);allRecs().forEach(r=>{if(r.lists)r.lists=r.lists.filter(x=>x!==o.name)});made++}else skip('no_match');
+      }else skip('unknown_op');
+    }catch(e){skip('error',{message:String(e&&e.message||e)})}
+  });
+  return {made,skipped:skippedList.length,skippedList,redirected};
+}
+// The last 60 patch results, oldest dropped first.
+const RESULTS_KEEP=60;
+const resKey=name=>name||'(unnamed)';
+function keepResult(name,ops,r){
+  S.patchResults=S.patchResults||{};
+  S.patchResults[resKey(name)]={at:new Date().toISOString(),contract:CONTRACT.version,ops:(ops||[]).length,applied:r.made,
+    skipped:r.skippedList.slice(0,300),redirected:r.redirected.map(({_value,...x})=>x)};
+  const ks=Object.keys(S.patchResults).sort((a,b)=>String(S.patchResults[a].at||'').localeCompare(String(S.patchResults[b].at||'')));
+  while(ks.length>RESULTS_KEEP)delete S.patchResults[ks.shift()];
+}
+function fillRedirects(name,red){
+  const res=(S.patchResults||{})[resKey(name)];if(!res||!red.length)return;
+  res.redirected=red.map(x=>{const v=normName(x._value);const {_value,...rest}=x;
+    rest.personIds=(S.people||[]).filter(p=>p.orgId===x.id&&!p.archived&&p.name&&v.includes(normName(p.name))).map(p=>p.id);return rest});
 }
 export function applyPatchObj(p,name,force){
   if(!p||!p.kinetixPatch)throw new Error('not a Kinetix patch file'); // accept 1 or true
@@ -174,8 +219,9 @@ export function applyPatchObj(p,name,force){
   const r=applyPatchOps(p.ops);
   _patchName='';
   S.appliedPatchTitles[name]=today();
+  keepResult(name,p.ops,r);
   try{backfillPersonTouches();const _rt=retriageUnmatched();r.made+=_rt.assigned}catch(e){console.warn('post-patch triage:',e)}
-  normaliseContacts().then(n=>{if(n){save();renderAll()}}).catch(e=>console.warn('contacts after patch:',e));
+  r.done=normaliseContacts().then(n=>{fillRedirects(name,r.redirected);if(n||r.redirected.length){save();renderAll()}}).catch(e=>console.warn('contacts after patch:',e));
   return r;
 }
 export function applyPatchFile(ev){

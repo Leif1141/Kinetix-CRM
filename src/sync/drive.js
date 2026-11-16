@@ -1,4 +1,3 @@
-import {legacyExport} from '../store/shards.js';
 import {S} from '../state.js';
 import {applyPatchObj} from './patch.js';
 import {db, save, serverGet, currentUser} from '../store/firebase.js';
@@ -69,15 +68,18 @@ export async function autoDriveBackup(){
     try{
       const wk=isoWeekKey(new Date());
       const snap=S._lastSnapshotWeek!==wk;
-      const r=await driveCall('backup',{snapshot:snap},{data:legacyExport(S)});
+      const bk=await import('./backup.js'),data=await bk.backupData(); // loaded on demand
+      const r=await driveCall('backup',{snapshot:snap},{data,contract:bk.CONTRACT});
       if(snap&&r.snapshot)S._lastSnapshotWeek=wk;
+      if(!r.contract)console.warn('KinetixCRM Contract.json not written: the Drive proxy needs the new version (tools/drive-proxy.gs)');
       S.lastDriveBackup=new Date().toISOString();save();
       console.log('Drive auto-backup via proxy: '+r.bytes+' bytes'+(r.snapshot?', snapshot '+r.snapshot:''));
     }catch(e){toast('⚠ Drive backup FAILED: '+e.message+'. Data is safe in Firebase, but weekly briefings go stale');console.warn('Drive backup failed:',e)}
     return;
   }
   try{
-    const name='KinetixCRM Backup.json';
+    const bk=await import('./backup.js'),name='KinetixCRM Backup.json',data=await bk.backupData();
+    await bk.driveWriteJson(bk.CONTRACT_NAME,bk.CONTRACT,gmailToken,DRIVE_CRM_FOLDER).catch(e=>console.warn('contract file:',e));
     // Eine rollierende Datei: vorhandene suchen und ueberschreiben statt jedes Mal neu anzulegen.
     const q=encodeURIComponent("'"+DRIVE_CRM_FOLDER+"' in parents and name='"+name+"' and trashed=false");
     const lr=await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id)',{headers:{Authorization:'Bearer '+gmailToken}});
@@ -85,12 +87,12 @@ export async function autoDriveBackup(){
     let res;
     if(ex){
       res=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+ex.id+'?uploadType=media',
-        {method:'PATCH',headers:{Authorization:'Bearer '+gmailToken,'Content-Type':'application/json'},body:JSON.stringify(legacyExport(S))});
+        {method:'PATCH',headers:{Authorization:'Bearer '+gmailToken,'Content-Type':'application/json'},body:JSON.stringify(data)});
     }else{
       const meta={name:name,parents:[DRIVE_CRM_FOLDER],mimeType:'application/json'};
       const boundary='kinetix'+Date.now();
       const body='--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify(meta)+
-        '\r\n--'+boundary+'\r\nContent-Type: application/json\r\n\r\n'+JSON.stringify(legacyExport(S))+'\r\n--'+boundary+'--';
+        '\r\n--'+boundary+'\r\nContent-Type: application/json\r\n\r\n'+JSON.stringify(data)+'\r\n--'+boundary+'--';
       res=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{Authorization:'Bearer '+gmailToken,'Content-Type':'multipart/related; boundary='+boundary},body:body});
     }
     if(!res.ok)throw new Error('upload '+res.status);
@@ -104,7 +106,7 @@ export async function autoDriveBackup(){
         await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',
           headers:{Authorization:'Bearer '+gmailToken,'Content-Type':'multipart/related; boundary='+sb},
           body:'--'+sb+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify(sm)+
-               '\r\n--'+sb+'\r\nContent-Type: application/json\r\n\r\n'+JSON.stringify(legacyExport(S))+'\r\n--'+sb+'--'});
+               '\r\n--'+sb+'\r\nContent-Type: application/json\r\n\r\n'+JSON.stringify(data)+'\r\n--'+sb+'--'});
         S._lastSnapshotWeek=wk;
       }catch(e){console.warn('weekly snapshot failed',e)}
     }

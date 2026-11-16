@@ -18,7 +18,8 @@
 //   get       -> content of one patch file in the CRM folder (by id)
 //   archive   -> move one patch file from the CRM folder into "0. Archive"
 //   granola   -> newest 60 files in "Granola Call Notes" (name, link, date; no content)
-//   backup    -> POST {idToken, action:'backup', snapshot:bool, data:{...}} writes the rolling backup
+//   backup    -> POST {idToken, action:'backup', snapshot:bool, data:{...}, contract:{...}} writes the rolling backup
+//                and, when contract is sent, KinetixCRM Contract.json next to it
 // POST bodies are sent as text/plain so the browser does not preflight (Apps Script has no OPTIONS).
 
 var OWNER = 'leif.berger26@gmail.com';
@@ -26,6 +27,7 @@ var FIREBASE_WEB_API_KEY = 'AIzaSyAEWlsy09Xhw0XMcTauGw9Hw_2lSn_GlYI'; // public 
 var CRM_FOLDER_ID = '19NSMw1zEmNctsmWuPnXCLZeX09ehO6bW';
 var ARCHIVE_NAME = '0. Archive';
 var BACKUP_NAME = 'KinetixCRM Backup.json';
+var CONTRACT_NAME = 'KinetixCRM Contract.json';
 var GRANOLA_NAME = 'Granola Call Notes';
 
 function doGet(e) { return handle_(e.parameter || {}); }
@@ -47,7 +49,7 @@ function handle_(p) {
       case 'get':     var f = crmFile_(p.id); return out_({ id: p.id, name: f.getName(), content: f.getBlob().getDataAsString('UTF-8') });
       case 'archive': crmFile_(p.id).moveTo(archiveFolder_()); return out_({ ok: true });
       case 'granola': return out_({ files: listGranola_() });
-      case 'backup':  return out_(backup_(p.data, !!p.snapshot));
+      case 'backup':  var b = backup_(p.data, !!p.snapshot); if (p.contract) b.contract = writeJson_(CONTRACT_NAME, p.contract); return out_(b);
       default:        return out_({ error: 'unknown action' });
     }
   } catch (err) {
@@ -112,6 +114,14 @@ function listGranola_() {
   }
   res.sort(function (a, b) { return a.createdTime < b.createdTime ? 1 : -1; });
   return res.slice(0, 60);
+}
+
+// One rolling JSON file in the CRM folder, overwritten by name.
+function writeJson_(name, obj) {
+  var json = JSON.stringify(obj), folder = crmFolder_(), it = folder.getFilesByName(name), f;
+  if (it.hasNext()) { f = it.next(); f.setContent(json); }
+  else { f = folder.createFile(name, json, 'application/json'); }
+  return f.getName();
 }
 
 function backup_(data, snapshot) {
