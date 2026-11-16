@@ -144,6 +144,15 @@ export function applyPatchOps(ops){
         if(mergeRecs(dup,keep))made++;else skipped++;
       }else if(o.op==='addList'){
         if(o.name){S.customLists=S.customLists||[];if(!S.customLists.includes(o.name))S.customLists.push(o.name);made++}else skipped++;
+      }else if(o.op==='addToList'||o.op==='removeFromList'){
+        // a record joins or leaves one existing list (Leif 16.11.2026); unknown list names are skipped, never created here
+        const r=patchFind(o.match);
+        if(r&&o.name&&(S.customLists||[]).includes(o.name)){
+          const has=(r.lists||[]).includes(o.name);
+          if(o.op==='addToList'&&!has){r.lists=(r.lists||[]).concat([o.name]);made++}
+          else if(o.op==='removeFromList'&&has){r.lists=r.lists.filter(x=>x!==o.name);made++}
+          else skipped++;
+        }else skipped++;
       }else if(o.op==='setAnalysed'){
         // analysed and dropped without an approach (red in MASTER Scoring); replaced as a whole on every refresh
         if(Array.isArray(o.items)){S.analysed={source:o.source||'',date:o.date||today(),items:o.items.filter(x=>x&&x.name).map(x=>({name:String(x.name),loc:x.loc||'',ebit:x.ebit??null,score:x.score??null,reason:x.reason||'',src:x.src||o.source||''}))};made++}else skipped++;
