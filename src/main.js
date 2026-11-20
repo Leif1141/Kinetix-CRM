@@ -101,6 +101,9 @@ document.getElementById('tabs').addEventListener('click',e=>{
   const v=t.dataset.t;
   ({home:['homeSearch'],orgs:['oSearch','oKind','oStage','oList'],people:['pSearch','pType','pHas'],pipeline:['fSearch','fChan'],threads:['thSearch','thCat'],locations:['locKind']}[v]||[]).forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
   if(v==='pipeline'){const f=document.getElementById('fFav');if(f)f.checked=false}
+  // the global search and its results clear too, so nothing stays selected (Leif 20.11.2026)
+  const gs=document.getElementById('gSearch');if(gs&&gs.value){gs.value='';try{renderGlobalSearch()}catch(err){}}
+  if(v==='screening')import('./views/screening.js').then(m=>m.resetScreeningView());
   ({home:resetHomeView,people:resetPeopleView,pipeline:resetPipeView,threads:resetThreadsView,reports:()=>{if(_insReg)import('./views/insights.js').then(m=>m.closeRepDrill())}}[v]||(()=>{}))();
   if(document.body.classList.contains('rec-open'))closeProfile();
   if(t.classList.contains('active')){renderAll();window.scrollTo(0,0);return}

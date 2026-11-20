@@ -6,7 +6,9 @@ import {esc} from '../util.js';
 import {stagePill} from './ui.js';
 import {openProfile} from './record.js';
 
-let f={dead:false,stage:'',own:'',minScore:'',q:'',sort:'score',dir:-1};
+const F0={dead:false,stage:'',own:'',minScore:'',q:'',sort:'score',dir:-1};
+let f={...F0};
+export function resetScreeningView(){f={...F0}}
 let charts={};
 const AGE_BINS=[['< 55',0,54],['55 to 59',55,59],['60 to 64',60,64],['65 to 69',65,69],['70+',70,200]];
 const STAGE_GRP=s=>['Replied','Meeting','NDA','LOI','Diligence'].includes(s)?'Live deal':['Contacted','On hold'].includes(s)?'Approached':s==='Dead'?'Dead':'Identified';
