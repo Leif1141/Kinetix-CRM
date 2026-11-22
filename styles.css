@@ -281,6 +281,11 @@ select.assign{font-size:11px;max-width:220px;padding:3px}
 #p-dash .todo-check:hover{border-color:var(--navy)}
 #p-dash .todo-check.checked{background:var(--green);border-color:var(--green)}
 #p-dash .todo-check.checked::after{content:'';width:5px;height:9px;border:solid white;border-width:0 2px 2px 0;transform:rotate(45deg);margin-top:-2px}
+#p-dash .todo-card-progress{border-left-color:#8C97B8}
+#p-dash .todo-note{font-size:12px;margin-top:3px;white-space:pre-wrap}
+#p-dash .todo-start{flex-shrink:0;background:var(--white);border:1px solid var(--navy);color:var(--navy);border-radius:4px;font-size:11px;padding:2px 8px;cursor:pointer}
+#p-dash .todo-edit{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;cursor:default;font-size:12px}
+#p-dash .todo-edit textarea{flex:1 1 100%;min-width:0;font:12px Arial;padding:6px 8px;border:1px solid #D0D0D8;border-radius:6px}
 #p-dash .todo-card.done{opacity:.5;cursor:default}
 #p-dash .todo-card.done .todo-title{text-decoration:line-through}
 #p-dash .todo-content{flex:1;min-width:0}
