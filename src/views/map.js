@@ -118,6 +118,7 @@ export function renderClusters(){
   ).join(''):'<p class="muted" style="padding:12px">No region with three or more targets within '+km+' km yet.</p>';
 }
 export let locMap=null,locLayer=null;
+let locPins=[]; // {m,gr,city} per marker, for the in-view list
 // Colour and label per record category. Used by the map markers, the region list and the nearby briefing.
 export function locParty(r){
   if(!r)return ['Contact','#434F80'];
@@ -220,7 +221,8 @@ export function renderLocations(){
   document.getElementById('locList').innerHTML=ctl+(groups.map(g=>'<div style="padding:8px 12px;border-bottom:1px solid #E8E8EC"><b style="cursor:pointer;text-decoration:underline dotted" title="Auf der Karte zeigen" data-click="locFocus|'+esc(g.head)+'">'+esc(g.head)+'</b> <span class="muted">('+g.recs.length+')</span>'+(g.cities.length>1?' <span class="muted" style="font-size:10px">incl. '+esc(g.cities.filter(c=>c!==g.head).join(', '))+'</span>':'')+'<br>'+g.recs.slice().sort((a,b)=>catOrder(a)-catOrder(b)||a.name.localeCompare(b.name)).map(groupChip).join(' ')+'</div>').join('')||'<p class="muted" style="padding:12px">No records with a city yet.</p>');
   if(typeof L==='undefined')return;
   if(!locMap){locMap=L.map('locMap').setView([51.1,10.3],6);locMap.setMaxBounds([[46.5,4.5],[55.5,16.5]]);locMap.setMinZoom(5);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(locMap)}
-  if(locLayer)locLayer.remove();locLayer=L.layerGroup().addTo(locMap);
+  if(!locMap._inView){locMap.on('moveend',renderInView);locMap._inView=1}
+  if(locLayer)locLayer.remove();locLayer=L.layerGroup().addTo(locMap);locPins=[];
   S.geoCache=S.geoCache||{};
   let plotted=0;const pts=[];
   cities.forEach(c=>{
@@ -234,6 +236,7 @@ export function renderLocations(){
       const [lbl,col]=gr.cat;
       const pr=gr.pin||gr.rec;const ex=addrLL(pr);const pos=ex?ex:[g[0]+off*Math.sin(ang),g[1]+off*Math.cos(ang)];
       const m=L.circleMarker(pos,{radius:ex?7:8,color:ex?'#000':'#fff',weight:1.5,fillColor:col,fillOpacity:0.92}).addTo(locLayer);
+      locPins.push({m,gr,city:c});
       const ppl=gr.people.map(p=>fixUml(p.name)).join(', ')||fixUml(gr.contact||'');
       m.bindPopup('<b>'+esc(gr.name)+'</b><br><span style="color:'+col+';font-weight:700">'+lbl+'</span> · '+esc(c)+(ppl?'<br>'+esc(ppl):'')+(ex?'<br><span style="font-size:10px">'+esc(pr.address||'')+'</span>':(addrParts(pr).street?'<br><span style="font-size:10px">'+esc(pr.address||'')+' (pin at the city centre until the address is located)</span>':'<br><span style="font-size:10px">Only the city is known, no street address in the CRM</span>'))+'<br><a href="#" data-click="openRec|'+gr.rec.id+'|$e">Open profile →</a>');
     });
@@ -251,6 +254,7 @@ export function renderLocations(){
   const missing=cities.filter(c=>!S.geoCache[c.toLowerCase()]).length;
   if(missing)geocodeMissing(true); // new or changed places are geocoded in the background, one request per second
   try{renderClusters()}catch(e){}
+  renderInView();
   // Always frame Germany. Foreign records are listed under Abroad, they do not widen the map.
   if(!locMap._fitted){try{locMap.fitBounds([[47.3,5.9],[55.1,15.0]],{padding:[10,10]});locMap._fitted=1}catch(e){}}
   setTimeout(()=>locMap.invalidateSize(),120);
@@ -280,3 +284,22 @@ export async function geocodeMissing(quiet){
   save();if(document.getElementById('p-locations')?.classList.contains('active'))renderLocations();if(!quiet||found)toast(found+' of '+todo.length+' places geocoded');
 }
 export function nearbyFor(city){const el=document.getElementById('locNear');if(el)el.value=city;nearbyBriefing()}
+// Below the map, like places on Google Maps: once zoomed in, every firm and contact whose pin is in view (Leif 22.11.2026).
+const IN_VIEW_ZOOM=9,IN_VIEW_MAX=150;
+export function renderInView(){
+  const el=document.getElementById('locInView');if(!el||!locMap)return;
+  if(locMap.getZoom()<IN_VIEW_ZOOM){el.innerHTML='<p class="muted" style="padding:8px 12px;margin:0">Zoom in on a region to list who is in view.</p>';return}
+  const b=locMap.getBounds();
+  const rank=x=>x.gr.cat[0]==='Target'?0:x.gr.cat[0]==='Contact'?9:1;
+  const vis=locPins.filter(x=>b.contains(x.m.getLatLng())).sort((a,c)=>rank(a)-rank(c)||a.gr.name.localeCompare(c.gr.name));
+  if(!vis.length){el.innerHTML='<p class="muted" style="padding:8px 12px;margin:0">Nobody in this part of the map.</p>';return}
+  el.innerHTML='<div style="padding:6px 12px;font-size:11px" class="muted">'+vis.length+' in view'+(vis.length>IN_VIEW_MAX?', first '+IN_VIEW_MAX+' shown':'')+'</div>'+vis.slice(0,IN_VIEW_MAX).map((x,i)=>{
+    const g=x.gr,ppl=g.people.map(p=>fixUml(p.name)).join(', ')||fixUml(g.contact||'');
+    return '<div class="inview-row" data-pin="'+locPins.indexOf(x)+'" style="padding:6px 12px;border-top:1px solid #E8E8EC;display:flex;gap:8px;align-items:baseline">'
+      +'<span style="flex:none;display:inline-block;width:10px;height:10px;border-radius:50%;background:'+g.cat[1]+'"></span>'
+      +'<span style="flex:1"><a href="#" data-click="openRec|'+g.rec.id+'|$e"><b>'+esc(g.name)+'</b></a>'+(ppl?' · '+esc(ppl):'')
+      +'<br><span class="muted" style="font-size:11px">'+esc(g.cat[0])+' · '+esc(x.city)+(g.rec.nextAction?' · '+esc(String(g.rec.nextAction).slice(0,90)):'')+'</span></span>'
+      +'<a href="#" style="flex:none;font-size:11px" data-click="showPin|'+locPins.indexOf(x)+'|$e">on map</a></div>';
+  }).join('');
+}
+export function showPin(i,e){if(e&&e.preventDefault)e.preventDefault();const x=locPins[+i];if(!x)return;x.m.openPopup();document.getElementById('locMap').scrollIntoView({behavior:'smooth',block:'start'})}
