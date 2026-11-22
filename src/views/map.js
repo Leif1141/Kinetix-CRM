@@ -170,7 +170,9 @@ export function locGroups(kindFilter){
     const g=add(key,{key,rec:p,org:null,name:p.firm?fixUml(p.firm):dispName(p),city:pc,cat:locParty(p),contact:'',people:[]});
     g.people.push(p);if(!g.contact)g.contact=p.name;
   });
-  return order.map(k=>groups[k]);
+  // An organisation shows only where Leif knows someone: an adviser's head-office pin goes when all its known people sit in other offices (Leif 22.11.2026).
+  const elsewhere={};order.forEach(k=>{const g=groups[k];if(g.office&&g.org)elsewhere[g.org.id]=1});
+  return order.map(k=>groups[k]).filter(g=>!(g.org&&g.org.kind!=='target'&&!g.office&&!g.people.length&&elsewhere[g.org.id])); // a target's own site always stays
 }
 export function groupLabel(g){const who=g.contact?fixUml(g.contact):'';return who&&who!==g.name?fixUml(g.name)+' · '+who:fixUml(g.name)}
 export function groupChip(g){return '<span class="chip" title="'+esc(g.cat[0])+'" style="cursor:pointer;background:'+g.cat[1]+';color:#fff" data-click="openRec|'+g.rec.id+'|$e">'+esc(groupLabel(g))+'</span>'}
@@ -234,7 +236,7 @@ export function renderLocations(){
       const ang=2*Math.PI*i/Math.max(n,1);
       const off=n>1?0.012:0;
       const [lbl,col]=gr.cat;
-      const pr=gr.pin||gr.rec;const ex=addrLL(pr);const pos=ex?ex:[g[0]+off*Math.sin(ang),g[1]+off*Math.cos(ang)];
+      const pr=gr.pin||(gr.office?{}:gr.rec);const ex=addrLL(pr); // an office pin never takes the head-office addressconst pos=ex?ex:[g[0]+off*Math.sin(ang),g[1]+off*Math.cos(ang)];
       const m=L.circleMarker(pos,{radius:ex?7:8,color:ex?'#000':'#fff',weight:1.5,fillColor:col,fillOpacity:0.92}).addTo(locLayer);
       locPins.push({m,gr,city:c});
       const ppl=gr.people.map(p=>fixUml(p.name)).join(', ')||fixUml(gr.contact||'');
