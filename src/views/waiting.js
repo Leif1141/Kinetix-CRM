@@ -2,12 +2,14 @@
 // REPLY OWED and WAITING ON THEM (Leif 04.11.2026). The old Open Items tab repeated Today: every record with a
 // next action counted as "my move". What Today could not see were mail threads without a next step:
 //  - reply owed: the last real exchange is a mail TO Leif and he has not answered (shown as rows on Today)
-//  - waiting: the last real exchange is Leif's own mail or letter and nobody answered (the Waiting tab)
+//  - waiting: the last real exchange is Leif's own mail or letter and nobody answered (the Waiting tab), and
+//    every next step that is itself waiting: warte auf, nachfassen, cadence, beim Partner nachfragen. Those carry
+//    a date, and until 22.11.2026 any date took the thread off the tab.
 // A meeting or call after a mail counts as the answer. Done-notes (✔), notes, calendar acceptances,
 // auto-replies and sign-up confirmations are not an exchange.
 // ═══════════════════════════════════════════════════════════════
 import {S, allOrgs, dispName, fixUml, isDeadRec, isIgnoredRec, orgPeople, rowLabel, tType, touchList} from '../state.js';
-import {addDays, daysAgo, esc, fmtDe, today} from '../util.js';
+import {addDays, daysAgo, fmtDe, today} from '../util.js';
 
 export const NOISE_RE=/^(zugesagt|angenommen|abgelehnt|mit vorbehalt|accepted|declined|tentative|automatische antwort|automatic reply|auto(matic)?[- ]?reply|abwesenheit|out of office|undeliverable|unzustellbar|mail delivery|delivery status)\b|newsletter|anmeldebestätigung|bestätigen sie ihre|confirm your (subscription|email)|registrierungsbestätigung|lesebestätigung|read receipt|ihre [\w-]*anmeldung|seminaranmeldung/i;
 export const REPLY_DAYS=60, WAIT_MIN=10, WAIT_MAX=60;
@@ -19,13 +21,11 @@ export function realTouch(t){
   return !NOISE_RE.test(s)&&!NOISE_RE.test(String(t.subject||''));
 }
 // the organisation with its people, or a person without an organisation
-function units(){
-  // a target on hold is parked until its revisit date (Leif 13.11.2026, Oelde): no reply owed, no waiting
-  const out=allOrgs().filter(o=>!o.archived&&!o.mergedInto&&!isDeadRec(o)&&!isIgnoredRec(o)&&!(o.kind==='target'&&o.stage==='On hold'));
-  (S.people||[]).forEach(p=>{if(!p.orgId&&!p.archived&&!p.mergedInto&&!isDeadRec(p)&&!isIgnoredRec(p))out.push(p)});
-  return out;
-}
-function lastReal(u){
+// a target on hold is parked until its revisit date (Leif 13.11.2026, Oelde): no reply owed, no waiting
+export const parked=r=>isIgnoredRec(r)||(r.kind==='target'&&r.stage==='On hold');
+export function liveUnits(){return allOrgs().concat((S.people||[]).filter(p=>!p.orgId)).filter(r=>!r.archived&&!r.mergedInto&&!isDeadRec(r))}
+function units(){return liveUnits().filter(r=>!parked(r))}
+export function lastReal(u){
   const seen=new Set();const ts=[];
   const add=(t,who)=>{const k=(t.date||'')+'|'+(t.subject||'');if(seen.has(k))return;seen.add(k);ts.push(Object.assign({},t,{_rec:who}))};
   touchList(u).forEach(t=>add(t,u));
@@ -45,7 +45,7 @@ function hasPlan(u,d){
 // record, Leif's answer on the adviser. Records linked by channelVia (deal -> adviser, adviser -> its deals) count as
 // one thread: a mail in the other direction on a linked record with the same subject (Re/AW stripped) after the
 // date answers it.
-const nm=s=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
+export const nm=s=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
 const subj=s=>nm(String(s||'').replace(/^[^\wÄÖÜäöü]+/,'').replace(/^((re|aw|wg|fw|fwd)\s*:\s*)+/i,''));
 function linked(u){
   if(u.kind==='person')return [];
@@ -75,12 +75,13 @@ export function replyOwedItems(){
   });
   return out;
 }
-export function waitingItems(){
+// older: the same threads past WAIT_MAX, listed folded at the foot of the tab instead of dropping out
+export function waitingItems(older){
   const out=[];const snooze=S.snoozeUntil||{},t0=today();
   units().forEach(u=>{
     const t=lastReal(u);if(!t||t.dir!=='out')return;
     const ty=tType(t);if(ty!=='Email'&&ty!=='Letter')return;
-    const d=(t.date||'').slice(0,10);const n=daysAgo(d);if(!d||n<WAIT_MIN||n>WAIT_MAX||hasPlan(u,d))return;
+    const d=(t.date||'').slice(0,10);const n=daysAgo(d);if(!d||n<WAIT_MIN||(older?n<=WAIT_MAX:n>WAIT_MAX)||hasPlan(u,d))return;
     if(answeredElsewhere(u,t,'in'))return;
     const key='wait_'+u.id+'_'+d;
     if(S.dismissed&&S.dismissed[key])return;
@@ -91,28 +92,11 @@ export function waitingItems(){
 }
 export function waitingCount(){return waitingItems().length}
 
-let wQ='';
-export function renderWaiting(){
-  const body=document.getElementById('thBody');if(!body)return;
-  wQ=((document.getElementById('thSearch')||{}).value||'').toLowerCase().trim();
-  const all=waitingItems();
-  const items=wQ?all.filter(i=>(dispName(i.rec)+' '+i.who+' '+i.subject).toLowerCase().includes(wQ)):all;
-  const cnt=document.getElementById('thCount');if(cnt)cnt.textContent=items.length+' of '+all.length;
-  const row=i=>{const L=rowLabel(i.rec);
-    return '<div class="qrow wrow" data-open="'+i.rec.id+'">'
-      +'<div class="q-acts"><button class="sm primary" data-wact="follow" data-key="'+esc(i.key)+'" data-id="'+i.rec.id+'" title="Put a follow-up on Today">Follow up</button> <button class="sm" data-wact="2w" data-key="'+esc(i.key)+'" title="Ask again in two weeks">+2w</button> <button class="sm" data-wact="park" data-key="'+esc(i.key)+'" title="Stop tracking this mail">Park</button></div>'
-      +'<div class="q-name"><b>'+esc(fixUml(L.top))+'</b>'+(i.who&&i.who!==L.top?'<div class="muted" style="font-size:10px">'+esc(i.who)+'</div>':'')+'</div>'
-      +'<div class="q-step">'+(i.type==='Letter'?'Letter: ':'')+(i.link?'<a href="'+esc(i.link)+'" target="_blank">'+esc(i.subject||'(no subject)')+'</a>':esc(i.subject||'(no subject)'))+'</div>'
-      +'<div class="q-due">'+i.days+' days</div>'
-      +'<div class="q-last muted">'+fmtDe(i.date)+'</div></div>'};
-  body.innerHTML='<div class="section"><div class="section-hdr">Waiting on them ('+items.length+')</div>'
-    +(items.length?'<div class="qhead wrow"><div></div><div>Name</div><div>Your last mail</div><div>Quiet</div><div>Sent</div></div>'+items.map(row).join('')
-      :'<p class="muted" style="padding:14px">Nobody owes you an answer from the last '+WAIT_MAX+' days.</p>')+'</div>';
-}
 // Follow up: puts the thread on Today now. +2w: back on this list in two weeks. Park: off the list until a new mail.
 export async function waitAct(act,key,id){
   const {save}=await import('../store/firebase.js');const {renderAll}=await import('../main.js');const {toast}=await import('../util.js');
-  const i=waitingItems().find(x=>x.key===key);if(!i)return;
+  if(act==='now'||act==='later')return (await import('./waitlist.js')).moveStep(act,key,{save,renderAll,toast});
+  const i=waitingItems().concat(waitingItems(true)).find(x=>x.key===key);if(!i)return;
   if(act==='follow'){const r=i.rec;r.nextAction='Nachfassen: "'+i.subject+'" vom '+fmtDe(i.date)+' ist unbeantwortet'+(i.who?' ('+i.who+')':'');r.nextDate=today();r.nextSet=today();toast('On Today')}
   else if(act==='2w'){S.snoozeUntil=S.snoozeUntil||{};S.snoozeUntil[key]=addDays(today(),14);toast('Back on the list on '+fmtDe(addDays(today(),14)))}
   else {S.dismissed=S.dismissed||{};S.dismissed[key]=today();toast('Parked')}

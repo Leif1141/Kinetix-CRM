@@ -1,7 +1,7 @@
 import {S, allRecs, findRec, fixUml, dispName, isDeadRec, isIgnoredRec, orgTouches, rawRecs, lastTouch, primaryName} from '../state.js';
 import {daysAgo} from '../util.js';
 import {openProfile} from './record.js';
-import {renderWaiting, waitAct} from './waiting.js';
+import {waitAct} from './waiting.js';
 
 // The thread list (S.threads, seeded 15.09.2026) stays as data: patches add threads, Dead marks their verdict.
 // The tab itself shows the Waiting list (views/waiting.js) since 04.11.2026; the old Open Items view was removed.
@@ -52,5 +52,5 @@ export function renderThreads(){
     const b=e.target.closest('button[data-wact]');if(b){e.stopPropagation();waitAct(b.dataset.wact,b.dataset.key,b.dataset.id);return}
     if(e.target.closest('a[href]'))return;
     const row=e.target.closest('[data-open]');if(row){const r=findRec(row.dataset.open);if(r)openProfile(r)}})}
-  renderWaiting();
+  import('./waitlist.js').then(m=>m.renderWaiting()).catch(e=>console.warn('waiting list',e)); // on demand
 }
