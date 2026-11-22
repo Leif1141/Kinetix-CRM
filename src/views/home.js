@@ -225,12 +225,13 @@ export function moveQueueItem(from,to,after){
   list.forEach((k,n)=>o[k]=n);
   S.homeOrder=o;return true;
 }
-export function homeUrgentCount(){return buildQueue().filter(i=>URGENT_KINDS.includes(i.kind)&&!i.answered).length}
+// The tab badge counts exactly the rows of the Today section, ANSWERED rows included (Leif 22.11.2026: 23 vs 26).
+export function homeUrgentCount(){return buildQueue().filter(i=>URGENT_KINDS.includes(i.kind)).length}
 export function renderHome(){
   const body=document.getElementById('homeQueue');if(!body)return;
   homeQ=((document.getElementById('homeSearch')||{}).value||'').toLowerCase().trim();
   const items=buildQueue();
-  const urgent=items.filter(i=>URGENT_KINDS.includes(i.kind)&&!i.answered);
+  const urgent=items.filter(i=>URGENT_KINDS.includes(i.kind));
   const badge=document.getElementById('homeBadge');if(badge){badge.style.display=urgent.length?'inline-block':'none';badge.textContent=urgent.length}
   const counts={};items.forEach(i=>{const g=grpOf(i.rec);counts[g]=(counts[g]||0)+1});
   const bar=document.getElementById('homeGroups');
