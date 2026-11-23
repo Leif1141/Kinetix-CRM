@@ -1,5 +1,5 @@
 // Offline cache for Allotments. Bump VERSION when any file here changes.
-const VERSION = 'allotments-v1';
+const VERSION = 'allotments-v2';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
