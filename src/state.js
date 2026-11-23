@@ -177,7 +177,7 @@ export function cadenceOf(c){
 }
 export function cadDue(c){const cd=cadenceOf(c);return !!(cd&&cd.next&&cd.next.due<=today())}
 // A target whose letter went out on or after the date of its next step: the letter was that step and the
-// cadence takes over (follow-up email after 10 days, call 3 weeks later). Covers letters recorded by the morning run.
+// cadence takes over (follow-up email after 10 days, call 14 days later). Covers letters recorded by the morning run.
 export function letterDoneStep(r){return !!(r&&r.kind==='target'&&r.letterSent&&r.nextDate&&r.nextDate<=r.letterSent)}
 // the date that is actually due: the next step, or the cadence step when the letter replaced it
 export function effDue(r){if(!r)return '';if(!letterDoneStep(r))return r.nextDate||'';const cd=cadenceOf(r);return cd&&cd.next?cd.next.due:''}

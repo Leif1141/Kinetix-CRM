@@ -1,7 +1,7 @@
 import {openDialog, confirmDialog} from './dialog.js';
 import {invalidateThreads} from '../views/threads.js';
 import {ACT_TYPES, ADV_CATS, ADV_STATUS, CHANNELS, DEADREASONS, PRIORITIES, PTYPES, STAGES, VERDICTS} from '../constants.js';
-import {S, addTouch, allOrgs, chanOf, deadCatOf, dispName, findRec, fixUml, isDeadSelf, isSysNote, newPerson, orgByDomain, orgDomain, orgPeople, personOrg, primaryOf, splitPhones, tType, touchList, touchTomb, lastTouch, meetMode, foldConv} from '../state.js';
+import {S, addTouch, allOrgs, cadenceOf, chanOf, deadCatOf, dispName, findRec, fixUml, isDeadSelf, isSysNote, newPerson, orgByDomain, orgDomain, orgPeople, personOrg, primaryOf, splitPhones, tType, touchList, touchTomb, lastTouch, meetMode, foldConv} from '../state.js';
 import {addDays, cleanPrev, esc, fmtAgo, fmtD, fmtDe, normDomain, normName, shortLoc, toast, today, uid} from '../util.js';
 import {fld, gv, n1, selFld, starHtml, stagePill} from './ui.js';
 import {letterBox} from './pipeline.js';
@@ -148,6 +148,9 @@ function promisesHtml(r){
   const lines=openPromises(r);
   const log=(r.actionLog||[]).slice(-5).reverse();
   let h='<div class="pbox" id="recNext"><h4>Next step</h4><div class="pgrid">'+fieldSpecs(r).next.slice(1).map(s=>fieldHtml(r,s)).join('')+'</div>'+fieldHtml(r,fieldSpecs(r).next[0]);
+  // the letter cadence carries the follow-up of a target (Leif 23.11.2026, Lüberg): shown here, not only in the Deal box
+  const cd=r.kind==='target'?cadenceOf(r):null;
+  if(cd&&cd.next)h+='<div style="margin-top:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">Letter cadence</div><div class="promise"><button class="sm primary" data-click="sugAct|done|'+r.id+'|cdz_'+r.id+'_'+cd.next.k+'|$e">Done</button> <span>'+esc(cd.next.label)+' by '+fmtDe(cd.next.due)+(cd.next.due<today()?' (overdue)':'')+'</span></div></div>';
   if(lines.length)h+='<div style="margin-top:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">Open promises</div>'+lines.map((l,i)=>'<div class="promise"><button class="sm primary" data-promise="'+i+'">Done</button> <span>'+esc(l)+'</span></div>').join('')+'</div>';
   if(log.length)h+='<details style="margin-top:8px"><summary class="muted" style="font-size:11px;cursor:pointer">Completed ('+(r.actionLog||[]).length+')</summary>'+log.map(a=>'<div style="font-size:11px;margin-top:3px"><span class="muted">'+fmtD(a.done)+'</span> '+esc(fixUml(a.what||''))+'</div>').join('')+'</details>';
   return h+'</div>';
