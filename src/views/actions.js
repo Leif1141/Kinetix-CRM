@@ -18,11 +18,21 @@ export function logDone(r,what){
   r.actionLog=r.actionLog||[];
   r.actionLog.push({done:today(),due:r.nextDate||'',set:r.nextSet||'',what:what});
 }
+// A target whose name went to a partner (adviser or partner letter) never ends without a step: when Leif ticks off
+// a one-off step (e.g. a fair visit), the partner check-in comes back, 3 months after the name went out (Leif 23.11.2026, Barthel).
+const PARTNER_CH=['M&A house / advisor','Partner letter'];
+export function partnerFallback(r){
+  if(!r||r.kind!=='target'||r.nextDate||!r.channelVia||!PARTNER_CH.includes(r.channel)||r.stage!=='Contacted')return;
+  const since=((r.stageLog||[]).filter(l=>l.stage==='Contacted').map(l=>l.date).sort().pop())||today();
+  let due=addDays(since,91);if(due<=today())due=addDays(today(),91);
+  r.nextAction='Beim Partner ('+r.channelVia+') nachfragen, ob es zu '+dispName(r)+' etwas Neues gibt';r.nextDate=due;r.nextSet=today();
+}
 export function completeAction(id,ev){
   if(ev)ev.stopPropagation();
   const r=findRec(id);if(!r)return;
   logDone(r,r.nextAction);
   r.nextDate='';r.nextAction='';r.nextSet='';
+  partnerFallback(r);
   if(S.dismissed)delete S.dismissed['due_'+r.id];
   save();renderAll();toast('Logged as done');
 }

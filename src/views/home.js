@@ -78,7 +78,8 @@ export function buildQueue(){
   });
   replyOwedItems().forEach(i=>items.push(i));
   const live=(S.companies||[]).filter(c=>ACTIVE_STAGES.includes(c.stage)&&!isIgnoredRec(c));
-  live.filter(c=>isStale(c)&&!c.nextDate&&!partnerQuiet(c)&&!isDismissed('stale_'+c.id)).forEach(c=>{
+  // a running letter cadence is the next step: no stale flag while it has a step to come (Leif 23.11.2026, Lüberg, Phytec)
+  live.filter(c=>isStale(c)&&!c.nextDate&&!partnerQuiet(c)&&!(cadenceOf(c)&&(cadenceOf(c).next||cadenceOf(c).partner))&&!isDismissed('stale_'+c.id)).forEach(c=>{
     items.push({rec:c,kind:'stale',key:'stale_'+c.id,text:c.stage+', last contact '+(lastTouch(c)?fmtDe(lastTouch(c)):'never'),due:'',sort:'4'+(lastTouch(c)||'')});
   });
   live.filter(c=>!c.nextDate&&!isStale(c)&&!partnerQuiet(c)&&!(cadenceOf(c)&&(cadenceOf(c).next||cadenceOf(c).partner))&&!isDismissed('noact_'+c.id)).forEach(c=>{
