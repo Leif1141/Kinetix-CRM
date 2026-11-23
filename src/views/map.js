@@ -10,13 +10,19 @@ import {addrParts} from '../addr.js';
 export function cleanCity(s){
   s=(s||'').trim(); if(!s)return '';
   s=s.split(/\s*[\/;,|]\s*| und | & | \+ /)[0].trim();
-  s=s.replace(/\s*\(.*?\)\s*/g,' ')
+  s=s.replace(/^(Raum|Region|Großraum)\s+/i,'').replace(/\s*\(.*?\)\s*/g,' ')
      .replace(/\s+i\.?\s*d\.?\s+\S+$/i,'')
      .replace(/\s+(i\.|im)\s+\S+$/i,'')
      .replace(/\s{2,}/g,' ').trim();
   return s;
 }
-export function recCity(r){return cleanCity(r.city||r.location||'')}
+// A location field that holds the full address ("Max-Planck-Str. 36-46, 27283 Verden", 122 records on 23.11.2026)
+// gives its place after the postcode; the postcode makes the lookup unambiguous (Leif 23.11.2026, Nachbarschaft run).
+const PLZ_CITY=/\b(?:D-)?(\d{5})\s+([A-Za-zÄÖÜäöüß][^,;|\/()\d]*)/;
+export function recCity(r){const raw=r.city||r.location||'';const m=/\d/.test(raw)&&raw.match(PLZ_CITY);return cleanCity(m?m[2]:raw)}
+export function recZip(r){if(r.zip&&/^\d{5}$/.test(String(r.zip).trim()))return String(r.zip).trim();const m=[r.city,r.location,r.address].map(x=>(x||'').match(PLZ_CITY)).find(Boolean);return m?m[1]:''}
+const GEO_CTRY={CH:'Switzerland',AT:'Austria',UK:'United Kingdom',FR:'France',NL:'Netherlands',LU:'Luxembourg',US:'USA'};
+function isDE(r){return !r.geo||r.geo==='DE'||/^germany$/i.test(r.geo)}
 // one key per place: München and Munich, Malmö and Malmo, "Landau" and "Landau in der Pfalz", "Ulm" and "Ulm-Einsingen"
 const CITY_EN={munich:'munchen',cologne:'koln',nuremberg:'nurnberg',gothenburg:'goteborg'};
 export function cityKey(c){
@@ -265,19 +271,24 @@ let _geoRun=false;
 export async function geocodeMissing(quiet){
   if(_geoRun)return;
   S.geoCache=S.geoCache||{};S.geoMiss=S.geoMiss||{};
-  const cities=[...new Set(allRecs().map(recCity).filter(Boolean))].filter(c=>!S.geoCache[c.toLowerCase()]);
+  const byCity={};allRecs().forEach(r=>{const c=recCity(r);if(!c||S.geoCache[c.toLowerCase()])return;const z=recZip(r),k=c.toLowerCase();if(!byCity[k]||(!byCity[k].zip&&z))byCity[k]={c,zip:isDE(r)?z:'',de:isDE(r),ctry:GEO_CTRY[r.geo]||''}});
+  const cities=Object.values(byCity).map(x=>x.c);
   const addrs=[];allRecs().forEach(r=>{const k=addrKey(r);if(k&&!S.geoCache[k]&&!addrs.some(x=>x[0]===k))addrs.push([k,addrQuery(r)])});
   // a place Nominatim did not find is not asked again for 30 days
-  const fresh=k=>{const t=S.geoMiss[k.replace(/[.#$\/\[\]]/g,'_')];return !t||Date.now()-new Date(t).getTime()>30*864e5};
+  // misses from before 23.11.2026 came from the broken ", Europe" query and are asked again
+  const fresh=k=>{const t=S.geoMiss[k.replace(/[.#$\/\[\]]/g,'_')];return !t||t<'2026-11-23'||Date.now()-new Date(t).getTime()>30*864e5};
   const todo=[...cities.filter(c=>fresh(c.toLowerCase())),...addrs.filter(a=>fresh(a[0]))];
   if(!todo.length){if(!quiet)toast('All cities and addresses geocoded');return}
   _geoRun=true;if(!quiet)toast('Geocoding '+todo.length+' places…');let found=0;
   try{
     for(const c of todo){
       try{
-        const isA=Array.isArray(c);const q=isA?c[1]:c+', Europe';const k=isA?c[0]:c.toLowerCase();
-        const res=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q));
-        const j=await res.json();
+        const isA=Array.isArray(c);const k=isA?c[0]:c.toLowerCase();const info=isA?null:byCity[k];
+        const url=q=>'https://nominatim.openstreetmap.org/search?format=json&limit=1&'+q;
+        const qs=isA?['q='+encodeURIComponent(c[1])]:[
+          ...(info.zip?['postalcode='+info.zip+'&city='+encodeURIComponent(c)+'&countrycodes=de','postalcode='+info.zip+'&countrycodes=de']:[]),
+          'q='+encodeURIComponent(c+(info.de?', Germany':info.ctry?', '+info.ctry:''))];
+        let j=[];for(const q of qs){j=await (await fetch(url(q))).json();if(j[0])break;await new Promise(r=>setTimeout(r,1100))}
         if(j[0]){S.geoCache[k]=[+j[0].lat,+j[0].lon];found++}else S.geoMiss[k.replace(/[.#$\/\[\]]/g,'_')]=new Date().toISOString().slice(0,10);
       }catch(e){}
       await new Promise(r=>setTimeout(r,1100));
