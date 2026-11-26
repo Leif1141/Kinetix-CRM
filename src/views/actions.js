@@ -22,7 +22,7 @@ export function logDone(r,what){
 // a one-off step (e.g. a fair visit), the partner check-in comes back, 3 months after the name went out (Leif 23.11.2026, Barthel).
 const PARTNER_CH=['M&A house / advisor','Partner letter'];
 export function partnerFallback(r){
-  if(!r||r.kind!=='target'||r.nextDate||!r.channelVia||!PARTNER_CH.includes(r.channel)||r.stage!=='Contacted')return;
+  if(!r||r.kind!=='target'||r.nextDate||!r.channelVia||!PARTNER_CH.includes(r.channel)||!['Identified','Contacted'].includes(r.stage))return;
   const since=((r.stageLog||[]).filter(l=>l.stage==='Contacted').map(l=>l.date).sort().pop())||today();
   let due=addDays(since,91);if(due<=today())due=addDays(today(),91);
   r.nextAction='Beim Partner ('+r.channelVia+') nachfragen, ob es zu '+dispName(r)+' etwas Neues gibt';r.nextDate=due;r.nextSet=today();
