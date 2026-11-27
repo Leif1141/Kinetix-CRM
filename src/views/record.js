@@ -389,8 +389,22 @@ const isCallTouch=t=>!!meetMode(t);
 const dirWord=t=>isCallTouch(t)?srcLabel(t):(t.dir==='out'?'Sent':'Received');
 // The phone glyph the old Granola import put in front of every title says nothing about the conversation.
 const subjOf=t=>String(t.subject||'').replace(/^📞\s*/,'');
+// Calendar traffic and auto-replies are not the conversation (Leif 27.11.2026, BearingPoint: three "Angenommen:" mails
+// with the legal footer as text pushed the real exchange out and said "they wrote last").
+const CAL_RE=/^(?:\W{0,3}\s*)?(Angenommen|Akzeptiert|Zugesagt|Bestätigt|Abgelehnt|Abgesagt|Mit Vorbehalt angenommen|Neue vorgeschlagene Zeit|Vorgeschlagene Zeit|Ereignis angenommen|Accepted|Declined|Tentative|Tentatively accepted|New Time Proposed|Canceled event|Canceled|Updated invitation|Invitation)\s*:\s*/i;
+const AUTO_RE=/^(Automatic reply|Automatische Antwort|Abwesenheitsnotiz|Out of office|OOO)\b/i;
+export const isCalTouch=t=>!meetMode(t)&&(CAL_RE.test(String(t.subject||''))||(t.dir==='out'&&/^\s*(Teams-Einladung|Microsoft Teams|_{8,})/i.test(String(t.prev||''))));
+const isAutoTouch=t=>AUTO_RE.test(String(t.subject||''));
+function calLine(c){
+  if(!c.length)return '';const t=c[0],m=String(t.subject||'').match(CAL_RE);
+  const w=m?m[1].toLowerCase():'',what=!m?(t.dir==='out'?'invitation sent':'invitation'):/ablehn|declin/.test(w)?'declined':/absag|cancel/.test(w)?'cancelled':/vorbehalt|tentat/.test(w)?'tentative':/zeit|time/.test(w)?'new time proposed':/invit/.test(w)?'invitation':'accepted';
+  return '<div style="font-size:12px;margin-bottom:9px"><b>Appointment:</b> '+linkWrap(t,esc(fixUml(subjOf(t).replace(CAL_RE,'')||'(no subject)')))+' &middot; '+what+' &middot; '+fmtD(t.date)+(c.length>1?' <span class="muted">('+c.length+' calendar mails)</span>':'')+'</div>';
+}
 export function wrapUpHtml(r){
-  const ts=convTouches(r); // newest first
+  const all=convTouches(r); // newest first
+  const cals=all.filter(isCalTouch),ts=all.filter(t=>!isCalTouch(t)&&!isAutoTouch(t));
+  const stand=(r.lastSummary||'').trim()?'<div style="font-size:12px;margin-bottom:9px;padding:6px 8px;background:#F4F5F9;border-radius:4px"><b>Status'+(r.lastSummaryDate?' '+fmtD(r.lastSummaryDate):'')+':</b> '+esc(fixUml(r.lastSummary.trim()))+'</div>':'';
+  if(!ts.length&&(stand||cals.length))return '<div class="pbox"><h4>Where we left things</h4>'+stand+calLine(cals)+elsewhereHtml(r)+'</div>';
   if(!ts.length){const e=elsewhereHtml(r);return e?'<div class="pbox"><h4>Where we left things</h4><div style="font-size:12px">No exchange with this person yet.</div>'+e+'</div>':''}
   const newest=ts[0];
   // "Kein offener Punkt: ..." is context, not a step of Leif's
@@ -405,7 +419,7 @@ export function wrapUpHtml(r){
   const blk=t=>!t?'':'<div style="margin-bottom:9px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">'+dirWord(t)+' &middot; '+fmtD(t.date)+' &middot; '+fmtAgo(t.date)+(isCallTouch(t)?'':' &middot; '+esc(srcLabel(t)))+(t.who?' &middot; '+esc(fixUml(t.who)):'')+'</div><b style="font-size:12px">'+linkWrap(t,esc(fixUml(subjOf(t)||'(no subject)')))+(t.link?' <span class="muted">&#8599;</span>':'')+'</b>'+((t.prev||t.note)?'<div class="tnote" style="margin-top:4px">'+esc(cut(fixUml(cleanPrev(t.prev||t.note,1200)),1200))+'</div>':'')+'</div>';
   const older=ts.slice(2,6);
   return '<div class="pbox" style="border-left:3px solid '+(!isCallTouch(newest)&&newest.dir==='in'?'#C6943E':'#2E3C65')+'">'+
-    '<h4>Where we left things</h4>'+
+    '<h4>Where we left things</h4>'+stand+calLine(cals)+
     '<div style="font-size:12px;font-weight:bold;margin-bottom:9px">'+ball+'</div>'+
     blk(ts[0])+blk(ts[1])+
     (older.length?'<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--lgray)"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#595959">Earlier in this thread</div>'+older.map(t=>'<div style="font-size:11px;margin-top:5px">'+fmtD(t.date)+' <span class="muted">'+(isCallTouch(t)?srcLabel(t).toLowerCase():(t.dir==='out'?'sent':'received')+' &middot; '+esc(srcLabel(t)))+'</span> <b>'+linkWrap(t,esc(fixUml(subjOf(t))))+'</b>'+(t.prev?'<div class="tnote" style="margin-top:2px">'+esc(cut(fixUml(cleanPrev(t.prev,400)),400))+'</div>':'')+'</div>').join('')+'</div>':'')+elsewhereHtml(r)+
