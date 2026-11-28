@@ -63,7 +63,8 @@ function whoOf(t,u){
 export function replyOwedItems(){
   const out=[];
   units().forEach(u=>{
-    const t=lastReal(u);if(!t||t.dir!=='in'||tType(t)!=='Email')return;
+    // a mail the daily run has read and found to need no answer (thanks, confirmation; Leif 28.11.2026, Board Advisors)
+    const t=lastReal(u);if(!t||t.dir!=='in'||tType(t)!=='Email'||t.noReply)return;
     const d=(t.date||'').slice(0,10);if(!d||daysAgo(d)>REPLY_DAYS||hasPlan(u,d))return;
     if(answeredElsewhere(u,t,'out'))return;
     const key='reply_'+u.id+'_'+d;

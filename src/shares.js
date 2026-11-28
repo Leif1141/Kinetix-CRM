@@ -14,8 +14,14 @@ import {searchHay} from './views/search.js';
 export function shareTokens(c){
   // distinctive tokens of a company name, legal forms stripped, umlaut-blind
   const base=foldSearch(normName(dispName(c)));
-  const stop=new Set(['und','the','group','gruppe','deutschland','germany','technik','industrie','werke','sohn','sohne','co']);
-  return base.split(' ').filter(w=>w.length>=5&&!stop.has(w));
+  const stop=new Set(['und','the','group','gruppe','deutschland','germany','technik','industrie','werke','sohn','sohne','co','gmbh','kg','ag','mbh','und','der','die','das','fur','for','von']);
+  // (Leif 28.11.2026, METZ CONNECT) a name is matched by its distinctive words of 5+ letters; everyday words
+  // ("connect", "armaturen", "automation") are not distinctive. A name without such a word ("METZ CONNECT",
+  // "SN-Maschinenbau") only matches as the whole name in a row, so "Re: Connect" no longer counts as handing it over.
+  const generic=new Set(['connect','systems','system','technology','technologies','solutions','engineering','international','holding','service','services','products','components','electronic','electronics','elektronik','maschinenbau','metall','kunststoff','kunststofftechnik','automation','energy','partner','partners','capital','management','consulting','industries','tools','werkzeug','antriebstechnik','verbindungstechnik','armaturen','pumpen','hydraulik','pneumatik','dichtungen','sensorik','messtechnik','steuerung','anlagenbau','handel','vertrieb','produktion','fertigung','robotik','geraete','gerate','service','form','werner']);
+  const all=base.split(/[^a-z0-9]+/).filter(w=>w&&!stop.has(w)),long=all.filter(w=>w.length>=5&&!generic.has(w));
+  if(long.length)return long;
+  const ph=all.filter(w=>w.length>=2);if(ph.length<2)return [];ph.phrase=true;return ph;
 }
 export let _shareIdx=null;
 export function invalidateShares(){_shareIdx=null}
@@ -33,7 +39,7 @@ export function shareIndex(){
       const wl=hay.split(/[^a-z0-9]+/),words=new Set(wl);
       const hit=k=>words.has(k)||(k.length>=6&&wl.some(w=>w.length<=k.length+2&&w.startsWith(k)));
       cos.forEach(x=>{
-        if(!x.tok.every(hit))return;
+        if(x.tok.phrase?!wl.some((w,i)=>x.tok.every((k,j)=>wl[i+j]===k)):!x.tok.every(hit))return;
         (idx[x.c.id]=idx[x.c.id]||[]).push({recId:r.id,date:(t.date||'').slice(0,10),subject:t.subject||'',auto:true,link:t.link||''});
       });
     });

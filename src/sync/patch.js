@@ -135,7 +135,7 @@ export function applyPatchOps(ops){
       }else if(o.op==='setTouch'){
         // corrects a logged touch: call or in-person meeting, subject, summary (06.11.2026)
         const r=o.match&&o.match.id?findRec(o.match.id):patchFind(o.match),t=r&&o.key&&(r.touches||{})[o.key],f=o.fields||{};let hit=0;
-        if(t&&!isArchTarget(r)){['mode','subject','prev','who','link'].forEach(k=>{if(f[k]!=null&&t[k]!==f[k]){t[k]=f[k];hit++}})}
+        if(t&&!isArchTarget(r)){['mode','subject','prev','who','link','noReply'].forEach(k=>{if(f[k]!=null&&t[k]!==f[k]){t[k]=f[k];hit++}})}
         if(!r||!t)skip('no_match');else if(isArchTarget(r))skip('archived_target');else if(hit)made++;else skip('noop');
       }else if(o.op==='setTouchLink'){
         const r=patchFind(o.match);let hit=0;
