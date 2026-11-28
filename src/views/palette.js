@@ -1,5 +1,5 @@
 import {S, allRecs, addTouch, dispName, findRec, fixUml, lastTouch, rowLabel} from '../state.js';
-import {addDays, esc, fmtAgo, foldSearch, toast, today, uid, wordHas} from '../util.js';
+import {addDays, esc, fmtAgo, foldSearch, toast, today, uid, wordHas, termHas} from '../util.js';
 import {searchHay} from './search.js';
 import {openProfile} from './record.js';
 import {save} from '../store/firebase.js';
@@ -48,7 +48,7 @@ function search(q){
     const name=foldSearch(dispName(r)||'');
     let score=0;
     if(name===q)score=100;else if(name.startsWith(q))score=80;else if(wordHas(name,q))score=60;
-    else{const h=searchHay(r);if(terms.every(t=>wordHas(h,t)))score=terms.every(t=>wordHas(name,t))?50:20}
+    else{const h=searchHay(r);if(terms.every(t=>termHas(h,t)))score=terms.every(t=>termHas(name,t))?50:20}
     if(!score)return null;
     return {r,score:score+(lastTouch(r)?1:0)};
   }).filter(Boolean).sort((a,b)=>b.score-a.score||(lastTouch(b.r)||'').localeCompare(lastTouch(a.r)||''));

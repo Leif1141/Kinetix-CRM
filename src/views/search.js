@@ -1,5 +1,5 @@
 import {allRecs, dispName, fixUml, lastTouch, orgPeople, personOrg, rowLabel, primaryName} from '../state.js';
-import {esc, fmtAgo, foldSearch, wordHas} from '../util.js';
+import {esc, fmtAgo, foldSearch, termHas} from '../util.js';
 
 export function searchHay(r){
   return foldSearch([dispName(r),r.name,r.firm,primaryName(r),r.email,r.domain,r.city,r.location,r.title,r.category,r.ptype,r.stage,r.status,(r.lists||[]).join(' '),r.description,(r.notes||'').slice(0,600)].filter(Boolean).join(' '));
@@ -11,7 +11,7 @@ export function renderGlobalSearch(){
   if(q.length<2){wrap.style.display='none';return}
   wrap.style.display='';
   const terms=q.split(' ').filter(Boolean);
-  const hitRecs=allRecs().filter(r=>{const h=searchHay(r);return terms.every(t=>wordHas(h,t))});
+  const hitRecs=allRecs().filter(r=>{const h=searchHay(r);return terms.every(t=>termHas(h,t))});
   // One row per organisation. A person who belongs to an org (linked or by firm name) is folded into that org's row,
   // even when only the person matched. People without any org record keep their own row.
   const rows={},order=[];
@@ -24,7 +24,9 @@ export function renderGlobalSearch(){
   const hits=order.map(k=>rows[k]);
   hits.forEach(x=>{if(x.r.kind!=='person'&&!x.people.length)x.people=orgPeople(x.r).slice(0,3)});
   const kindRank={target:0,advisor:1,person:2};
-  hits.sort((a,b)=>(kindRank[a.r.kind]-kindRank[b.r.kind])||((lastTouch(b.r)||'').localeCompare(lastTouch(a.r)||'')));
+  // a record whose own name carries every term comes first (Stadtsparkasse Düsseldorf before a target that mentions it)
+  const inName=x=>[x.r].concat(x.people).some(r=>terms.every(t=>termHas(foldSearch(dispName(r)||''),t)))?0:1;
+  hits.sort((a,b)=>(inName(a)-inName(b))||(kindRank[a.r.kind]-kindRank[b.r.kind])||((lastTouch(b.r)||'').localeCompare(lastTouch(a.r)||'')));
   document.getElementById('gCount').textContent=hits.length+' match'+(hits.length===1?'':'es');
   const kindLbl={target:'Target',advisor:'Organization',person:'Person'};
   document.getElementById('gSearchBody').innerHTML=hits.length
